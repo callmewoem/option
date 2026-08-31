@@ -88,6 +88,13 @@ installed (`compileSdk 35`, JDK 17). This repository ships its own Gradle wrappe
 > access to `dl.google.com` and `repo.maven.apache.org` is the first thing to do
 > after cloning.
 
+### CI
+
+`.github/workflows/android-build.yml` builds a debug APK on every push to `main`
+or a `claude/**` branch, and on every pull request into `main`. Grab the result
+from the run's **Artifacts** section (`habits-first-debug-apk`) — no signing
+config needed since it's a debug build.
+
 ## Known follow-ups
 
 - Wire real Health Connect reads for the steps/exercise habit types (the
