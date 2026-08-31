@@ -17,6 +17,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -68,13 +71,49 @@ fun AppPickerScreen(
                         singleLine = true,
                     )
                 }
+                item {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp),
+                    ) {
+                        AppSortMode.entries.forEachIndexed { index, mode ->
+                            SegmentedButton(
+                                selected = state.sortMode == mode,
+                                onClick = { viewModel.onSortModeChanged(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(index, AppSortMode.entries.size),
+                            ) {
+                                Text(mode.label)
+                            }
+                        }
+                    }
+                }
                 items(state.filteredApps, key = { it.packageName }) { app ->
                     val isBlocked = app.packageName in state.blockedPackageNames
+                    val usageMinutes = state.usageMinutesByPackage[app.packageName] ?: 0
                     ListItem(
                         headlineContent = { Text(app.label) },
-                        supportingContent = if (app.isSystemApp) {
-                            { Text("System app", style = MaterialTheme.typography.bodySmall) }
-                        } else null,
+                        supportingContent = {
+                            val label = when {
+                                state.sortMode == AppSortMode.MOST_USED && usageMinutes > 0 ->
+                                    "$usageMinutes min today"
+                                state.isRecommended(app) -> "Recommended"
+                                app.isSystemApp -> "System app"
+                                else -> null
+                            }
+                            if (label != null) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (state.isRecommended(app)) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        },
                         trailingContent = {
                             Switch(
                                 checked = isBlocked,
