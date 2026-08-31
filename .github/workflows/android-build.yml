@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: Assemble debug APK
+    name: Assemble APKs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,10 +35,49 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: habits-first-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      # Release signing needs four repo secrets (Settings > Secrets and variables >
+      # Actions): RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD,
+      # RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD. Skipped entirely (not failed) if
+      # they haven't been set up yet, so the debug build above still works either way.
+      - name: Check for release signing secrets
+        id: release_signing
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decode release keystore
+        if: steps.release_signing.outputs.configured == 'true'
+        run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Assemble release APK
+        if: steps.release_signing.outputs.configured == 'true'
+        env:
+          RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload release APK
+        if: steps.release_signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: habits-first-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Clean up decoded keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

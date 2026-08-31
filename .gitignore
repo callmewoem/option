@@ -15,6 +15,7 @@ app/build/
 # Log/OS
 *.log
 
-# Keystores (never commit signing keys)
+# Keystores and signing credentials (never commit these)
 *.jks
 *.keystore
+keystore.properties

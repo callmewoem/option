@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,24 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+// Release signing: never commit the actual keystore or its passwords.
+// - Locally: put them in a git-ignored `keystore.properties` file at the repo root
+//   (see keystore.properties.example).
+// - In CI: supply them as the RELEASE_KEYSTORE_PATH/RELEASE_KEYSTORE_PASSWORD/
+//   RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD environment variables (see
+//   .github/workflows/android-build.yml).
+// If neither is present, `signingConfigs.release`'s fields stay null and only
+// assembleRelease fails (with Gradle's own clear "signing config" error) --
+// assembleDebug and everyday development are unaffected.
+val keystoreProperties = Properties().apply {
+    val propertiesFile = rootProject.file("keystore.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use { load(it) }
+    }
+}
+fun signingProp(propertyName: String, envName: String): String? =
+    System.getenv(envName) ?: keystoreProperties.getProperty(propertyName)
 
 android {
     namespace = "com.habitsfirst.androidclone"
@@ -21,11 +41,21 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    signingConfigs {
+        create("release") {
+            signingProp("storeFile", "RELEASE_KEYSTORE_PATH")?.let { storeFile = file(it) }
+            storePassword = signingProp("storePassword", "RELEASE_KEYSTORE_PASSWORD")
+            keyAlias = signingProp("keyAlias", "RELEASE_KEY_ALIAS")
+            keyPassword = signingProp("keyPassword", "RELEASE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false

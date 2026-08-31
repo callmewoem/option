@@ -79,21 +79,46 @@ installed (`compileSdk 35`, JDK 17). This repository ships its own Gradle wrappe
 ./gradlew assembleDebug
 ```
 
-> **Note on this repo's build environment:** the sandbox this project was authored
-> in blocks network access to Google's Maven repository (`dl.google.com`), which is
-> where the Android Gradle Plugin and all AndroidX/Compose/Room/Hilt artifacts are
-> hosted — so the build could not be run end-to-end here. The Gradle wrapper,
-> version catalog, and every source file were written and reviewed by hand against
-> the documented APIs; running `./gradlew assembleDebug` on a normal machine with
-> access to `dl.google.com` and `repo.maven.apache.org` is the first thing to do
-> after cloning.
+> **Note on this repo's build environment:** the sandbox this project was originally
+> authored in blocks network access to Google's Maven repository (`dl.google.com`),
+> so the build couldn't be run end-to-end there — CI (see below) is what actually
+> compiles it and is the source of truth for build health.
 
 ### CI
 
-`.github/workflows/android-build.yml` builds a debug APK on every push to `main`
+`.github/workflows/android-build.yml` builds a **debug APK** on every push to `main`
 or a `claude/**` branch, and on every pull request into `main`. Grab the result
 from the run's **Artifacts** section (`habits-first-debug-apk`) — no signing
 config needed since it's a debug build.
+
+### Release signing
+
+`assembleRelease` produces a signed, minified release APK, both locally and in CI,
+once a signing key is set up:
+
+1. Generate a keystore (or use one you already have):
+   ```bash
+   keytool -genkeypair -v -keystore habitsfirst-release.jks -alias habitsfirst \
+     -keyalg RSA -keysize 2048 -validity 10950
+   ```
+2. **Local builds:** copy `keystore.properties.example` to `keystore.properties`
+   (git-ignored) at the repo root and fill in the real `storeFile`/passwords/alias.
+3. **CI:** add four repository secrets under Settings → Secrets and variables →
+   Actions:
+   - `RELEASE_KEYSTORE_BASE64` — the keystore file, base64-encoded
+     (`base64 -w0 habitsfirst-release.jks`)
+   - `RELEASE_KEYSTORE_PASSWORD`
+   - `RELEASE_KEY_ALIAS`
+   - `RELEASE_KEY_PASSWORD`
+
+   The workflow skips the release build/upload entirely (debug still runs) until
+   these are set. Once they are, every run also uploads a
+   `habits-first-release-apk` artifact.
+
+**Keep the keystore and its passwords somewhere safe outside this repo** (a
+password manager, a secrets vault) — losing it means you can never publish an
+update to the same Play Store listing again, and it must never be committed
+(`.gitignore` already excludes `*.jks`, `*.keystore`, and `keystore.properties`).
 
 ## Known follow-ups
 
