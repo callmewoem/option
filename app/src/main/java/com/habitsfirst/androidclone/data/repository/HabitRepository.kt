@@ -11,8 +11,10 @@ import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.util.DateProvider
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.ZoneId
@@ -26,6 +28,14 @@ import javax.inject.Singleton
  * count, since a completion row there means a slip, not a done day.
  */
 data class HabitCompletionStat(val habit: Habit, val rate: Float)
+
+/** Where an onboarding "ease into it" ramp currently stands -- see [Habit.easeInOrder]. */
+data class EaseInStatus(
+    val activeHabitName: String,
+    val activeHabitStreak: Int,
+    val requiredStreak: Int,
+    val nextHabitName: String,
+)
 
 @Singleton
 class HabitRepository @Inject constructor(
@@ -44,28 +54,37 @@ class HabitRepository @Inject constructor(
     /** Today's GATING habits paired with today's progress, in display order -- what Home and the block screen show. */
     fun observeTodayProgress(): Flow<List<HabitProgress>> = observeTodayProgressByKind(HabitKind.GATING)
 
-    fun observeTodayProgressByKind(kind: HabitKind): Flow<List<HabitProgress>> {
-        val today = DateProvider.todayString()
-        return combine(
-            habitDao.observeActiveHabitsByKind(kind.name),
-            completionDao.observeCompletionsForDate(today),
-        ) { habits, completions ->
-            val byHabitId = completions.associateBy { it.habitId }
-            habits.map { habitEntity ->
-                val habit = habitEntity.toDomain()
-                val completion = byHabitId[habitEntity.id]
-                HabitProgress(
-                    habit = habit,
-                    currentValue = completion?.currentValue ?: 0,
-                    isCompleted = completion?.isCompleted ?: false,
-                )
+    // Re-derives "today" on every emission from currentDateFlow() rather than
+    // capturing it once -- see that function's doc for why. Both of these Flows are
+    // typically held for a whole ViewModel's lifetime (Home, the block gate), so
+    // without this they'd go stale the first time someone leaves the screen open
+    // across midnight.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeTodayProgressByKind(kind: HabitKind): Flow<List<HabitProgress>> =
+        DateProvider.currentDateFlow().flatMapLatest { today ->
+            combine(
+                habitDao.observeActiveHabitsByKind(kind.name),
+                completionDao.observeCompletionsForDate(today),
+            ) { habits, completions ->
+                val byHabitId = completions.associateBy { it.habitId }
+                habits.map { habitEntity ->
+                    val habit = habitEntity.toDomain()
+                    val completion = byHabitId[habitEntity.id]
+                    HabitProgress(
+                        habit = habit,
+                        currentValue = completion?.currentValue ?: 0,
+                        isCompleted = completion?.isCompleted ?: false,
+                    )
+                }
             }
         }
-    }
 
     /** Emits true once every active GATING habit has a completed entry for today. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun observeAllHabitsCompletedToday(): Flow<Boolean> =
-        habitDao.observeIncompleteHabitCountForDate(DateProvider.todayString()).map { it == 0 }
+        DateProvider.currentDateFlow().flatMapLatest { today ->
+            habitDao.observeIncompleteHabitCountForDate(today).map { it == 0 }
+        }
 
     /** One-shot check used by the accessibility service before it locks the screen. */
     suspend fun areAllHabitsCompletedForDate(date: String = DateProvider.todayString()): Boolean =
@@ -188,6 +207,57 @@ class HabitRepository @Inject constructor(
      */
     suspend fun getCompletedDatesForHabit(habitId: Long, startDate: String, endDate: String): Set<String> =
         completionDao.getCompletedDatesForHabit(habitId, startDate, endDate).toSet()
+
+    // -- Onboarding "ease into it" ramp (see Habit.easeInOrder / EaseInRepository) -------
+
+    /** Active habits chosen together at onboarding to ease in, easiest (order 0) first. */
+    suspend fun getEaseInHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.easeInOrder != null }
+            .sortedBy { it.easeInOrder }
+
+    suspend fun promoteHabitToGating(habitId: Long) {
+        val habit = habitDao.getById(habitId)?.toDomain() ?: return
+        habitDao.update(habit.copy(kind = HabitKind.GATING).toEntity())
+    }
+
+    /**
+     * Current unbroken streak of completed days for a single habit, ending today or
+     * yesterday (an in-progress today doesn't break yesterday's streak) -- the ease-in
+     * ramp's graduation signal, as opposed to [computeCurrentStreak]'s all-gating-habits
+     * version.
+     */
+    suspend fun computeHabitStreak(habitId: Long, lookbackDays: Int): Int {
+        val today = DateProvider.fromDateString(DateProvider.todayString())
+        val windowStart = today.minusDays(lookbackDays.toLong() + 1)
+        val completedDates = getCompletedDatesForHabit(habitId, DateProvider.toDateString(windowStart), DateProvider.toDateString(today))
+
+        var streak = 0
+        var cursor = today
+        if (DateProvider.toDateString(cursor) !in completedDates) cursor = cursor.minusDays(1)
+        while (DateProvider.toDateString(cursor) in completedDates) {
+            streak++
+            cursor = cursor.minusDays(1)
+        }
+        return streak
+    }
+
+    /**
+     * Null once there's no ease-in ramp in progress (none was started, or every chosen
+     * habit has already graduated to GATING).
+     */
+    suspend fun getEaseInStatus(requiredStreak: Int): EaseInStatus? {
+        val easeInHabits = getEaseInHabitsOnce()
+        val activeGate = easeInHabits.filter { it.kind == HabitKind.GATING }.maxByOrNull { it.easeInOrder!! } ?: return null
+        val next = easeInHabits.getOrNull(easeInHabits.indexOf(activeGate) + 1) ?: return null
+        return EaseInStatus(
+            activeHabitName = activeGate.name,
+            activeHabitStreak = computeHabitStreak(activeGate.id, requiredStreak),
+            requiredStreak = requiredStreak,
+            nextHabitName = next.name,
+        )
+    }
 
     /** Current unbroken streak of days where every active GATING habit was completed, ending today or yesterday. */
     suspend fun computeCurrentStreak(): Int {

@@ -42,6 +42,7 @@ class PreferencesRepository @Inject constructor(
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
         val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
+        val EASE_IN_STREAK_LENGTH = intPreferencesKey("ease_in_streak_length")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -225,7 +226,18 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
+    // -- Onboarding "ease into it" ramp ------------------------------------------------
+
+    /** Consecutive completed days required before the ramp's next habit is promoted to GATING. */
+    val easeInStreakLength: Flow<Int> =
+        dataStore.data.map { it[Keys.EASE_IN_STREAK_LENGTH] ?: DEFAULT_EASE_IN_STREAK_LENGTH }
+
+    suspend fun setEaseInStreakLength(days: Int) {
+        dataStore.edit { it[Keys.EASE_IN_STREAK_LENGTH] = days.coerceIn(1, 30) }
+    }
+
     companion object {
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
+        const val DEFAULT_EASE_IN_STREAK_LENGTH = 5
     }
 }

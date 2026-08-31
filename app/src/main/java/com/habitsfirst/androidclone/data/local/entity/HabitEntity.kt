@@ -20,6 +20,7 @@ data class HabitEntity(
     val isArchived: Boolean = false,
     val kind: String = HabitKind.GATING.name,
     val expiresAfterDate: String? = null,
+    val easeInOrder: Int? = null,
 )
 
 fun HabitEntity.toDomain(): Habit = Habit(
@@ -33,6 +34,7 @@ fun HabitEntity.toDomain(): Habit = Habit(
     createdAtEpochMillis = createdAtEpochMillis,
     kind = runCatching { HabitKind.valueOf(kind) }.getOrDefault(HabitKind.GATING),
     expiresAfterDate = expiresAfterDate,
+    easeInOrder = easeInOrder,
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -47,4 +49,5 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     isArchived = isArchived,
     kind = kind.name,
     expiresAfterDate = expiresAfterDate,
+    easeInOrder = easeInOrder,
 )

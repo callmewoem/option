@@ -7,6 +7,7 @@ import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.service.WorkScheduler
@@ -39,12 +40,18 @@ val onboardingHabitTemplates = listOf(
 data class OnboardingUiState(
     val installedApps: List<InstalledApp> = emptyList(),
     val selectedPackageNames: Set<String> = emptySet(),
-    val selectedTemplates: Set<HabitTemplate> = setOf(onboardingHabitTemplates[0], onboardingHabitTemplates[2]),
+    /**
+     * Selected habit templates, ordered easiest-first. With 2+ selected, this order
+     * becomes the "ease into it" ramp: only the first gates right away, and the rest
+     * are promoted one at a time as the current one becomes a consistent streak (see
+     * [com.habitsfirst.androidclone.data.repository.EaseInRepository]).
+     */
+    val selectedTemplateOrder: List<HabitTemplate> = listOf(onboardingHabitTemplates[0], onboardingHabitTemplates[2]),
     val isFinishing: Boolean = false,
     val finished: Boolean = false,
 ) {
     val canContinueFromApps: Boolean get() = true // blocking zero apps is a valid (if pointless) choice
-    val canContinueFromHabits: Boolean get() = selectedTemplates.isNotEmpty()
+    val canContinueFromHabits: Boolean get() = selectedTemplateOrder.isNotEmpty()
 
     fun isRecommended(app: InstalledApp): Boolean = RecommendedApps.isRecommended(app.packageName)
 }
@@ -80,11 +87,26 @@ class OnboardingViewModel @Inject constructor(
         )
     }
 
+    /** A newly-checked template joins the end of the order (hardest, until reordered). */
     fun onTemplateToggled(template: HabitTemplate, selected: Boolean) {
-        val current = _uiState.value.selectedTemplates
-        _uiState.value = _uiState.value.copy(
-            selectedTemplates = if (selected) current + template else current - template,
-        )
+        val current = _uiState.value.selectedTemplateOrder
+        val updated = when {
+            selected && template !in current -> current + template
+            !selected -> current - template
+            else -> current
+        }
+        _uiState.value = _uiState.value.copy(selectedTemplateOrder = updated)
+    }
+
+    /** Moves [template] one spot easier (delta = -1) or harder (delta = +1) in the ease-in order. */
+    fun onTemplateReordered(template: HabitTemplate, delta: Int) {
+        val current = _uiState.value.selectedTemplateOrder.toMutableList()
+        val index = current.indexOf(template)
+        if (index < 0) return
+        val target = (index + delta).coerceIn(0, current.lastIndex)
+        if (target == index) return
+        current.add(target, current.removeAt(index))
+        _uiState.value = _uiState.value.copy(selectedTemplateOrder = current)
     }
 
     fun finishOnboarding() {
@@ -97,11 +119,24 @@ class OnboardingViewModel @Inject constructor(
                 val label = appsByPackage[packageName]?.label ?: packageName
                 blockedAppRepository.setBlocked(packageName, label, blocked = true)
             }
-            state.selectedTemplates.forEach { template ->
+
+            // One habit has nothing to ease into -- it just gates immediately, same as
+            // before. Two or more ramp in by the chosen order: only the easiest gates
+            // right away, the rest start TRACKED and are promoted one at a time.
+            val templates = state.selectedTemplateOrder
+            val isRamp = templates.size > 1
+            templates.forEachIndexed { index, template ->
                 habitRepository.saveHabit(
-                    Habit(name = template.name, type = template.type, targetValue = template.targetValue),
+                    Habit(
+                        name = template.name,
+                        type = template.type,
+                        targetValue = template.targetValue,
+                        kind = if (!isRamp || index == 0) HabitKind.GATING else HabitKind.TRACKED,
+                        easeInOrder = if (isRamp) index else null,
+                    ),
                 )
             }
+
             preferencesRepository.setOnboardingComplete(true)
             WorkScheduler.scheduleUsageTracking(appContext)
             WorkScheduler.scheduleMorningTodoReminder(appContext)

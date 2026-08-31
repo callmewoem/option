@@ -62,7 +62,12 @@ class HabitsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HabitsUiState())
 
     init {
-        refreshStats()
+        // Re-runs whenever the calendar date actually changes, not just once at
+        // startup -- otherwise this screen left open across midnight would keep
+        // showing the window as it stood the moment it was opened.
+        viewModelScope.launch {
+            DateProvider.currentDateFlow().collect { refreshStats() }
+        }
     }
 
     fun refreshStats() {

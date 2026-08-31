@@ -21,11 +21,12 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
         StreakScarEntity::class,
         TodoEntity::class,
     ],
-    // v2: added HabitEntity.kind/expiresAfterDate, streak_scars, todos. No migration is
-    // written since the app hasn't shipped yet -- provideDatabase() in di/AppModule.kt
-    // uses fallbackToDestructiveMigration(), which is fine pre-release but must be
-    // replaced with a real Migration before this ships with real user data on device.
-    version = 2,
+    // v2: added HabitEntity.kind/expiresAfterDate, streak_scars, todos.
+    // v3: added HabitEntity.easeInOrder (onboarding "ease into it" ramp).
+    // No migration is written since the app hasn't shipped yet -- provideDatabase() in
+    // di/AppModule.kt uses fallbackToDestructiveMigration(), which is fine pre-release
+    // but must be replaced with a real Migration before this ships with real user data.
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

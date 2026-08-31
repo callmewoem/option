@@ -17,7 +17,12 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 
 1. **Onboarding** -- pick which installed apps to lock, pick a few starter habits
    (steps, exercise, meditation, or a plain custom check-in), and grant three
-   special permissions.
+   special permissions. Picking 2+ habits also asks you to rank them easiest-first
+   ("ease into it"): only the easiest gates your apps right away, and each one
+   after it is promoted from tracked-only to gating automatically once the habit
+   before it has been a consistent streak for a configurable number of days
+   (`EaseInRepository`, checked on the same periodic worker as usage tracking).
+   Home surfaces the ramp's progress with a small banner while it's in flight.
 2. **Home** -- shows today's gating habits with live progress, your current streak,
    and how many apps are locked right now.
 3. **The lock** -- an `AccessibilityService` watches for foreground-app changes.

@@ -3,9 +3,11 @@ package com.habitsfirst.androidclone.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
+import com.habitsfirst.androidclone.data.repository.EaseInStatus
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.TodoRepository
 import com.habitsfirst.androidclone.domain.model.BlockedApp
 import com.habitsfirst.androidclone.domain.model.HabitKind
@@ -34,6 +36,7 @@ data class HomeUiState(
     val todos: List<Todo> = emptyList(),
     val blockedApps: List<BlockedApp> = emptyList(),
     val streakDays: Int = 0,
+    val easeInStatus: EaseInStatus? = null,
 ) {
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
@@ -48,6 +51,7 @@ class HomeViewModel @Inject constructor(
     private val lootboxRepository: LootboxRepository,
     private val penaltyRepository: PenaltyRepository,
     private val todoRepository: TodoRepository,
+    private val preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     /** Bumped whenever a completion changes, so the streak (which needs a DB round trip) recomputes. */
@@ -68,8 +72,9 @@ class HomeViewModel @Inject constructor(
         kindsFlow,
         blockedAppRepository.observeBlockedApps(),
         streakRefreshTrigger,
-        todoRepository.observeForDate(),
-    ) { (gating, tracked, antihabits), blockedApps, _, todos ->
+        todoRepository.observeForToday(),
+        preferencesRepository.easeInStreakLength,
+    ) { (gating, tracked, antihabits), blockedApps, _, todos, easeInStreakLength ->
         HomeUiState(
             isLoading = false,
             gating = gating,
@@ -78,6 +83,7 @@ class HomeViewModel @Inject constructor(
             todos = todos,
             blockedApps = blockedApps,
             streakDays = habitRepository.computeCurrentStreak(),
+            easeInStatus = habitRepository.getEaseInStatus(easeInStreakLength),
         )
     }.stateIn(
         scope = viewModelScope,

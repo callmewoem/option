@@ -17,6 +17,13 @@ data class Habit(
     val kind: HabitKind = HabitKind.GATING,
     /** If set, this habit auto-archives once the date has passed -- used for makeup habits. */
     val expiresAfterDate: String? = null,
+    /**
+     * Position (0 = easiest) in an onboarding "ease-in" ramp, null if this habit isn't
+     * part of one. Habits with a non-null order were chosen together at onboarding and
+     * ranked by difficulty; only the lowest-order one starts GATING, the rest start
+     * TRACKED and are promoted one at a time by [com.habitsfirst.androidclone.data.repository.EaseInRepository].
+     */
+    val easeInOrder: Int? = null,
 ) {
     val displayTarget: String
         get() = if (type == HabitType.CUSTOM) "" else "$targetValue ${type.unit}"

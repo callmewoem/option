@@ -216,6 +216,31 @@ fun SettingsScreen(
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
+            item { SectionHeader("Ease into it") }
+            item {
+                Text(
+                    "How many consistent days before onboarding's next habit unlocks",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(3, 5, 7).forEach { days ->
+                        FilterChip(
+                            selected = state.easeInStreakLength == days,
+                            onClick = { viewModel.onEaseInStreakLengthChanged(days) },
+                            label = { Text("$days days") },
+                        )
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+            }
+
             item { SectionHeader(stringResource(R.string.settings_permissions)) }
             item {
                 PermissionRow(

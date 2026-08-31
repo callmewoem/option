@@ -30,6 +30,7 @@ data class SettingsUiState(
     val morningReminderEnabled: Boolean = true,
     val morningReminderTime: String = "08:00",
     val hardModeEnabled: Boolean = false,
+    val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
 )
 
 private data class ThemeAndTokens(
@@ -74,8 +75,8 @@ class SettingsViewModel @Inject constructor(
         preferencesRepository.areNotificationsEnabled,
         themeAndTokens,
         reminderSettings,
-        preferencesRepository.isHardModeEnabled,
-    ) { habits, notificationsEnabled, tt, rs, hardMode ->
+        combine(preferencesRepository.isHardModeEnabled, preferencesRepository.easeInStreakLength, ::Pair),
+    ) { habits, notificationsEnabled, tt, rs, (hardMode, easeInStreakLength) ->
         SettingsUiState(
             habits = habits,
             notificationsEnabled = notificationsEnabled,
@@ -89,6 +90,7 @@ class SettingsViewModel @Inject constructor(
             morningReminderEnabled = rs.morning.enabled,
             morningReminderTime = rs.morning.time,
             hardModeEnabled = hardMode,
+            easeInStreakLength = easeInStreakLength,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -115,6 +117,10 @@ class SettingsViewModel @Inject constructor(
     /** Enabling grants a batch of grace tokens to ease into it (see [PreferencesRepository.setHardModeEnabled]). */
     fun onHardModeToggled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
+    }
+
+    fun onEaseInStreakLengthChanged(days: Int) {
+        viewModelScope.launch { preferencesRepository.setEaseInStreakLength(days) }
     }
 
     /** Consumes a task-skip token to force-complete [habitId] today without doing it. */

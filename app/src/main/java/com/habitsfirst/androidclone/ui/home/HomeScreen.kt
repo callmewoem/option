@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -49,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.data.repository.EaseInStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
@@ -126,6 +128,10 @@ fun HomeScreen(
                     lockedAppCount = state.blockedApps.count { it.isEnabled },
                     allDone = state.allDone,
                 )
+            }
+
+            state.easeInStatus?.let { status ->
+                item { EaseInBanner(status) }
             }
 
             item {
@@ -232,6 +238,33 @@ private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
                 modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EaseInBanner(status: EaseInStatus) {
+    val remaining = (status.requiredStreak - status.activeHabitStreak).coerceAtLeast(0)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Filled.Spa, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            val dayWord = if (remaining == 1) "day" else "days"
+            Text(
+                text = "$remaining more $dayWord on \"${status.activeHabitName}\" unlocks \"${status.nextHabitName}\"",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
     }
