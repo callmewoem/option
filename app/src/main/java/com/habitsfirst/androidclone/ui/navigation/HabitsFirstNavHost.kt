@@ -26,7 +26,6 @@ import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickHabitsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
-import com.habitsfirst.androidclone.ui.todos.TodosScreen
 
 @Composable
 fun HabitsFirstNavHost() {
@@ -92,14 +91,7 @@ fun HabitsFirstNavHost() {
             HabitsScreen(
                 navController = navController,
                 onAddHabit = { kind -> navController.navigate(Screen.AddHabit.createRoute(kind)) },
-                onOpenHabit = { habitId -> navController.navigate(Screen.MeditationTimer.createRoute(habitId)) },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) },
-            )
-        }
-
-        composable(Screen.Todos.route) {
-            TodosScreen(
-                navController = navController,
+                onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
             )
         }

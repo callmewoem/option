@@ -27,13 +27,18 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
    is what every Play Store app-blocker uses. An app is allowed to be open once
    today's gating habits are done, no active penalty lock is running, and (unless
    it's bedtime, which no token bypasses) you haven't redeemed a grace token.
-4. **Habit kinds** (`Habits` tab) -- every habit is one of three kinds:
-   - *Gating* -- must be done today or your locked apps stay locked (the default,
-     and the only kind Home shows).
+4. **Habit kinds** -- every habit is one of three kinds:
+   - *Gating* -- must be done today or your locked apps stay locked (the default).
    - *Tracked* -- logged and shown on the heatmap, never blocks anything.
    - *Antihabit* -- silence is success. A day you don't log it is a clean day
      (green); logging it records a slip (red) and immediately extends the block
      lock via `PenaltyRepository`.
+
+   `Home` is where you do all of the above -- every kind, plus today's todos,
+   completable inline so there's no reason to leave it. `Habits` is read-only
+   progress and management: the heatmap plus every habit grouped by kind, each
+   card colored by kind and tapped to edit (never to complete) -- one consistent
+   tap behavior instead of a different action per habit type.
 5. **Habit types** (independent of kind, above):
    - *Walk N steps* / *Exercise N minutes* -- logged manually from Home (a
      Health Connect-ready target package is already declared, so real step/workout
@@ -61,9 +66,10 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
    today's heatmap cell (uncommon), a new theme accent unlock (uncommon), or a
    task-skip token (rare -- force-completes one gating habit for the day, redeemed
    from Settings).
-10. **Todos** tab -- plain non-repeating one-off tasks for today, separate from
-    habits. A periodic worker posts a reminder to fill them in once it's near your
-    configured morning time (a ~15-minute-cadence check, not an exact alarm).
+10. **Todos** -- plain non-repeating one-off tasks for today, added and checked off
+    inline on Home (there's no separate Todos tab). A periodic worker posts a
+    reminder to fill them in once it's near your configured morning time (a
+    ~15-minute-cadence check, not an exact alarm).
 11. Progress resets automatically at midnight because completion is stored keyed by
     calendar date, not as a flag that has to be cleared.
 

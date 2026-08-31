@@ -3,12 +3,9 @@ package com.habitsfirst.androidclone.ui.habits
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.HabitRepository
-import com.habitsfirst.androidclone.data.repository.LootboxRepository
-import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
-import com.habitsfirst.androidclone.domain.model.LootboxReward
 import com.habitsfirst.androidclone.util.DateProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,17 +27,18 @@ data class HabitsUiState(
     val goldStarDates: Set<LocalDate> = emptySet(),
 )
 
+/**
+ * Read-only: progress today (for the accent on each card) plus the heatmap. Doing a
+ * habit happens on Home; this screen is for reviewing and managing the list, so tapping
+ * a card here always opens it for editing -- see [HabitsScreen].
+ */
 @HiltViewModel
 class HabitsViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
-    private val penaltyRepository: PenaltyRepository,
     private val preferencesRepository: PreferencesRepository,
-    private val lootboxRepository: LootboxRepository,
 ) : ViewModel() {
 
     private val dayScores = MutableStateFlow<Map<LocalDate, Float>>(emptyMap())
-    private val _wonReward = MutableStateFlow<LootboxReward?>(null)
-    val wonReward: StateFlow<LootboxReward?> = _wonReward
 
     val uiState: StateFlow<HabitsUiState> = combine(
         habitRepository.observeTodayProgressByKind(HabitKind.GATING),
@@ -69,45 +67,6 @@ class HabitsViewModel @Inject constructor(
             val start = DateProvider.toDateString(DateProvider.fromDateString(end).minusWeeks(HEATMAP_WEEKS))
             dayScores.value = habitRepository.getDayScoresInRange(start, end)
                 .mapKeys { DateProvider.fromDateString(it.key) }
-        }
-    }
-
-    fun onLogProgress(habitId: Long, target: Int, newValue: Int) {
-        viewModelScope.launch {
-            habitRepository.setProgress(habitId, newValue, target)
-            refreshHeatmap()
-            maybeAwardLootbox()
-        }
-    }
-
-    fun onCustomHabitToggled(habitId: Long, done: Boolean) {
-        viewModelScope.launch {
-            habitRepository.setCustomHabitDone(habitId, done)
-            refreshHeatmap()
-            maybeAwardLootbox()
-        }
-    }
-
-    fun onRewardDismissed() {
-        _wonReward.value = null
-    }
-
-    /**
-     * Habits can be completed from either Home or this screen, so both view models
-     * check for a lootbox award; harmless to call after a TRACKED-habit change too,
-     * since eligibility only ever depends on GATING habits.
-     */
-    private suspend fun maybeAwardLootbox() {
-        val allComplete = habitRepository.areAllHabitsCompletedForDate()
-        val reward = lootboxRepository.maybeAwardDailyLootbox(allComplete)
-        if (reward != null) _wonReward.value = reward
-    }
-
-    fun onToggleAntihabitSlip(habitId: Long, habitName: String, logged: Boolean) {
-        viewModelScope.launch {
-            habitRepository.setAntihabitSlipLogged(habitId, logged)
-            if (logged) penaltyRepository.applyAntihabitSlipPenalty(habitName)
-            refreshHeatmap()
         }
     }
 

@@ -12,7 +12,6 @@ sealed class Screen(val route: String) {
 
     data object Home : Screen("home")
     data object Habits : Screen("habits")
-    data object Todos : Screen("todos")
     data object AppPicker : Screen("app_picker")
     data object Settings : Screen("settings")
 

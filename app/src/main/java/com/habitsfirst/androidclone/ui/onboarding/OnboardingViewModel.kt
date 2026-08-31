@@ -12,6 +12,7 @@ import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.habit.defaultTarget
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
+import com.habitsfirst.androidclone.util.RecommendedApps
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,8 @@ data class OnboardingUiState(
 ) {
     val canContinueFromApps: Boolean get() = true // blocking zero apps is a valid (if pointless) choice
     val canContinueFromHabits: Boolean get() = selectedTemplates.isNotEmpty()
+
+    fun isRecommended(app: InstalledApp): Boolean = RecommendedApps.isRecommended(app.packageName)
 }
 
 @HiltViewModel
@@ -60,7 +63,12 @@ class OnboardingViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val apps = installedAppsProvider.getLaunchableApps()
+            // Same ordering as the app picker reached later from Settings -- recommended
+            // (commonly-blocked, attention-grabbing) apps float to the top.
+            val apps = installedAppsProvider.getLaunchableApps().sortedWith(
+                compareByDescending<InstalledApp> { RecommendedApps.isRecommended(it.packageName) }
+                    .thenBy { it.label.lowercase() },
+            )
             _uiState.value = _uiState.value.copy(installedApps = apps)
         }
     }

@@ -29,9 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,29 +37,28 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
-import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.components.Heatmap
 import com.habitsfirst.androidclone.ui.components.HabitCard
-import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
 import com.habitsfirst.androidclone.ui.components.accentColor
 import com.habitsfirst.androidclone.ui.components.heatmapFractionColor
-import com.habitsfirst.androidclone.ui.home.LogProgressDialog
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
-import com.habitsfirst.androidclone.ui.navigation.Screen
 import java.time.LocalDate
 
+/**
+ * Progress + management, not completion -- doing a habit happens on Home. Every card
+ * here opens it for editing, so there's exactly one tap behavior on this whole screen
+ * instead of a different action per habit type.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitsScreen(
     navController: NavController,
     onAddHabit: (HabitKind) -> Unit,
-    onOpenHabit: (Long) -> Unit,
+    onEditHabit: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: HabitsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
-    var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
 
     Scaffold(
         topBar = {
@@ -116,13 +112,7 @@ fun HabitsScreen(
                     title = "Gating",
                     habits = state.gating,
                     onAdd = { onAddHabit(HabitKind.GATING) },
-                    onClick = { progress ->
-                        when (progress.habit.type) {
-                            HabitType.CUSTOM -> viewModel.onCustomHabitToggled(progress.habit.id, !progress.isCompleted)
-                            HabitType.MEDITATION_MINUTES -> onOpenHabit(progress.habit.id)
-                            else -> progressDialogTarget = progress
-                        }
-                    },
+                    onClick = { progress -> onEditHabit(progress.habit.id) },
                 )
             }
 
@@ -132,13 +122,7 @@ fun HabitsScreen(
                     title = "Tracked",
                     habits = state.tracked,
                     onAdd = { onAddHabit(HabitKind.TRACKED) },
-                    onClick = { progress ->
-                        when (progress.habit.type) {
-                            HabitType.CUSTOM -> viewModel.onCustomHabitToggled(progress.habit.id, !progress.isCompleted)
-                            HabitType.MEDITATION_MINUTES -> onOpenHabit(progress.habit.id)
-                            else -> progressDialogTarget = progress
-                        }
-                    },
+                    onClick = { progress -> onEditHabit(progress.habit.id) },
                 )
             }
 
@@ -148,29 +132,12 @@ fun HabitsScreen(
                     title = "Antihabits",
                     habits = state.antihabits,
                     onAdd = { onAddHabit(HabitKind.ANTIHABIT) },
-                    onClick = { progress ->
-                        viewModel.onToggleAntihabitSlip(progress.habit.id, progress.habit.name, !progress.isCompleted)
-                    },
+                    onClick = { progress -> onEditHabit(progress.habit.id) },
                 )
             }
 
             item { Spacer(modifier = Modifier.height(4.dp)) }
         }
-    }
-
-    progressDialogTarget?.let { progress ->
-        LogProgressDialog(
-            progress = progress,
-            onDismiss = { progressDialogTarget = null },
-            onConfirm = { newValue ->
-                viewModel.onLogProgress(progress.habit.id, progress.habit.targetValue, newValue)
-                progressDialogTarget = null
-            },
-        )
-    }
-
-    wonReward?.let { reward ->
-        LootboxRewardDialog(reward = reward, onDismiss = viewModel::onRewardDismissed)
     }
 }
 

@@ -1,7 +1,6 @@
 package com.habitsfirst.androidclone.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
@@ -19,10 +18,9 @@ private data class BottomTab(val screen: Screen, val label: String, val icon: Im
 private val TABS = listOf(
     BottomTab(Screen.Home, "Home", Icons.Filled.Home),
     BottomTab(Screen.Habits, "Habits", Icons.Filled.Checklist),
-    BottomTab(Screen.Todos, "Todos", Icons.AutoMirrored.Filled.ListAlt),
 )
 
-/** Shared bottom nav for the app's three top-level destinations. */
+/** Shared bottom nav for the app's top-level destinations. */
 @Composable
 fun LockeBottomBar(navController: NavController) {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
