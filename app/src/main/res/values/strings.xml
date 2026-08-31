@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Habits First</string>
+    <string name="accessibility_service_description">Habits First uses this to notice when you open an app you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Do your habits.\nThen use your apps.</string>
+    <string name="onboarding_welcome_subtitle">Habits First locks the apps that distract you most and only unlocks them once you\'ve finished your habits for the day.</string>
+    <string name="onboarding_get_started">Get Started</string>
+    <string name="onboarding_pick_apps_title">What steals your time?</string>
+    <string name="onboarding_pick_apps_subtitle">Choose the apps you want locked until your habits are done.</string>
+    <string name="onboarding_pick_habits_title">What matters more?</string>
+    <string name="onboarding_pick_habits_subtitle">Pick the habits that unlock your apps. You can add more later.</string>
+    <string name="onboarding_permissions_title">Almost there</string>
+    <string name="onboarding_permissions_subtitle">Habits First needs a few permissions to lock apps and check your progress.</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_finish">Start locking in</string>
+
+    <!-- Permissions -->
+    <string name="permission_usage_access_title">Usage Access</string>
+    <string name="permission_usage_access_desc">Lets Habits First see which app is currently open, so it knows when to show the lock screen.</string>
+    <string name="permission_accessibility_title">Accessibility Service</string>
+    <string name="permission_accessibility_desc">Lets Habits First detect the moment you switch into a blocked app.</string>
+    <string name="permission_overlay_title">Display Over Other Apps</string>
+    <string name="permission_overlay_desc">Lets Habits First show the lock screen on top of a blocked app.</string>
+    <string name="permission_notifications_title">Notifications</string>
+    <string name="permission_notifications_desc">Reminds you about unfinished habits and streak milestones.</string>
+    <string name="permission_grant">Grant</string>
+    <string name="permission_granted">Granted</string>
+
+    <!-- Home -->
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_todays_habits">Today\'s habits</string>
+    <string name="home_blocked_apps">Locked apps</string>
+    <string name="home_all_done_title">All habits done!</string>
+    <string name="home_all_done_subtitle">Your apps are unlocked for the rest of the day.</string>
+    <string name="home_remaining_habits">%1$d of %2$d habits left</string>
+    <string name="home_streak_days">%1$d day streak</string>
+    <string name="home_add_habit">Add habit</string>
+    <string name="home_manage_apps">Manage locked apps</string>
+
+    <!-- Habit types -->
+    <string name="habit_type_steps">Walk steps</string>
+    <string name="habit_type_exercise">Exercise minutes</string>
+    <string name="habit_type_meditation">Meditate</string>
+    <string name="habit_type_app_usage">Use an app</string>
+    <string name="habit_type_custom">Custom check-in</string>
+
+    <!-- Block screen -->
+    <string name="block_title">%1$s is locked</string>
+    <string name="block_subtitle">Finish these habits to unlock it for the rest of today.</string>
+    <string name="block_go_home">Take a break</string>
+    <string name="block_open_habits">Open Habits First</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_habits">Habits</string>
+    <string name="settings_blocked_apps">Locked apps</string>
+    <string name="settings_permissions">Permissions</string>
+    <string name="settings_about">About</string>
+    <string name="settings_reset_streak_warning">Editing habits after today resets your current streak safeguard.</string>
+
+    <!-- Add/Edit Habit -->
+    <string name="add_habit_title">New habit</string>
+    <string name="edit_habit_title">Edit habit</string>
+    <string name="add_habit_choose_type">Choose a habit type</string>
+    <string name="add_habit_target_steps">Daily step goal</string>
+    <string name="add_habit_target_minutes">Target minutes</string>
+    <string name="add_habit_choose_app">Which app?</string>
+    <string name="add_habit_name">Habit name</string>
+    <string name="add_habit_save">Save habit</string>
+    <string name="add_habit_delete">Delete habit</string>
+
+    <!-- Meditation timer -->
+    <string name="timer_start">Start</string>
+    <string name="timer_pause">Pause</string>
+    <string name="timer_reset">Reset</string>
+    <string name="timer_complete">Mark complete</string>
+
+    <!-- Generic -->
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="done">Done</string>
+    <string name="back">Back</string>
+    <string name="mark_done">Mark as done</string>
+    <string name="completed">Completed</string>
+</resources>
