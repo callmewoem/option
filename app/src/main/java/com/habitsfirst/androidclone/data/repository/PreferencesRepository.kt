@@ -41,6 +41,7 @@ class PreferencesRepository @Inject constructor(
         val MORNING_TODO_REMINDER_ENABLED = booleanPreferencesKey("morning_todo_reminder_enabled")
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
+        val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -206,5 +207,25 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setLastMorningReminderSentDate(date: String) {
         dataStore.edit { it[Keys.LAST_MORNING_REMINDER_SENT_DATE] = date }
+    }
+
+    // -- Hard mode --------------------------------------------------------------------
+
+    /** Hard mode: gating habits and blocked apps can be added but never removed or loosened. */
+    val isHardModeEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.HARD_MODE_ENABLED] ?: false }
+
+    /** Turning hard mode on grants a one-time batch of grace tokens to ease into it; turning it back off doesn't claw them back. */
+    suspend fun setHardModeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            val wasEnabled = prefs[Keys.HARD_MODE_ENABLED] ?: false
+            prefs[Keys.HARD_MODE_ENABLED] = enabled
+            if (enabled && !wasEnabled) {
+                prefs[Keys.GRACE_TOKEN_COUNT] = (prefs[Keys.GRACE_TOKEN_COUNT] ?: 0) + HARD_MODE_ENTRY_GRACE_TOKENS
+            }
+        }
+    }
+
+    companion object {
+        const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
     }
 }

@@ -29,6 +29,7 @@ data class SettingsUiState(
     val bedtimeEnd: String = "06:30",
     val morningReminderEnabled: Boolean = true,
     val morningReminderTime: String = "08:00",
+    val hardModeEnabled: Boolean = false,
 )
 
 private data class ThemeAndTokens(
@@ -73,7 +74,8 @@ class SettingsViewModel @Inject constructor(
         preferencesRepository.areNotificationsEnabled,
         themeAndTokens,
         reminderSettings,
-    ) { habits, notificationsEnabled, tt, rs ->
+        preferencesRepository.isHardModeEnabled,
+    ) { habits, notificationsEnabled, tt, rs, hardMode ->
         SettingsUiState(
             habits = habits,
             notificationsEnabled = notificationsEnabled,
@@ -86,6 +88,7 @@ class SettingsViewModel @Inject constructor(
             bedtimeEnd = rs.bedtime.end,
             morningReminderEnabled = rs.morning.enabled,
             morningReminderTime = rs.morning.time,
+            hardModeEnabled = hardMode,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -107,6 +110,11 @@ class SettingsViewModel @Inject constructor(
 
     fun onMorningReminderChanged(enabled: Boolean, time: String) {
         viewModelScope.launch { preferencesRepository.setMorningTodoReminderSettings(enabled, time) }
+    }
+
+    /** Enabling grants a batch of grace tokens to ease into it (see [PreferencesRepository.setHardModeEnabled]). */
+    fun onHardModeToggled(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
     }
 
     /** Consumes a task-skip token to force-complete [habitId] today without doing it. */

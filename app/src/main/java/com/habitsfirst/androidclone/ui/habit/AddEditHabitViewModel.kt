@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.HabitRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
@@ -28,6 +29,8 @@ data class AddEditHabitUiState(
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
+    /** Hard mode: this is an existing gating habit, so it can't be deleted or downgraded. */
+    val isKindLocked: Boolean = false,
     val installedApps: List<InstalledApp> = emptyList(),
     val savedSuccessfully: Boolean = false,
 ) {
@@ -49,6 +52,7 @@ fun HabitType.defaultTarget(): Int = when (this) {
 class AddEditHabitViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val installedAppsProvider: InstalledAppsProvider,
+    private val preferencesRepository: PreferencesRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -70,7 +74,8 @@ class AddEditHabitViewModel @Inject constructor(
     init {
         if (habitId != 0L) {
             viewModelScope.launch {
-                habitRepository.getHabit(habitId)?.let { habit ->
+                val habit = habitRepository.getHabit(habitId)
+                if (habit != null) {
                     _uiState.value = _uiState.value.copy(
                         name = habit.name,
                         kind = habit.kind,
@@ -79,6 +84,14 @@ class AddEditHabitViewModel @Inject constructor(
                         targetPackageName = habit.targetPackageName,
                         targetAppLabel = habit.targetAppLabel,
                     )
+                }
+                // Hard mode only ever locks an *existing* gate -- a habit already
+                // created as GATING before or during hard mode. New habits and other
+                // kinds are never restricted.
+                if (habit?.kind == HabitKind.GATING) {
+                    preferencesRepository.isHardModeEnabled.collect { hardMode ->
+                        _uiState.value = _uiState.value.copy(canDelete = !hardMode, isKindLocked = hardMode)
+                    }
                 }
             }
         }
@@ -93,6 +106,7 @@ class AddEditHabitViewModel @Inject constructor(
     }
 
     fun onKindChanged(kind: HabitKind) {
+        if (_uiState.value.isKindLocked) return
         _uiState.value = _uiState.value.copy(kind = kind)
     }
 
@@ -134,7 +148,7 @@ class AddEditHabitViewModel @Inject constructor(
     }
 
     fun onDelete() {
-        if (habitId == 0L) return
+        if (habitId == 0L || !_uiState.value.canDelete) return
         viewModelScope.launch {
             habitRepository.deleteHabit(habitId)
             _uiState.value = _uiState.value.copy(savedSuccessfully = true)

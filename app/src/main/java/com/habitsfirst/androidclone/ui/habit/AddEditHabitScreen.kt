@@ -114,17 +114,17 @@ fun AddEditHabitScreen(
                     FilterChip(
                         selected = state.kind == kind,
                         onClick = { viewModel.onKindChanged(kind) },
+                        enabled = !state.isKindLocked,
                         label = { Text(kind.label) },
                     )
                 }
             }
             Text(
-                text = when (state.kind) {
-                    HabitKind.GATING -> "Must be completed today or your locked apps stay locked."
-                    HabitKind.TRACKED -> "Logged and shown on your heatmap -- never blocks anything."
-                    HabitKind.ANTIHABIT ->
-                        "Silence is success: a day you don't log this is a clean day. Logging it " +
-                            "records a slip and locks your apps a little longer."
+                text = when {
+                    state.isKindLocked -> "Locked by Hard Mode"
+                    state.kind == HabitKind.GATING -> "Gates your locked apps."
+                    state.kind == HabitKind.TRACKED -> "Tracked only, never blocks."
+                    else -> "Log only when you slip."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

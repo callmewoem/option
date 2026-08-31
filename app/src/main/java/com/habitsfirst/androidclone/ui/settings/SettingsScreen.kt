@@ -195,6 +195,27 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionHeader("Hard mode") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Hard mode") },
+                    supportingContent = {
+                        Text(
+                            if (state.hardModeEnabled) {
+                                "Gates and blocked apps can only be added, never removed."
+                            } else {
+                                "Locks in your gates and blocked apps. Grants 5 grace tokens."
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                    trailingContent = {
+                        Switch(checked = state.hardModeEnabled, onCheckedChange = viewModel::onHardModeToggled)
+                    },
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
             item { SectionHeader(stringResource(R.string.settings_permissions)) }
             item {
                 PermissionRow(

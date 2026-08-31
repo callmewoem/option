@@ -32,11 +32,11 @@
     <string name="home_greeting_morning">Good morning</string>
     <string name="home_greeting_afternoon">Good afternoon</string>
     <string name="home_greeting_evening">Good evening</string>
-    <string name="home_todays_habits">Today\'s habits</string>
+    <string name="home_todays_habits">Today</string>
     <string name="home_blocked_apps">Locked apps</string>
-    <string name="home_all_done_title">All habits done!</string>
-    <string name="home_all_done_subtitle">Your apps are unlocked for the rest of the day.</string>
-    <string name="home_remaining_habits">%1$d of %2$d habits left</string>
+    <string name="home_all_done_title">All done</string>
+    <string name="home_all_done_subtitle">Unlocked for today.</string>
+    <string name="home_remaining_habits">%1$d / %2$d left</string>
     <string name="home_streak_days">%1$d day streak</string>
     <string name="home_add_habit">Add habit</string>
     <string name="home_manage_apps">Manage locked apps</string>
@@ -84,7 +84,7 @@
 
     <!-- Todos -->
     <string name="todos_title">Todos</string>
-    <string name="todos_add_hint">Add a one-off task for today</string>
+    <string name="todos_add_hint">New task</string>
     <string name="morning_reminder_title">Plan your day</string>
     <string name="morning_reminder_body">Add today\'s one-off tasks before you get going.</string>
 

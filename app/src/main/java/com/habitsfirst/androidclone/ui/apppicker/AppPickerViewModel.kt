@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.ui.apppicker
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
 import com.habitsfirst.androidclone.util.RecommendedApps
@@ -28,6 +29,8 @@ data class AppPickerUiState(
     val query: String = "",
     val sortMode: AppSortMode = AppSortMode.RECOMMENDED,
     val usageMinutesByPackage: Map<String, Int> = emptyMap(),
+    /** Hard mode: an already-blocked app can't be unblocked, only new ones added. */
+    val isHardModeEnabled: Boolean = false,
 ) {
     val filteredApps: List<InstalledApp>
         get() {
@@ -49,6 +52,7 @@ data class AppPickerUiState(
 class AppPickerViewModel @Inject constructor(
     private val installedAppsProvider: InstalledAppsProvider,
     private val blockedAppRepository: BlockedAppRepository,
+    private val preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     private val allApps = MutableStateFlow<List<InstalledApp>>(emptyList())
@@ -58,13 +62,13 @@ class AppPickerViewModel @Inject constructor(
     private val isLoading = MutableStateFlow(true)
 
     val uiState: StateFlow<AppPickerUiState> = combine(
-        // Paired first since kotlinx.coroutines.flow.combine tops out at 5 flows.
+        // Paired up since kotlinx.coroutines.flow.combine tops out at 5 flows.
         combine(allApps, usageMinutes, ::Pair),
-        blockedAppRepository.observeEnabledPackageNames(),
+        combine(blockedAppRepository.observeEnabledPackageNames(), preferencesRepository.isHardModeEnabled, ::Pair),
         query,
         sortMode,
         isLoading,
-    ) { (apps, usage), blocked, q, sort, loading ->
+    ) { (apps, usage), (blocked, hardMode), q, sort, loading ->
         AppPickerUiState(
             isLoading = loading,
             apps = apps,
@@ -72,6 +76,7 @@ class AppPickerViewModel @Inject constructor(
             query = q,
             sortMode = sort,
             usageMinutesByPackage = usage,
+            isHardModeEnabled = hardMode,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPickerUiState())
 
@@ -94,6 +99,8 @@ class AppPickerViewModel @Inject constructor(
     }
 
     fun onToggleApp(app: InstalledApp, blocked: Boolean) {
+        // Hard mode: apps can be added to the block list but never removed from it.
+        if (!blocked && uiState.value.isHardModeEnabled) return
         viewModelScope.launch {
             blockedAppRepository.setBlocked(app.packageName, app.label, blocked)
         }

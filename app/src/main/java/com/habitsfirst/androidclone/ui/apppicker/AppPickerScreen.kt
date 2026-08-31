@@ -118,6 +118,7 @@ fun AppPickerScreen(
                             Switch(
                                 checked = isBlocked,
                                 onCheckedChange = { viewModel.onToggleApp(app, it) },
+                                enabled = !(isBlocked && state.isHardModeEnabled),
                             )
                         },
                     )

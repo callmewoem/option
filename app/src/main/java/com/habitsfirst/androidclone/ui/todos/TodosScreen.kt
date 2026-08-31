@@ -119,7 +119,7 @@ fun TodosScreen(
             if (state.todos.isEmpty()) {
                 item {
                     Text(
-                        "Nothing on today's list yet.",
+                        "Nothing yet.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

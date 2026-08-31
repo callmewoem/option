@@ -1,7 +1,8 @@
 package com.habitsfirst.androidclone.ui.habits
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,12 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +44,7 @@ import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.components.Heatmap
 import com.habitsfirst.androidclone.ui.components.HabitCard
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
+import com.habitsfirst.androidclone.ui.components.accentColor
 import com.habitsfirst.androidclone.ui.components.heatmapFractionColor
 import com.habitsfirst.androidclone.ui.home.LogProgressDialog
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
@@ -89,8 +89,6 @@ fun HabitsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text("Last 20 weeks", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
                 val today = LocalDate.now()
                 // Canvas draws in a DrawScope, not a composable context, so these have
                 // to be resolved here and captured by value, not read inside colorForDate.
@@ -114,8 +112,8 @@ fun HabitsScreen(
 
             item {
                 HabitKindSection(
+                    kind = HabitKind.GATING,
                     title = "Gating",
-                    subtitle = "Must be done today or your apps stay locked.",
                     habits = state.gating,
                     onAdd = { onAddHabit(HabitKind.GATING) },
                     onClick = { progress ->
@@ -130,8 +128,8 @@ fun HabitsScreen(
 
             item {
                 HabitKindSection(
+                    kind = HabitKind.TRACKED,
                     title = "Tracked",
-                    subtitle = "Logged on your heatmap. Never blocks anything.",
                     habits = state.tracked,
                     onAdd = { onAddHabit(HabitKind.TRACKED) },
                     onClick = { progress ->
@@ -145,11 +143,13 @@ fun HabitsScreen(
             }
 
             item {
-                AntihabitSection(
+                HabitKindSection(
+                    kind = HabitKind.ANTIHABIT,
+                    title = "Antihabits",
                     habits = state.antihabits,
                     onAdd = { onAddHabit(HabitKind.ANTIHABIT) },
-                    onToggleSlip = { progress, logged ->
-                        viewModel.onToggleAntihabitSlip(progress.habit.id, progress.habit.name, logged)
+                    onClick = { progress ->
+                        viewModel.onToggleAntihabitSlip(progress.habit.id, progress.habit.name, !progress.isCompleted)
                     },
                 )
             }
@@ -174,108 +174,50 @@ fun HabitsScreen(
     }
 }
 
+/** One kind's habits -- [kind]'s accent color on each [HabitCard] is the distinguishing signal, not this header. */
 @Composable
 private fun HabitKindSection(
+    kind: HabitKind,
     title: String,
-    subtitle: String,
     habits: List<HabitProgress>,
     onAdd: () -> Unit,
     onClick: (HabitProgress) -> Unit,
 ) {
     Column {
-        SectionHeader(title = title, subtitle = subtitle, onAdd = onAdd)
-        Spacer(modifier = Modifier.height(8.dp))
-        habits.forEach { progress ->
-            HabitCard(progress = progress, onClick = { onClick(progress) }, modifier = Modifier.padding(bottom = 8.dp))
-        }
-        if (habits.isEmpty()) {
-            Text(
-                "None yet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AntihabitSection(
-    habits: List<HabitProgress>,
-    onAdd: () -> Unit,
-    onToggleSlip: (HabitProgress, Boolean) -> Unit,
-) {
-    Column {
-        SectionHeader(
-            title = "Antihabits",
-            subtitle = "Silence is success. Log it only when you slip.",
-            onAdd = onAdd,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        habits.forEach { progress ->
-            val slipped = progress.isCompleted
-            Card(
-                onClick = { onToggleSlip(progress, !slipped) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (slipped) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-            ) {
-                Row(
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.WarningAmber,
-                        contentDescription = null,
-                        tint = if (slipped) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(progress.habit.name, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            if (slipped) "Slipped today -- apps locked a little longer." else "Clean today.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                        .size(10.dp)
+                        .background(kind.accentColor(), CircleShape),
+                )
+                Text(title, style = MaterialTheme.typography.titleLarge)
+            }
+            OutlinedButton(onClick = onAdd) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Add")
             }
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        habits.forEach { progress ->
+            HabitCard(
+                progress = progress,
+                kind = kind,
+                onClick = { onClick(progress) },
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
         if (habits.isEmpty()) {
             Text(
                 "None yet.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String, subtitle: String, onAdd: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        OutlinedButton(onClick = onAdd) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Add")
         }
     }
 }
