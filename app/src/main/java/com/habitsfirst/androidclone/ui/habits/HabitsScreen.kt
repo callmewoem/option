@@ -44,6 +44,7 @@ import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.components.Heatmap
 import com.habitsfirst.androidclone.ui.components.HabitCard
+import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
 import com.habitsfirst.androidclone.ui.components.heatmapFractionColor
 import com.habitsfirst.androidclone.ui.home.LogProgressDialog
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
@@ -60,6 +61,7 @@ fun HabitsScreen(
     viewModel: HabitsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
 
     Scaffold(
@@ -165,6 +167,10 @@ fun HabitsScreen(
                 progressDialogTarget = null
             },
         )
+    }
+
+    wonReward?.let { reward ->
+        LootboxRewardDialog(reward = reward, onDismiss = viewModel::onRewardDismissed)
     }
 }
 

@@ -24,6 +24,10 @@ class UsageTrackingWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // Piggybacks on this worker's existing 15-min cadence to clean up any makeup
+        // habit (see PenaltyRepository) whose one-day expiry has passed.
+        habitRepository.archiveExpiredHabits()
+
         val usageStatsManager =
             applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
                 ?: return Result.failure()
