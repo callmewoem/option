@@ -2,4 +2,8 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Eco-brutalist neutrals, matched to ui/theme/Color.kt's Concrete scale. -->
+    <color name="concrete_ink">#FF141311</color>
+    <color name="concrete_paper">#FFF7F3EA</color>
 </resources>

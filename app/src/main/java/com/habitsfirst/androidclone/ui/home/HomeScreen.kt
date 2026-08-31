@@ -1,5 +1,6 @@
 package com.habitsfirst.androidclone.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -176,6 +177,8 @@ private fun SummaryCard(
                 MaterialTheme.colorScheme.surfaceVariant
             },
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
@@ -227,7 +230,12 @@ private fun SummaryCard(
 
 @Composable
 private fun EmptyHabitsCard(onAddHabit: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onAddHabit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onAddHabit,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
