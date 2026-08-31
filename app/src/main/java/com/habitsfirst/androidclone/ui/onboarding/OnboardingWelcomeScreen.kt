@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -27,7 +28,10 @@ import com.habitsfirst.androidclone.R
 
 @Composable
 fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    // enableEdgeToEdge() (and API 35's enforced edge-to-edge) means this bare Box gets
+    // no automatic inset handling the way a Scaffold would -- without this, the
+    // bottom-pinned button below renders under the system navigation bar.
+    Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
