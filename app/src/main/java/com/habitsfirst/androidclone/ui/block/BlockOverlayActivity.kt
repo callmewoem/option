@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.MainActivity
@@ -41,6 +42,7 @@ class BlockOverlayActivity : ComponentActivity() {
                     onTakeBreak = ::goHome,
                     onOpenHabitsFirst = ::openHabitsFirst,
                     onAllHabitsComplete = ::finish,
+                    onGraceRedeemed = ::finish,
                 )
             }
         }
@@ -67,5 +69,6 @@ class BlockOverlayActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PACKAGE_NAME = "extra_package_name"
+        const val EXTRA_IS_BEDTIME = "extra_is_bedtime"
     }
 }

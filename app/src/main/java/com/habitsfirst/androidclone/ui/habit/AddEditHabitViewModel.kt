@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.ui.navigation.Screen
@@ -19,6 +20,7 @@ import javax.inject.Inject
 data class AddEditHabitUiState(
     val habitId: Long = 0L,
     val name: String = "",
+    val kind: HabitKind = HabitKind.GATING,
     val type: HabitType = HabitType.STEPS,
     val targetValue: Int = HabitType.STEPS.defaultTarget(),
     val targetPackageName: String? = null,
@@ -51,9 +53,17 @@ class AddEditHabitViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val habitId: Long = savedStateHandle.get<String>(Screen.ARG_HABIT_ID)?.toLongOrNull() ?: 0L
+    private val initialKind: HabitKind = savedStateHandle.get<String>(Screen.ARG_KIND)
+        ?.let { runCatching { HabitKind.valueOf(it) }.getOrNull() }
+        ?: HabitKind.GATING
 
     private val _uiState = MutableStateFlow(
-        AddEditHabitUiState(habitId = habitId, isNew = habitId == 0L, canDelete = habitId != 0L),
+        AddEditHabitUiState(
+            habitId = habitId,
+            kind = initialKind,
+            isNew = habitId == 0L,
+            canDelete = habitId != 0L,
+        ),
     )
     val uiState: StateFlow<AddEditHabitUiState> = _uiState.asStateFlow()
 
@@ -63,6 +73,7 @@ class AddEditHabitViewModel @Inject constructor(
                 habitRepository.getHabit(habitId)?.let { habit ->
                     _uiState.value = _uiState.value.copy(
                         name = habit.name,
+                        kind = habit.kind,
                         type = habit.type,
                         targetValue = habit.targetValue,
                         targetPackageName = habit.targetPackageName,
@@ -79,6 +90,10 @@ class AddEditHabitViewModel @Inject constructor(
 
     fun onNameChanged(name: String) {
         _uiState.value = _uiState.value.copy(name = name)
+    }
+
+    fun onKindChanged(kind: HabitKind) {
+        _uiState.value = _uiState.value.copy(kind = kind)
     }
 
     fun onTypeChanged(type: HabitType) {
@@ -107,6 +122,7 @@ class AddEditHabitViewModel @Inject constructor(
                 Habit(
                     id = state.habitId,
                     name = state.name.trim(),
+                    kind = state.kind,
                     type = state.type,
                     targetValue = if (state.type == HabitType.CUSTOM) 1 else state.targetValue,
                     targetPackageName = state.targetPackageName,

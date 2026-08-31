@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.components.label
@@ -100,6 +101,33 @@ fun AddEditHabitScreen(
                 label = { Text(stringResource(R.string.add_habit_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(text = "Kind", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HabitKind.entries.forEach { kind ->
+                    FilterChip(
+                        selected = state.kind == kind,
+                        onClick = { viewModel.onKindChanged(kind) },
+                        label = { Text(kind.label) },
+                    )
+                }
+            }
+            Text(
+                text = when (state.kind) {
+                    HabitKind.GATING -> "Must be completed today or your locked apps stay locked."
+                    HabitKind.TRACKED -> "Logged and shown on your heatmap -- never blocks anything."
+                    HabitKind.ANTIHABIT ->
+                        "Silence is success: a day you don't log this is a clean day. Logging it " +
+                            "records a slip and locks your apps a little longer."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(20.dp))

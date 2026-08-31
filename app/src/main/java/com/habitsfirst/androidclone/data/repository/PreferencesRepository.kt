@@ -33,11 +33,14 @@ class PreferencesRepository @Inject constructor(
         val TASK_SKIP_TOKEN_COUNT = intPreferencesKey("task_skip_token_count")
         val LAST_LOOTBOX_AWARDED_DATE = stringPreferencesKey("last_lootbox_awarded_date")
         val PENALTY_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("penalty_locked_until_epoch_millis")
+        val GRACE_UNLOCK_UNTIL_EPOCH_MILLIS = longPreferencesKey("grace_unlock_until_epoch_millis")
+        val GOLD_STAR_DATES = stringSetPreferencesKey("gold_star_dates")
         val BEDTIME_LOCK_ENABLED = booleanPreferencesKey("bedtime_lock_enabled")
         val BEDTIME_START = stringPreferencesKey("bedtime_start") // "HH:mm"
         val BEDTIME_END = stringPreferencesKey("bedtime_end") // "HH:mm"
         val MORNING_TODO_REMINDER_ENABLED = booleanPreferencesKey("morning_todo_reminder_enabled")
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
+        val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -145,6 +148,21 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[Keys.PENALTY_LOCKED_UNTIL_EPOCH_MILLIS] = 0L }
     }
 
+    /** A redeemed grace-period token bypasses habit/penalty locks (never bedtime) until this instant. */
+    val graceUnlockUntilEpochMillis: Flow<Long> =
+        dataStore.data.map { it[Keys.GRACE_UNLOCK_UNTIL_EPOCH_MILLIS] ?: 0L }
+
+    suspend fun setGraceUnlockUntil(untilEpochMillis: Long) {
+        dataStore.edit { it[Keys.GRACE_UNLOCK_UNTIL_EPOCH_MILLIS] = untilEpochMillis }
+    }
+
+    /** Dates cosmetically starred by a GOLD_STAR lootbox reward -- purely decorative on the heatmap. */
+    val goldStarDates: Flow<Set<String>> = dataStore.data.map { it[Keys.GOLD_STAR_DATES] ?: emptySet() }
+
+    suspend fun addGoldStarDate(date: String) {
+        dataStore.edit { it[Keys.GOLD_STAR_DATES] = (it[Keys.GOLD_STAR_DATES] ?: emptySet()) + date }
+    }
+
     // -- Bedtime lock -----------------------------------------------------------------
 
     data class BedtimeSettings(val enabled: Boolean, val start: String, val end: String)
@@ -181,5 +199,12 @@ class PreferencesRepository @Inject constructor(
             it[Keys.MORNING_TODO_REMINDER_ENABLED] = enabled
             it[Keys.MORNING_TODO_REMINDER_TIME] = time
         }
+    }
+
+    val lastMorningReminderSentDate: Flow<String?> =
+        dataStore.data.map { it[Keys.LAST_MORNING_REMINDER_SENT_DATE] }
+
+    suspend fun setLastMorningReminderSentDate(date: String) {
+        dataStore.edit { it[Keys.LAST_MORNING_REMINDER_SENT_DATE] = date }
     }
 }

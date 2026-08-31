@@ -96,6 +96,7 @@ class OnboardingViewModel @Inject constructor(
             }
             preferencesRepository.setOnboardingComplete(true)
             WorkScheduler.scheduleUsageTracking(appContext)
+            WorkScheduler.scheduleMorningTodoReminder(appContext)
             _uiState.value = _uiState.value.copy(isFinishing = false, finished = true)
         }
     }

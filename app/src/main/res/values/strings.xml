@@ -51,6 +51,9 @@
     <!-- Block screen -->
     <string name="block_title">%1$s is locked</string>
     <string name="block_subtitle">Finish these habits to unlock it for the rest of today.</string>
+    <string name="block_bedtime_title">It\'s bedtime</string>
+    <string name="block_bedtime_subtitle">Locked apps stay locked until your bedtime window ends -- no habit checklist unlocks this one.</string>
+    <string name="block_use_grace_token">Use a grace token (%1$d left) -- 1 min unlock</string>
     <string name="block_go_home">Take a break</string>
     <string name="block_open_habits">Open Locke</string>
 
@@ -78,6 +81,12 @@
     <string name="timer_pause">Pause</string>
     <string name="timer_reset">Reset</string>
     <string name="timer_complete">Mark complete</string>
+
+    <!-- Todos -->
+    <string name="todos_title">Todos</string>
+    <string name="todos_add_hint">Add a one-off task for today</string>
+    <string name="morning_reminder_title">Plan your day</string>
+    <string name="morning_reminder_body">Add today\'s one-off tasks before you get going.</string>
 
     <!-- Generic -->
     <string name="cancel">Cancel</string>

@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
+import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.domain.model.BlockedApp
 import com.habitsfirst.androidclone.domain.model.HabitProgress
+import com.habitsfirst.androidclone.domain.model.LootboxReward
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,10 +32,14 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val blockedAppRepository: BlockedAppRepository,
+    private val lootboxRepository: LootboxRepository,
 ) : ViewModel() {
 
     /** Bumped whenever a completion changes, so the streak (which needs a DB round trip) recomputes. */
     private val streakRefreshTrigger = MutableStateFlow(0)
+
+    private val _wonReward = MutableStateFlow<LootboxReward?>(null)
+    val wonReward: StateFlow<LootboxReward?> = _wonReward
 
     val uiState: StateFlow<HomeUiState> = combine(
         habitRepository.observeTodayProgress(),
@@ -56,6 +62,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             habitRepository.setCustomHabitDone(habitId, done)
             streakRefreshTrigger.value++
+            maybeAwardLootbox()
         }
     }
 
@@ -63,10 +70,21 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             habitRepository.setProgress(habitId, newValue, target)
             streakRefreshTrigger.value++
+            maybeAwardLootbox()
         }
     }
 
     fun refreshStreak() {
         streakRefreshTrigger.value++
+    }
+
+    fun onRewardDismissed() {
+        _wonReward.value = null
+    }
+
+    private suspend fun maybeAwardLootbox() {
+        val allComplete = habitRepository.areAllHabitsCompletedForDate()
+        val reward = lootboxRepository.maybeAwardDailyLootbox(allComplete)
+        if (reward != null) _wonReward.value = reward
     }
 }

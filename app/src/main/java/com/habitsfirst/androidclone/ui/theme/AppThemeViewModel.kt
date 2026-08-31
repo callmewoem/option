@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.ui.theme
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
+import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

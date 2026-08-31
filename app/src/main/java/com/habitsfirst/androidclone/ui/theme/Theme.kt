@@ -10,24 +10,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-
-/**
- * A lootbox-unlockable accent pair. Shapes and type never change between variants --
- * only the primary/secondary signal color does, so every variant still reads as the
- * same eco-brutalist app. [Moss] is the only variant unlocked by default.
- */
-enum class ThemeVariant(val displayName: String) {
-    Moss("Moss"),
-    Rust("Rust"),
-    Concrete("Concrete"),
-    Ink("Ink");
-
-    companion object {
-        val DEFAULT = Moss
-
-        fun fromId(id: String?): ThemeVariant = entries.firstOrNull { it.name == id } ?: DEFAULT
-    }
-}
+import com.habitsfirst.androidclone.domain.model.ThemeVariant
 
 private fun lightSchemeFor(variant: ThemeVariant) = when (variant) {
     ThemeVariant.Moss -> lightColorScheme(

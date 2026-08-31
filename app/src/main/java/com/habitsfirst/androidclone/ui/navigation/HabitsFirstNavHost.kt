@@ -14,9 +14,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
 import com.habitsfirst.androidclone.ui.habit.MeditationTimerScreen
+import com.habitsfirst.androidclone.ui.habits.HabitsScreen
 import com.habitsfirst.androidclone.ui.home.HomeScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPermissionsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickAppsScreen
@@ -24,6 +26,7 @@ import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickHabitsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
+import com.habitsfirst.androidclone.ui.todos.TodosScreen
 
 @Composable
 fun HabitsFirstNavHost() {
@@ -77,10 +80,27 @@ fun HabitsFirstNavHost() {
 
         composable(Screen.Home.route) {
             HomeScreen(
-                onAddHabit = { navController.navigate(Screen.AddHabit.route) },
+                navController = navController,
+                onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onOpenHabit = { habitId -> navController.navigate(Screen.MeditationTimer.createRoute(habitId)) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
+            )
+        }
+
+        composable(Screen.Habits.route) {
+            HabitsScreen(
+                navController = navController,
+                onAddHabit = { kind -> navController.navigate(Screen.AddHabit.createRoute(kind)) },
+                onOpenHabit = { habitId -> navController.navigate(Screen.MeditationTimer.createRoute(habitId)) },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+            )
+        }
+
+        composable(Screen.Todos.route) {
+            TodosScreen(
+                navController = navController,
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
             )
         }
 
@@ -91,13 +111,21 @@ fun HabitsFirstNavHost() {
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onAddHabit = { navController.navigate(Screen.AddHabit.route) },
+                onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
             )
         }
 
-        composable(Screen.AddHabit.route) {
+        composable(
+            route = Screen.AddHabit.route,
+            arguments = listOf(
+                navArgument(Screen.ARG_KIND) {
+                    type = NavType.StringType
+                    defaultValue = HabitKind.GATING.name
+                },
+            ),
+        ) {
             AddEditHabitScreen(
                 onDone = { navController.popBackStack() },
                 onOpenMeditationTimer = { habitId ->

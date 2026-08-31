@@ -2,10 +2,12 @@ package com.habitsfirst.androidclone.data.repository
 
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
+import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity
 import com.habitsfirst.androidclone.data.local.entity.toDomain
 import com.habitsfirst.androidclone.data.local.entity.toEntity
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.util.DateProvider
@@ -19,17 +21,23 @@ import javax.inject.Singleton
 class HabitRepository @Inject constructor(
     private val habitDao: HabitDao,
     private val completionDao: HabitCompletionDao,
+    private val streakScarDao: StreakScarDao,
 ) {
     fun observeHabits(): Flow<List<Habit>> =
         habitDao.observeActiveHabits().map { list -> list.map { it.toDomain() } }
 
+    fun observeHabitsByKind(kind: HabitKind): Flow<List<Habit>> =
+        habitDao.observeActiveHabitsByKind(kind.name).map { list -> list.map { it.toDomain() } }
+
     fun observeHabitCount(): Flow<Int> = habitDao.observeActiveHabitCount()
 
-    /** Today's habits paired with today's progress, in display order. */
-    fun observeTodayProgress(): Flow<List<HabitProgress>> {
+    /** Today's GATING habits paired with today's progress, in display order -- what Home and the block screen show. */
+    fun observeTodayProgress(): Flow<List<HabitProgress>> = observeTodayProgressByKind(HabitKind.GATING)
+
+    fun observeTodayProgressByKind(kind: HabitKind): Flow<List<HabitProgress>> {
         val today = DateProvider.todayString()
         return combine(
-            habitDao.observeActiveHabits(),
+            habitDao.observeActiveHabitsByKind(kind.name),
             completionDao.observeCompletionsForDate(today),
         ) { habits, completions ->
             val byHabitId = completions.associateBy { it.habitId }
@@ -45,7 +53,7 @@ class HabitRepository @Inject constructor(
         }
     }
 
-    /** Emits true once every active habit has a completed entry for today. */
+    /** Emits true once every active GATING habit has a completed entry for today. */
     fun observeAllHabitsCompletedToday(): Flow<Boolean> =
         habitDao.observeIncompleteHabitCountForDate(DateProvider.todayString()).map { it == 0 }
 
@@ -69,6 +77,11 @@ class HabitRepository @Inject constructor(
 
     suspend fun deleteHabit(habitId: Long) {
         habitDao.archive(habitId)
+    }
+
+    /** Removes expired makeup habits (see [PenaltyRepository]). Safe to call often -- it's a no-op most days. */
+    suspend fun archiveExpiredHabits(date: String = DateProvider.todayString()) {
+        habitDao.archiveExpiredHabits(date)
     }
 
     /** Sets a habit's raw progress value for today, marking it complete once it hits target. */
@@ -102,6 +115,16 @@ class HabitRepository @Inject constructor(
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
     }
 
+    /**
+     * Logs (or clears) a slip for an ANTIHABIT habit on [date]. Reuses the same
+     * completion row as every other habit kind -- `isCompleted = true` means "a slip
+     * was logged", not "done". UI showing antihabits inverts the usual green/red
+     * mapping accordingly (see [HabitKind] docs).
+     */
+    suspend fun setAntihabitSlipLogged(habitId: Long, logged: Boolean, date: String = DateProvider.todayString()) {
+        setProgress(habitId, if (logged) 1 else 0, target = 1, date = date)
+    }
+
     /** Active habits that track time spent in a specific app, for the usage-tracking worker. */
     suspend fun getAppUsageHabitsOnce(): List<Habit> =
         habitDao.getActiveHabitsOnce()
@@ -111,7 +134,30 @@ class HabitRepository @Inject constructor(
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0
 
-    /** Current unbroken streak of days where every active habit was completed, ending today or yesterday. */
+    /**
+     * Aggregate day score (0f..1f, the fraction of GATING habits completed) for every
+     * date with recorded activity in the range -- the data source for the GitHub-style
+     * heatmap. A date marked as a [com.habitsfirst.androidclone.data.local.entity.StreakScarEntity]
+     * is forced to 0f regardless of how many habits were actually completed.
+     */
+    suspend fun getDayScoresInRange(startDate: String, endDate: String): Map<String, Float> {
+        val counts = completionDao.getDayCompletionCountsInRange(startDate, endDate)
+        val scarredDates = streakScarDao.getScarredDatesInRange(startDate, endDate).toSet()
+        return counts.associate { c ->
+            val score = if (c.totalCount == 0) 0f else c.completedCount.toFloat() / c.totalCount
+            c.date to if (c.date in scarredDates) 0f else score
+        }
+    }
+
+    /**
+     * Dates in range where [habitId] has a completed entry -- for GATING/TRACKED habits
+     * that's a "green day"; for ANTIHABIT habits it's a "slip day" and callers should
+     * invert the color mapping.
+     */
+    suspend fun getCompletedDatesForHabit(habitId: Long, startDate: String, endDate: String): Set<String> =
+        completionDao.getCompletedDatesForHabit(habitId, startDate, endDate).toSet()
+
+    /** Current unbroken streak of days where every active GATING habit was completed, ending today or yesterday. */
     suspend fun computeCurrentStreak(): Int {
         var streak = 0
         var cursor = DateProvider.fromDateString(DateProvider.todayString())
@@ -138,9 +184,11 @@ class HabitRepository @Inject constructor(
     }
 
     private suspend fun isDateFullyComplete(date: String): Boolean {
+        if (streakScarDao.isScarred(date)) return false
         val activeHabitCount = habitDao.getIncompleteHabitCountForDate(date)
-        val completions = completionDao.getCompletionsForDateOnce(date)
-        // A day counts only if there was at least one habit tracked and none incomplete.
-        return completions.isNotEmpty() && activeHabitCount == 0
+        // Only count real GATING activity -- a TRACKED/ANTIHABIT-only day shouldn't
+        // read as a "complete" gating day just because some other habit was logged.
+        val gatingCounts = completionDao.getDayCompletionCountsInRange(date, date).firstOrNull()
+        return (gatingCounts?.totalCount ?: 0) > 0 && activeHabitCount == 0
     }
 }

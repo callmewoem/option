@@ -44,15 +44,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.components.HabitCard
+import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
+import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
 import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    navController: NavController,
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
     onOpenSettings: () -> Unit,
@@ -60,9 +64,11 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
 
     Scaffold(
+        bottomBar = { LockeBottomBar(navController) },
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(greetingRes())) },
@@ -157,6 +163,10 @@ fun HomeScreen(
                 progressDialogTarget = null
             },
         )
+    }
+
+    wonReward?.let { reward ->
+        LootboxRewardDialog(reward = reward, onDismiss = viewModel::onRewardDismissed)
     }
 }
 

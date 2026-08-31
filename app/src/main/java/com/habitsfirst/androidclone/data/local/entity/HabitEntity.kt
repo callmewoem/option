@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 
 @Entity(tableName = "habits")
@@ -17,6 +18,8 @@ data class HabitEntity(
     val createdAtEpochMillis: Long,
     /** Soft-delete flag so historical [HabitCompletionEntity] rows stay meaningful. */
     val isArchived: Boolean = false,
+    val kind: String = HabitKind.GATING.name,
+    val expiresAfterDate: String? = null,
 )
 
 fun HabitEntity.toDomain(): Habit = Habit(
@@ -28,6 +31,8 @@ fun HabitEntity.toDomain(): Habit = Habit(
     targetAppLabel = targetAppLabel,
     sortOrder = sortOrder,
     createdAtEpochMillis = createdAtEpochMillis,
+    kind = runCatching { HabitKind.valueOf(kind) }.getOrDefault(HabitKind.GATING),
+    expiresAfterDate = expiresAfterDate,
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -40,4 +45,6 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     sortOrder = sortOrder,
     createdAtEpochMillis = createdAtEpochMillis,
     isArchived = isArchived,
+    kind = kind.name,
+    expiresAfterDate = expiresAfterDate,
 )
