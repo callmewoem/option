@@ -90,8 +90,6 @@ fun HabitsFirstNavHost() {
         composable(Screen.Habits.route) {
             HabitsScreen(
                 navController = navController,
-                onAddHabit = { kind -> navController.navigate(Screen.AddHabit.createRoute(kind)) },
-                onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
             )
         }

@@ -1,7 +1,7 @@
 package com.habitsfirst.androidclone.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -17,7 +17,7 @@ private data class BottomTab(val screen: Screen, val label: String, val icon: Im
 
 private val TABS = listOf(
     BottomTab(Screen.Home, "Home", Icons.Filled.Home),
-    BottomTab(Screen.Habits, "Habits", Icons.Filled.Checklist),
+    BottomTab(Screen.Habits, "Stats", Icons.Filled.BarChart),
 )
 
 /** Shared bottom nav for the app's top-level destinations. */

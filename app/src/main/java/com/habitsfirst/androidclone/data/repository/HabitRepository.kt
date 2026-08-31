@@ -14,8 +14,18 @@ import com.habitsfirst.androidclone.util.DateProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * A habit's completion rate over a stats window. For an ANTIHABIT, [rate] is the
+ * *clean* rate (days without a logged slip) -- the inverse of the raw completed-entry
+ * count, since a completion row there means a slip, not a done day.
+ */
+data class HabitCompletionStat(val habit: Habit, val rate: Float)
 
 @Singleton
 class HabitRepository @Inject constructor(
@@ -146,6 +156,28 @@ class HabitRepository @Inject constructor(
         return counts.associate { c ->
             val score = if (c.totalCount == 0) 0f else c.completedCount.toFloat() / c.totalCount
             c.date to if (c.date in scarredDates) 0f else score
+        }
+    }
+
+    /**
+     * Every active habit's completion rate within [startDate]..[endDate] -- the data
+     * source for the stats screen's per-habit distribution. A habit created partway
+     * through the window is rated only over the days it actually existed, so a brand
+     * new habit doesn't read as a mostly-missed one.
+     */
+    suspend fun getHabitCompletionStats(startDate: String, endDate: String): List<HabitCompletionStat> {
+        val habits = habitDao.getActiveHabitsOnce().map { it.toDomain() }
+        val countsByHabit = completionDao.getCompletedCountsByHabitInRange(startDate, endDate).associateBy { it.habitId }
+        val rangeStart = DateProvider.fromDateString(startDate)
+        val rangeEnd = DateProvider.fromDateString(endDate)
+        return habits.map { habit ->
+            val createdDate = Instant.ofEpochMilli(habit.createdAtEpochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+            val effectiveStart = maxOf(rangeStart, createdDate)
+            val totalDays = if (effectiveStart > rangeEnd) 0 else ChronoUnit.DAYS.between(effectiveStart, rangeEnd) + 1
+            val completed = countsByHabit[habit.id]?.completedCount ?: 0
+            val rawRate = if (totalDays <= 0) 0f else (completed.toFloat() / totalDays.toFloat()).coerceIn(0f, 1f)
+            val rate = if (habit.kind == HabitKind.ANTIHABIT) 1f - rawRate else rawRate
+            HabitCompletionStat(habit, rate)
         }
     }
 

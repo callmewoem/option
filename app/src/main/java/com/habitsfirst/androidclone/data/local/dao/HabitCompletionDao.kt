@@ -14,6 +14,12 @@ data class DayCompletionCounts(
     val totalCount: Int,
 )
 
+/** One habit's completed-entry count within a date range, for the stats distribution. */
+data class HabitCompletedCount(
+    val habitId: Long,
+    val completedCount: Int,
+)
+
 @Dao
 interface HabitCompletionDao {
 
@@ -51,4 +57,15 @@ interface HabitCompletionDao {
         """,
     )
     suspend fun getDayCompletionCountsInRange(startDate: String, endDate: String): List<DayCompletionCounts>
+
+    /** Completed-entry counts per habit within a range, for the per-habit stats distribution. */
+    @Query(
+        """
+        SELECT habitId, SUM(CASE WHEN isCompleted = 1 THEN 1 ELSE 0 END) as completedCount
+        FROM habit_completions
+        WHERE date BETWEEN :startDate AND :endDate
+        GROUP BY habitId
+        """,
+    )
+    suspend fun getCompletedCountsByHabitInRange(startDate: String, endDate: String): List<HabitCompletedCount>
 }

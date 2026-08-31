@@ -35,10 +35,10 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
      lock via `PenaltyRepository`.
 
    `Home` is where you do all of the above -- every kind, plus today's todos,
-   completable inline so there's no reason to leave it. `Habits` is read-only
-   progress and management: the heatmap plus every habit grouped by kind, each
-   card colored by kind and tapped to edit (never to complete) -- one consistent
-   tap behavior instead of a different action per habit type.
+   completable inline so there's no reason to leave it. `Stats` is pure
+   read-only stats (heatmap, completion rate by habit, completion rate by day
+   of week) -- nothing to tap. Managing the habit list itself (add/edit/delete)
+   lives in Settings.
 5. **Habit types** (independent of kind, above):
    - *Walk N steps* / *Exercise N minutes* -- logged manually from Home (a
      Health Connect-ready target package is already declared, so real step/workout
@@ -48,10 +48,13 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
      automatically via `UsageStatsManager`, refreshed every 15 minutes and again
      immediately after you leave the tracked app.
    - *Custom check-in* -- a plain manual toggle.
-6. **Heatmap** -- a GitHub-style contribution grid on the Habits tab: a Canvas-drawn
-   grid shaded by the fraction of gating habits completed each day (5 buckets, like
-   GitHub's), with a cosmetic gold-star overlay on days a lootbox awarded one. A day
-   marked broken by a penalty reads as failed even if habits were later completed.
+6. **Stats tab** -- a GitHub-style heatmap (Canvas-drawn, shaded by the fraction of
+   gating habits completed each day in 5 buckets like GitHub's, with a cosmetic
+   gold-star overlay on days a lootbox awarded one; a day marked broken by a
+   penalty reads as failed even if habits were later completed), plus two
+   distribution views computed from the same window: completion rate per habit
+   (a habit created partway through the window is rated only over the days it
+   actually existed) and average completion rate by day of week.
 7. **Penalties** -- a small, reusable engine (`PenaltyRepository`) with three
    primitives everything else composes from: extend the block lock by N minutes,
    add a one-day makeup habit, or mark a day's streak broken. Right now the only
