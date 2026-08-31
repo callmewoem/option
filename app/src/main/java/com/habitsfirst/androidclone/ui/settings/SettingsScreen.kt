@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -244,7 +245,7 @@ fun SettingsScreen(
             onDismissRequest = { showSkipHabitDialog = false },
             title = { Text("Skip a habit today") },
             text = {
-                LazyColumn {
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
                     items(skippable, key = { it.id }) { habit ->
                         ListItem(
                             headlineContent = { Text(habit.name) },
