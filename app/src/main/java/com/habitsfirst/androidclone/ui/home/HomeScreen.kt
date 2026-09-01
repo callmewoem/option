@@ -2,7 +2,6 @@ package com.habitsfirst.androidclone.ui.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,15 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.Card
@@ -42,9 +40,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -65,10 +65,8 @@ import com.habitsfirst.androidclone.domain.model.Todo
 import com.habitsfirst.androidclone.ui.components.HabitCard
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
-import java.time.DayOfWeek
+import com.habitsfirst.androidclone.util.DateProvider
 import java.time.LocalTime
-import java.time.format.TextStyle
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,13 +78,18 @@ fun HomeScreen(
     onCheckIn: () -> Unit,
     onOpenSettings: () -> Unit,
     onManageApps: () -> Unit,
+    onSetUpPhotoVerification: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
     var newTodoText by remember { mutableStateOf("") }
-    var newTodoRepeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
+    var newTodoDueTomorrow by remember { mutableStateOf(false) }
+    // Which of the tour's steps is showing -- local only, since the tour is meant to be
+    // stepped through in one sitting; onTourDismissed() is what actually persists that
+    // it's done, so a process death mid-tour just restarts it rather than losing it.
+    var tourStep by remember { mutableIntStateOf(0) }
 
     // Everything actionable today, tagged by kind so HabitCard can render its accent --
     // this is the "do it all from Home" list; Habits/Todos are for managing the lists.
@@ -133,6 +136,22 @@ fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (state.showTour) {
+                item {
+                    HomeTourBanner(
+                        step = tourStep,
+                        onNext = {
+                            if (tourStep < HOME_TOUR_STEPS.lastIndex) {
+                                tourStep++
+                            } else {
+                                viewModel.onTourDismissed()
+                            }
+                        },
+                        onSkip = viewModel::onTourDismissed,
+                    )
+                }
+            }
+
             item {
                 SummaryCard(
                     completed = state.completedCount,
@@ -149,6 +168,18 @@ fun HomeScreen(
 
             if (state.proofOfLifeDue) {
                 item { ProofOfLifeBanner(onClick = onCheckIn) }
+            }
+
+            if (state.showPhotoVerificationPrompt) {
+                item {
+                    PhotoVerificationPromptBanner(
+                        onSetUp = {
+                            viewModel.onPhotoVerificationPromptDismissed()
+                            onSetUpPhotoVerification()
+                        },
+                        onDismiss = viewModel::onPhotoVerificationPromptDismissed,
+                    )
+                }
             }
 
             item {
@@ -204,24 +235,18 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = {
-                            viewModel.onAddTodo(newTodoText, newTodoRepeatDays)
+                            viewModel.onAddTodo(newTodoText, newTodoDueTomorrow)
                             newTodoText = ""
-                            newTodoRepeatDays = emptySet()
+                            newTodoDueTomorrow = false
                         },
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Add")
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                RepeatDaysPicker(
-                    selectedDays = newTodoRepeatDays,
-                    onToggleDay = { day ->
-                        newTodoRepeatDays = if (day in newTodoRepeatDays) {
-                            newTodoRepeatDays - day
-                        } else {
-                            newTodoRepeatDays + day
-                        }
-                    },
+                DueDatePicker(
+                    dueTomorrow = newTodoDueTomorrow,
+                    onDueTomorrowChanged = { newTodoDueTomorrow = it },
                 )
             }
 
@@ -253,23 +278,24 @@ fun HomeScreen(
     }
 }
 
-/** Lets the user pick which days of the week a new todo recurs on; none selected means one-off. */
+/** Lets the user pick whether a new todo is due today or tomorrow -- todos aren't day-dependent beyond that. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RepeatDaysPicker(selectedDays: Set<DayOfWeek>, onToggleDay: (DayOfWeek) -> Unit) {
+private fun DueDatePicker(dueTomorrow: Boolean, onDueTomorrowChanged: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        DayOfWeek.values().forEach { day ->
-            FilterChip(
-                selected = day in selectedDays,
-                onClick = { onToggleDay(day) },
-                label = { Text(day.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
-            )
-        }
+        FilterChip(
+            selected = !dueTomorrow,
+            onClick = { onDueTomorrowChanged(false) },
+            label = { Text("Today") },
+        )
+        FilterChip(
+            selected = dueTomorrow,
+            onClick = { onDueTomorrowChanged(true) },
+            label = { Text("Tomorrow") },
+        )
     }
 }
 
@@ -293,21 +319,12 @@ private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit, onDelete: () -> Unit)
                     style = MaterialTheme.typography.bodyLarge,
                     textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
                 )
-                if (todo.isRecurring) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Filled.Repeat,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.height(14.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = formatRepeatDays(todo.repeatDays),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                if (!DateProvider.isToday(todo.date)) {
+                    Text(
+                        text = "Tomorrow",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             IconButton(onClick = onDelete) {
@@ -317,12 +334,74 @@ private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit, onDelete: () -> Unit)
     }
 }
 
-/** e.g. "Every Sun", "Every Mon, Wed, Fri", or "Every day" when all seven are set. */
-private fun formatRepeatDays(days: Set<DayOfWeek>): String {
-    if (days.size == 7) return "Every day"
-    val ordered = DayOfWeek.values().filter { it in days }
-        .joinToString(", ") { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
-    return "Every $ordered"
+/** One stop on the first-run Home tour: what to notice, and why it's worth knowing. */
+private data class TourStep(val title: String, val body: String)
+
+private val HOME_TOUR_STEPS = listOf(
+    TourStep(
+        title = "Your day at a glance",
+        body = "This card tracks what's left today, your streak, and how many apps are " +
+            "still locked -- it updates live as you complete habits below.",
+    ),
+    TourStep(
+        title = "Nothing here is fixed",
+        body = "Tap the lock icon above to add or remove locked apps anytime, and the + " +
+            "button to add a new habit -- onboarding was just a starting point.",
+    ),
+    TourStep(
+        title = "Finish for a reward",
+        body = "Complete every gating habit in a day and Locke opens a daily lootbox -- " +
+            "grace tokens, task-skip tokens, or a new theme accent.",
+    ),
+)
+
+/**
+ * A short, dismissible spotlight tour shown once on Home after onboarding -- same banner
+ * pattern as [EaseInBanner] and [ProofOfLifeBanner] rather than an overlay, so it reads as
+ * one more card in the list instead of blocking anything underneath it.
+ */
+@Composable
+private fun HomeTourBanner(step: Int, onNext: () -> Unit, onSkip: () -> Unit) {
+    val current = HOME_TOUR_STEPS[step]
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${step + 1}/${HOME_TOUR_STEPS.size} -- ${current.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onSkip) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Skip tour",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+            Text(
+                text = current.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onNext) {
+                    Text(if (step < HOME_TOUR_STEPS.lastIndex) "Next" else "Got it")
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -381,6 +460,61 @@ private fun ProofOfLifeBanner(onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A one-day-only nudge toward the flagship habit type: it needs a description and/or
+ * example photo, so it doesn't fit onboarding's quick-pick template list -- this is
+ * the deep link into setting one up instead, offered once and then left alone.
+ */
+@Composable
+private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        Icons.Filled.CameraAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Try photo verification",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Dismiss",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+            Text(
+                text = "One habit can be checked by AI instead of the honor system -- describe what a " +
+                    "proof photo should show and Locke verifies it for you. Set one up now, or skip it -- " +
+                    "it's always available later from Settings.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onSetUp) { Text("Set it up") }
             }
         }
     }

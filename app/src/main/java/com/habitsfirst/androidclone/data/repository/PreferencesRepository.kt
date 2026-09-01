@@ -24,6 +24,9 @@ class PreferencesRepository @Inject constructor(
 ) {
     private object Keys {
         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+        val ONBOARDING_COMPLETED_DATE = stringPreferencesKey("onboarding_completed_date")
+        val HAS_SEEN_HOME_TOUR = booleanPreferencesKey("has_seen_home_tour")
+        val HAS_DISMISSED_PHOTO_VERIFICATION_PROMPT = booleanPreferencesKey("has_dismissed_photo_verification_prompt")
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val CACHED_STREAK = intPreferencesKey("cached_streak")
         val CACHED_STREAK_DATE = stringPreferencesKey("cached_streak_date")
@@ -49,6 +52,7 @@ class PreferencesRepository @Inject constructor(
         val PROOF_OF_LIFE_WINDOW_MINUTES = intPreferencesKey("proof_of_life_window_minutes")
         val PROOF_OF_LIFE_CONFIRMED_DATE = stringPreferencesKey("proof_of_life_confirmed_date")
         val PROOF_OF_LIFE_LAST_PENALIZED_DATE = stringPreferencesKey("proof_of_life_last_penalized_date")
+        val HEALTH_CONNECT_SYNC_ENABLED = booleanPreferencesKey("health_connect_sync_enabled")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -56,6 +60,29 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setOnboardingComplete(complete: Boolean) {
         dataStore.edit { it[Keys.ONBOARDING_COMPLETE] = complete }
+    }
+
+    /** Whether the short spotlight tour on Home's first post-onboarding visit has been dismissed. */
+    val hasSeenHomeTour: Flow<Boolean> =
+        dataStore.data.map { it[Keys.HAS_SEEN_HOME_TOUR] ?: false }
+
+    suspend fun setHasSeenHomeTour(seen: Boolean) {
+        dataStore.edit { it[Keys.HAS_SEEN_HOME_TOUR] = seen }
+    }
+
+    /** The calendar date onboarding finished on, so Home can offer a same-day-only nudge (e.g. the photo verification prompt). Null before onboarding completes. */
+    val onboardingCompletedDate: Flow<String?> = dataStore.data.map { it[Keys.ONBOARDING_COMPLETED_DATE] }
+
+    suspend fun setOnboardingCompletedDate(date: String) {
+        dataStore.edit { it[Keys.ONBOARDING_COMPLETED_DATE] = date }
+    }
+
+    /** Whether the day-one "try photo verification" nudge on Home has been dismissed or acted on. */
+    val hasDismissedPhotoVerificationPrompt: Flow<Boolean> =
+        dataStore.data.map { it[Keys.HAS_DISMISSED_PHOTO_VERIFICATION_PROMPT] ?: false }
+
+    suspend fun setHasDismissedPhotoVerificationPrompt(dismissed: Boolean) {
+        dataStore.edit { it[Keys.HAS_DISMISSED_PHOTO_VERIFICATION_PROMPT] = dismissed }
     }
 
     val areNotificationsEnabled: Flow<Boolean> =
@@ -283,6 +310,16 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setProofOfLifeLastPenalizedDate(date: String) {
         dataStore.edit { it[Keys.PROOF_OF_LIFE_LAST_PENALIZED_DATE] = date }
+    }
+
+    // -- Health Connect sync -----------------------------------------------------------
+
+    /** Whether the periodic worker should sync steps/exercise habits from Health Connect. Off by default -- turning it on requires the read permissions be granted first (see Settings). */
+    val isHealthConnectSyncEnabled: Flow<Boolean> =
+        dataStore.data.map { it[Keys.HEALTH_CONNECT_SYNC_ENABLED] ?: false }
+
+    suspend fun setHealthConnectSyncEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.HEALTH_CONNECT_SYNC_ENABLED] = enabled }
     }
 
     companion object {

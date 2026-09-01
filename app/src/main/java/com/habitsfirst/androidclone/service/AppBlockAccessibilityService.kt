@@ -3,14 +3,19 @@ package com.habitsfirst.androidclone.service
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
+import com.habitsfirst.androidclone.data.repository.ActiveDomainBlock
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
+import com.habitsfirst.androidclone.data.repository.UrlBlockRepository
+import com.habitsfirst.androidclone.domain.model.BlockMode
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.block.BlockOverlayActivity
+import com.habitsfirst.androidclone.util.BrowserUrlExtractor
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +37,12 @@ import javax.inject.Inject
  * "Allowed to be open" now has more than one gate (see [evaluateLockState]): today's
  * gating habits, any active penalty lock, the bedtime curfew, and a redeemed grace
  * token that can bypass the first two (never the bedtime curfew).
+ *
+ * The same overlay technique also covers URL blocking: when a known browser is
+ * foreground, [handleBrowserUrlChanged] reads its address bar (see
+ * [BrowserUrlExtractor]) and, if the host matches an enabled block list, covers the
+ * browser too -- gated the same way as apps, or unconditionally if that list is
+ * [BlockMode.PERMANENT].
  */
 @AndroidEntryPoint
 class AppBlockAccessibilityService : AccessibilityService() {
@@ -46,11 +57,15 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     @Inject lateinit var lootboxRepository: LootboxRepository
 
+    @Inject lateinit var urlBlockRepository: UrlBlockRepository
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var blockedPackageNames: Set<String> = emptySet()
     private var appUsageTargetPackages: Set<String> = emptySet()
+    private var activeDomainIndex: Map<String, ActiveDomainBlock> = emptyMap()
     private var lastForegroundPackage: String? = null
     private var homePackageName: String? = null
+    private val lastUrlCheckElapsedMs = mutableMapOf<String, Long>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -67,11 +82,30 @@ class AppBlockAccessibilityService : AccessibilityService() {
             }
             .onEach { appUsageTargetPackages = it }
             .launchIn(serviceScope)
+        urlBlockRepository.observeActiveDomainIndex()
+            .onEach { activeDomainIndex = it }
+            .launchIn(serviceScope)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
+
+        // Content-changed events fire for every app system-wide (no android:packageNames
+        // filter in accessibility_service_config.xml -- app-usage tracking below needs
+        // *every* app's window-state changes, which rules out a static filter). Bail
+        // immediately for the overwhelming majority that aren't a known browser; a
+        // known browser's own event rate is already coalesced by notificationTimeout.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            handleBrowserUrlChanged(packageName)
+            return
+        }
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+
+        // A fresh browser window (tab switch, cold launch) won't fire a content-changed
+        // event on its own -- check it here too, before the lastForegroundPackage dedup
+        // below (which is keyed for the app-block path, not URL matching).
+        handleBrowserUrlChanged(packageName)
+
         if (packageName == lastForegroundPackage) return
 
         val previousPackage = lastForegroundPackage
@@ -92,14 +126,40 @@ class AppBlockAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             when (val lockState = evaluateLockState()) {
                 LockState.Unlocked -> Unit
-                is LockState.Locked -> showBlockScreen(packageName, lockState.isBedtime)
+                is LockState.Locked -> showAppBlockScreen(packageName, lockState.isBedtime)
+            }
+        }
+    }
+
+    /** Reads [packageName]'s address bar (if it's a known browser) and covers it when the host matches an enabled block list. */
+    private fun handleBrowserUrlChanged(packageName: String) {
+        if (packageName !in BrowserUrlExtractor.KNOWN_BROWSER_PACKAGES) return
+        if (activeDomainIndex.isEmpty()) return
+
+        val now = SystemClock.elapsedRealtime()
+        val last = lastUrlCheckElapsedMs[packageName] ?: 0L
+        if (now - last < URL_CHECK_THROTTLE_MS) return
+        lastUrlCheckElapsedMs[packageName] = now
+
+        val addressBarText = BrowserUrlExtractor.findCurrentUrl(rootInActiveWindow, packageName) ?: return
+        val host = BrowserUrlExtractor.extractHost(addressBarText) ?: return
+        val block = UrlBlockRepository.findBlockForHost(host, activeDomainIndex) ?: return
+
+        serviceScope.launch {
+            val lockState = if (block.blockMode == BlockMode.PERMANENT) {
+                LockState.Locked(isBedtime = false, isPermanent = true)
+            } else {
+                evaluateLockState()
+            }
+            if (lockState is LockState.Locked) {
+                showUrlBlockScreen(host, block.listName, lockState.isPermanent, lockState.isBedtime)
             }
         }
     }
 
     private sealed class LockState {
         data object Unlocked : LockState()
-        data class Locked(val isBedtime: Boolean) : LockState()
+        data class Locked(val isBedtime: Boolean, val isPermanent: Boolean = false) : LockState()
     }
 
     private suspend fun evaluateLockState(): LockState {
@@ -120,10 +180,23 @@ class AppBlockAccessibilityService : AccessibilityService() {
         return resolveInfo?.activityInfo?.packageName
     }
 
-    private fun showBlockScreen(blockedPackageName: String, isBedtime: Boolean) {
+    private fun showAppBlockScreen(blockedPackageName: String, isBedtime: Boolean) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(BlockOverlayActivity.EXTRA_PACKAGE_NAME, blockedPackageName)
+            putExtra(BlockOverlayActivity.EXTRA_IS_URL_BLOCK, false)
+            putExtra(BlockOverlayActivity.EXTRA_TARGET, blockedPackageName)
+            putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
+        }
+        startActivity(intent)
+    }
+
+    private fun showUrlBlockScreen(domain: String, listName: String, isPermanent: Boolean, isBedtime: Boolean) {
+        val intent = Intent(this, BlockOverlayActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(BlockOverlayActivity.EXTRA_IS_URL_BLOCK, true)
+            putExtra(BlockOverlayActivity.EXTRA_TARGET, domain)
+            putExtra(BlockOverlayActivity.EXTRA_LIST_NAME, listName)
+            putExtra(BlockOverlayActivity.EXTRA_IS_PERMANENT, isPermanent)
             putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
         }
         startActivity(intent)
@@ -145,5 +218,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
             "com.google.android.apps.nexuslauncher",
             "com.android.launcher",
         )
+
+        /** Minimum gap between two address-bar reads for the same browser -- content-changed events can fire in quick bursts (e.g. a loading page). */
+        private const val URL_CHECK_THROTTLE_MS = 250L
     }
 }

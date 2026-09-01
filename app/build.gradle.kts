@@ -48,6 +48,22 @@ android {
             keyAlias = signingProp("keyAlias", "RELEASE_KEY_ALIAS")
             keyPassword = signingProp("keyPassword", "RELEASE_KEY_PASSWORD")
         }
+        // Without this, debug builds fall back to AGP's auto-generated
+        // ~/.android/debug.keystore -- which doesn't exist yet on a fresh CI
+        // runner, so it's regenerated (with a new random key) on every single
+        // run. Each debug APK then carries a different signature, so installing
+        // a newer build over an older one fails ("App not installed") and looks
+        // like you have to uninstall every time. Pointing debug builds at this
+        // checked-in keystore instead keeps that signature stable everywhere --
+        // CI and every local machine -- so installs update in place. It's fine
+        // to commit: these are the well-known Android debug defaults, not a
+        // secret, and this key must never be used to sign a release build.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
@@ -60,6 +76,7 @@ android {
         debug {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

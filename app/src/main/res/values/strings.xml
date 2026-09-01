@@ -1,18 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Locke</string>
-    <string name="accessibility_service_description">Locke uses this to notice when you open an app you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits.</string>
+    <string name="accessibility_service_description">Locke uses this to notice when you open an app, or browse to a website, you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits (or keep it blocked outright, for lists you\'ve set to never unlock).</string>
 
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">Do your habits.\nThen use your apps.</string>
     <string name="onboarding_welcome_subtitle">Locke locks the apps that distract you most and only unlocks them once you\'ve finished your habits for the day.</string>
+    <string name="onboarding_welcome_feature_lock">Pick the apps to lock and the habits that unlock them -- takes about a minute</string>
+    <string name="onboarding_welcome_feature_photo">Habits can be honor-system, or photo-verified by AI so you can\'t fake it</string>
+    <string name="onboarding_welcome_feature_rewards">Streaks, a daily lootbox, and a bedtime curfew keep it going after today</string>
     <string name="onboarding_get_started">Get Started</string>
+    <string name="onboarding_step_of">Step %1$d of %2$d</string>
     <string name="onboarding_pick_apps_title">What steals your time?</string>
-    <string name="onboarding_pick_apps_subtitle">Choose the apps you want locked until your habits are done.</string>
+    <string name="onboarding_pick_apps_subtitle">Choose the apps you want locked until your habits are done. Nothing locks until you finish setup, and you can add or remove apps anytime from Settings.</string>
+    <string name="onboarding_pick_apps_selected_count">%1$d app selected</string>
+    <string name="onboarding_pick_apps_selected_count_plural">%1$d apps selected</string>
+    <string name="onboarding_pick_apps_none_selected">No apps selected yet -- that\'s fine, you can lock some later from Settings.</string>
     <string name="onboarding_pick_habits_title">What matters more?</string>
-    <string name="onboarding_pick_habits_subtitle">Pick the habits that unlock your apps. You can add more later.</string>
+    <string name="onboarding_pick_habits_subtitle">Pick the habits that unlock your apps. Check at least one to continue -- you can edit, add, or remove habits anytime later.</string>
+    <string name="onboarding_pick_habits_gating_explainer">Every habit you pick here gates your locked apps: miss it today and those apps stay locked. Want a habit that\'s just tracked, or an antihabit, or one verified by a proof photo? Add those later from Settings -- these five are just a quick start.</string>
     <string name="onboarding_permissions_title">Almost there</string>
-    <string name="onboarding_permissions_subtitle">Locke needs a few permissions to lock apps and check your progress.</string>
+    <string name="onboarding_permissions_subtitle">Locke needs a few permissions to lock apps and check your progress. All three are optional here -- skip any of them and finish setup anyway, then grant them later from Settings whenever you\'re ready. Until they\'re granted, Locke simply won\'t lock anything.</string>
+    <string name="onboarding_permissions_whats_next_title">Worth exploring once you\'re in</string>
+    <string name="onboarding_permissions_whats_next_body">Photo verification (add an Anthropic API key in Settings), a hard bedtime curfew, antihabits you pay a time penalty for slipping on, and the daily lootbox that hands out grace tokens and skip tokens -- all live in Settings, ready whenever you want them.</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_finish">Start locking in</string>
 
@@ -52,6 +62,9 @@
     <!-- Block screen -->
     <string name="block_title">%1$s is locked</string>
     <string name="block_subtitle">Finish these habits to unlock it for the rest of today.</string>
+    <string name="block_url_subtitle">Finish these habits to unlock this site for the rest of today.</string>
+    <string name="block_permanent_title">%1$s is blocked</string>
+    <string name="block_permanent_subtitle">Blocked by your \"%1$s\" list -- no habit or grace token unlocks it.</string>
     <string name="block_bedtime_title">It\'s bedtime</string>
     <string name="block_bedtime_subtitle">Locked apps stay locked until your bedtime window ends -- no habit checklist unlocks this one.</string>
     <string name="block_use_grace_token">Use a grace token (%1$d left) -- 1 min unlock</string>

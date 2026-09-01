@@ -17,6 +17,8 @@ object DateProvider {
 
     fun todayString(): String = LocalDate.now().format(formatter)
 
+    fun tomorrowString(): String = LocalDate.now().plusDays(1).format(formatter)
+
     fun toDateString(date: LocalDate): String = date.format(formatter)
 
     fun fromDateString(date: String): LocalDate = LocalDate.parse(date, formatter)

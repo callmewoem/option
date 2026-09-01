@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -63,7 +64,7 @@ class HabitRepository @Inject constructor(
     fun observeTodayProgressByKind(kind: HabitKind): Flow<List<HabitProgress>> =
         DateProvider.currentDateFlow().flatMapLatest { today ->
             combine(
-                habitDao.observeActiveHabitsByKind(kind.name),
+                habitDao.observeActiveHabitsByKindForDate(kind.name, dayBitFor(today)),
                 completionDao.observeCompletionsForDate(today),
             ) { habits, completions ->
                 val byHabitId = completions.associateBy { it.habitId }
@@ -83,12 +84,12 @@ class HabitRepository @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     fun observeAllHabitsCompletedToday(): Flow<Boolean> =
         DateProvider.currentDateFlow().flatMapLatest { today ->
-            habitDao.observeIncompleteHabitCountForDate(today).map { it == 0 }
+            habitDao.observeIncompleteHabitCountForDate(today, dayBitFor(today)).map { it == 0 }
         }
 
     /** One-shot check used by the accessibility service before it locks the screen. */
     suspend fun areAllHabitsCompletedForDate(date: String = DateProvider.todayString()): Boolean =
-        habitDao.getIncompleteHabitCountForDate(date) == 0
+        habitDao.getIncompleteHabitCountForDate(date, dayBitFor(date)) == 0
 
     suspend fun getHabit(id: Long): Habit? = habitDao.getById(id)?.toDomain()
 
@@ -187,6 +188,12 @@ class HabitRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.type == HabitType.APP_USAGE_MINUTES && it.targetPackageName != null }
 
+    /** Active steps/exercise habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
+    suspend fun getHealthConnectHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.STEPS || it.type == HabitType.EXERCISE_MINUTES }
+
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0
 
@@ -219,12 +226,27 @@ class HabitRepository @Inject constructor(
         return habits.map { habit ->
             val createdDate = Instant.ofEpochMilli(habit.createdAtEpochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
             val effectiveStart = maxOf(rangeStart, createdDate)
-            val totalDays = if (effectiveStart > rangeEnd) 0 else ChronoUnit.DAYS.between(effectiveStart, rangeEnd) + 1
+            // For a habit scheduled on only some days of the week, "total days" is how
+            // many of those days actually fell in the window it existed for, not every
+            // calendar day -- otherwise a Sunday-only habit completed every Sunday
+            // would read as a mostly-missed one instead of a perfect one.
+            val totalDays = if (effectiveStart > rangeEnd) 0 else countScheduledDays(habit, effectiveStart, rangeEnd)
             val completed = countsByHabit[habit.id]?.completedCount ?: 0
             val rawRate = if (totalDays <= 0) 0f else (completed.toFloat() / totalDays.toFloat()).coerceIn(0f, 1f)
             val rate = if (habit.kind == HabitKind.ANTIHABIT) 1f - rawRate else rawRate
             HabitCompletionStat(habit, rate)
         }
+    }
+
+    private fun countScheduledDays(habit: Habit, start: LocalDate, end: LocalDate): Long {
+        if (habit.isDaily) return ChronoUnit.DAYS.between(start, end) + 1
+        var count = 0L
+        var cursor = start
+        while (!cursor.isAfter(end)) {
+            if (cursor.dayOfWeek in habit.scheduledDays) count++
+            cursor = cursor.plusDays(1)
+        }
+        return count
     }
 
     /**
@@ -312,12 +334,19 @@ class HabitRepository @Inject constructor(
         return streak
     }
 
+    /**
+     * A day only counts as "fully complete" once every GATING habit due on it has a
+     * completed entry -- with day-of-week scheduling, that can be vacuously true on a
+     * day nothing's due (e.g. the six days between a "hoover every Sunday" habit's
+     * occurrences), so [getActiveGatingHabitCount] guards against the truly-empty case
+     * (no GATING habit configured at all yet) trivially counting as complete instead.
+     */
     private suspend fun isDateFullyComplete(date: String): Boolean {
         if (streakScarDao.isScarred(date)) return false
-        val activeHabitCount = habitDao.getIncompleteHabitCountForDate(date)
-        // Only count real GATING activity -- a TRACKED/ANTIHABIT-only day shouldn't
-        // read as a "complete" gating day just because some other habit was logged.
-        val gatingCounts = completionDao.getDayCompletionCountsInRange(date, date).firstOrNull()
-        return (gatingCounts?.totalCount ?: 0) > 0 && activeHabitCount == 0
+        val incompleteCount = habitDao.getIncompleteHabitCountForDate(date, dayBitFor(date))
+        return incompleteCount == 0 && habitDao.getActiveGatingHabitCount() > 0
     }
+
+    /** `1 shl (dayOfWeek.value - 1)` for [date]'s day of week -- see [HabitEntity.scheduledDaysMask][com.habitsfirst.androidclone.data.local.entity.HabitEntity]. */
+    private fun dayBitFor(date: String): Int = 1 shl (DateProvider.fromDateString(date).dayOfWeek.value - 1)
 }

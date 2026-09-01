@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.habitsfirst.androidclone.domain.model.HabitKind
+import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
 import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
@@ -28,6 +29,7 @@ import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
 import com.habitsfirst.androidclone.ui.proofoflife.ProofOfLifeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
+import com.habitsfirst.androidclone.ui.urlblock.UrlBlockScreen
 
 @Composable
 fun HabitsFirstNavHost() {
@@ -54,6 +56,7 @@ fun HabitsFirstNavHost() {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPickAppsScreen(
+                onBack = { navController.popBackStack() },
                 onContinue = { navController.navigate(Screen.OnboardingPickHabits.route) },
                 viewModel = onboardingViewModel,
             )
@@ -62,6 +65,7 @@ fun HabitsFirstNavHost() {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPickHabitsScreen(
+                onBack = { navController.popBackStack() },
                 onContinue = { navController.navigate(Screen.OnboardingPermissions.route) },
                 viewModel = onboardingViewModel,
             )
@@ -70,6 +74,7 @@ fun HabitsFirstNavHost() {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPermissionsScreen(
+                onBack = { navController.popBackStack() },
                 onFinish = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
@@ -88,6 +93,9 @@ fun HabitsFirstNavHost() {
                 onCheckIn = { navController.navigate(Screen.ProofOfLife.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
+                onSetUpPhotoVerification = {
+                    navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.IMAGE_VERIFICATION))
+                },
             )
         }
 
@@ -102,12 +110,17 @@ fun HabitsFirstNavHost() {
             AppPickerScreen(onBack = { navController.popBackStack() })
         }
 
+        composable(Screen.UrlBlockList.route) {
+            UrlBlockScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
+                onManageUrls = { navController.navigate(Screen.UrlBlockList.route) },
             )
         }
 
@@ -117,6 +130,10 @@ fun HabitsFirstNavHost() {
                 navArgument(Screen.ARG_KIND) {
                     type = NavType.StringType
                     defaultValue = HabitKind.GATING.name
+                },
+                navArgument(Screen.ARG_TYPE) {
+                    type = NavType.StringType
+                    defaultValue = ""
                 },
             ),
         ) {

@@ -58,8 +58,12 @@ import coil.compose.AsyncImage
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
+import com.habitsfirst.androidclone.domain.model.toScheduleLabel
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.components.label
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,6 +222,21 @@ fun AddEditHabitScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(text = "Frequency", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = state.scheduledDays.toScheduleLabel(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FrequencyPicker(
+                scheduledDays = state.scheduledDays,
+                onEveryDaySelected = viewModel::onEveryDaySelected,
+                onDayToggled = viewModel::onScheduledDayToggled,
+            )
+
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = viewModel::onSave,
@@ -278,6 +297,44 @@ fun AddEditHabitScreen(
                 TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+}
+
+/**
+ * Lets the user pick which days of the week a habit is due on -- "Every day" (the
+ * default) or specific days, e.g. "hoover" every Sunday. Tapping any day chip narrows
+ * [scheduledDays] to just the selected days; tapping "Every day" clears it back to
+ * empty, which [com.habitsfirst.androidclone.domain.model.Habit.isDaily] reads as due every day.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FrequencyPicker(
+    scheduledDays: Set<DayOfWeek>,
+    onEveryDaySelected: () -> Unit,
+    onDayToggled: (DayOfWeek) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        FilterChip(
+            selected = scheduledDays.isEmpty(),
+            onClick = onEveryDaySelected,
+            label = { Text("Every day") },
+        )
+    }
+    Spacer(modifier = Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        DayOfWeek.values().forEach { day ->
+            FilterChip(
+                selected = day in scheduledDays,
+                onClick = { onDayToggled(day) },
+                label = { Text(day.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
+            )
+        }
     }
 }
 

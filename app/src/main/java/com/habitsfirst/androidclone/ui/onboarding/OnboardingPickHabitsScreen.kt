@@ -34,12 +34,14 @@ import com.habitsfirst.androidclone.ui.components.icon
 
 @Composable
 fun OnboardingPickHabitsScreen(
+    onBack: () -> Unit,
     onContinue: () -> Unit,
     viewModel: OnboardingViewModel,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
+        topBar = { OnboardingTopBar(step = 2, totalSteps = 3, onBack = onBack) },
         bottomBar = {
             Button(
                 onClick = onContinue,
@@ -61,6 +63,12 @@ fun OnboardingPickHabitsScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.onboarding_pick_habits_gating_explainer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             LazyColumn(
@@ -71,6 +79,11 @@ fun OnboardingPickHabitsScreen(
                     val checked = template in state.selectedTemplateOrder
                     ListItem(
                         headlineContent = { Text(template.name) },
+                        supportingContent = if (template.type.isMeasurable) {
+                            { Text("${template.targetValue} ${template.type.unit}/day".trim()) }
+                        } else {
+                            null
+                        },
                         leadingContent = {
                             Checkbox(
                                 checked = checked,

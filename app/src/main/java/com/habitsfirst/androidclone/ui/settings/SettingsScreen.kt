@@ -1,6 +1,8 @@
 package com.habitsfirst.androidclone.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,11 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -48,13 +52,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.BuildConfig
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
@@ -68,6 +75,7 @@ fun SettingsScreen(
     onAddHabit: () -> Unit,
     onEditHabit: (Long) -> Unit,
     onManageApps: () -> Unit,
+    onManageUrls: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,6 +89,11 @@ fun SettingsScreen(
     val hasUsageAccess = remember(permissionRefreshTick) { PermissionUtils.hasUsageAccess(context) }
     val hasAccessibility = remember(permissionRefreshTick) { PermissionUtils.isAccessibilityServiceEnabled(context) }
     val hasOverlay = remember(permissionRefreshTick) { PermissionUtils.hasOverlayPermission(context) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshHealthConnectPermissions() }
+
+    val healthConnectPermissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract(),
+    ) { granted -> viewModel.onHealthConnectPermissionResult(granted.containsAll(HealthConnectManager.PERMISSIONS)) }
 
     Scaffold(
         topBar = {
@@ -99,7 +112,11 @@ fun SettingsScreen(
             items(state.habits, key = { it.id }) { habit ->
                 ListItem(
                     headlineContent = { Text(habit.name) },
-                    supportingContent = { Text("${habit.kind.label} · ${habit.displayTarget.ifBlank { "Custom check-in" }}") },
+                    supportingContent = {
+                        val target = habit.displayTarget.ifBlank { "Custom check-in" }
+                        val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
+                        Text("${habit.kind.label} · $target${schedule.orEmpty()}")
+                    },
                     leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
                     trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
                     modifier = Modifier
@@ -131,12 +148,25 @@ fun SettingsScreen(
                 )
                 HorizontalDivider()
             }
+            item {
+                ListItem(
+                    headlineContent = { Text("Blocked websites") },
+                    supportingContent = { Text("Premade porn/social lists, plus your own custom lists") },
+                    leadingContent = { Icon(Icons.Filled.Public, contentDescription = null) },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onManageUrls),
+                )
+                HorizontalDivider()
+            }
 
             item { SectionHeader("Theme") }
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -146,7 +176,12 @@ fun SettingsScreen(
                             selected = state.selectedThemeVariant == variant,
                             onClick = { viewModel.onThemeVariantSelected(variant) },
                             enabled = unlocked,
-                            label = { Text(variant.displayName) },
+                            // A fillMaxWidth Row with 4 chips can squeeze one below its
+                            // natural width and wrap "Concrete"/"Ink" onto a second line;
+                            // scrolling (above) avoids that squeeze, and this is the
+                            // belt-and-suspenders fallback -- overflow with an ellipsis
+                            // rather than ever wrapping to a second line.
+                            label = { Text(variant.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = if (!unlocked) {
                                 { Icon(Icons.Filled.Lock, contentDescription = "Locked", modifier = Modifier.size(16.dp)) }
                             } else {
@@ -252,6 +287,18 @@ fun SettingsScreen(
                     }
                 }
                 HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+            }
+
+            if (state.healthConnectAvailable) {
+                item { SectionHeader("Health Connect") }
+                item {
+                    HealthConnectSection(
+                        permissionsGranted = state.healthConnectPermissionsGranted,
+                        syncEnabled = state.healthConnectSyncEnabled,
+                        onRequestPermissions = { healthConnectPermissionLauncher.launch(HealthConnectManager.PERMISSIONS) },
+                        onSyncToggled = viewModel::onHealthConnectSyncToggled,
+                    )
+                }
             }
 
             item { SectionHeader(stringResource(R.string.settings_permissions)) }
@@ -508,6 +555,60 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
                 .onFocusChanged { focus -> if (!focus.isFocused && text != apiKey.orEmpty()) onApiKeyChanged(text) },
         )
     }
+}
+
+/**
+ * Lets Walk-steps and Exercise habits sync from Health Connect instead of being logged
+ * by hand, mirroring the "use an app for N minutes" habit's automatic tracking. Only
+ * shown when [HealthConnectManager.isAvailable] -- the whole section is a no-op on a
+ * device without the provider installed.
+ */
+@Composable
+private fun HealthConnectSection(
+    permissionsGranted: Boolean,
+    syncEnabled: Boolean,
+    onRequestPermissions: () -> Unit,
+    onSyncToggled: (Boolean) -> Unit,
+) {
+    Text(
+        "Sync Walk steps and Exercise habits from Health Connect instead of logging them by hand.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    ListItem(
+        headlineContent = { Text("Read permissions") },
+        supportingContent = { Text("Steps and exercise sessions, read-only") },
+        trailingContent = {
+            if (permissionsGranted) {
+                Text(
+                    stringResource(R.string.permission_granted),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            } else {
+                OutlinedButton(onClick = onRequestPermissions) {
+                    Text(stringResource(R.string.permission_grant))
+                }
+            }
+        },
+    )
+    ListItem(
+        headlineContent = { Text("Sync automatically") },
+        supportingContent = {
+            Text(
+                if (permissionsGranted) {
+                    "Checks every 30 minutes; logging progress by hand still always works."
+                } else {
+                    "Grant read permissions above first."
+                },
+            )
+        },
+        trailingContent = {
+            Switch(checked = syncEnabled, onCheckedChange = onSyncToggled, enabled = permissionsGranted)
+        },
+    )
+    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 }
 
 @Composable

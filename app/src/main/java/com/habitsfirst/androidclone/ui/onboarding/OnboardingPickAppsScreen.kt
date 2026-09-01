@@ -29,12 +29,14 @@ import com.habitsfirst.androidclone.R
 
 @Composable
 fun OnboardingPickAppsScreen(
+    onBack: () -> Unit,
     onContinue: () -> Unit,
     viewModel: OnboardingViewModel,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
+        topBar = { OnboardingTopBar(step = 1, totalSteps = 3, onBack = onBack) },
         bottomBar = {
             Button(
                 onClick = onContinue,
@@ -55,6 +57,18 @@ fun OnboardingPickAppsScreen(
                     stringResource(R.string.onboarding_pick_apps_subtitle),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = if (state.selectedPackageNames.isEmpty()) {
+                        stringResource(R.string.onboarding_pick_apps_none_selected)
+                    } else if (state.selectedPackageNames.size == 1) {
+                        stringResource(R.string.onboarding_pick_apps_selected_count, 1)
+                    } else {
+                        stringResource(R.string.onboarding_pick_apps_selected_count_plural, state.selectedPackageNames.size)
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 

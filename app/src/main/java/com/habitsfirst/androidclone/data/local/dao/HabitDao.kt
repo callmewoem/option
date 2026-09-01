@@ -17,6 +17,20 @@ interface HabitDao {
     @Query("SELECT * FROM habits WHERE isArchived = 0 AND kind = :kind ORDER BY sortOrder ASC, createdAtEpochMillis ASC")
     fun observeActiveHabitsByKind(kind: String): Flow<List<HabitEntity>>
 
+    /**
+     * Active [kind] habits due on the day [dayBit] (`1 shl (dayOfWeek.value - 1)`)
+     * represents -- a habit whose [HabitEntity.scheduledDaysMask] is 0 is due every
+     * day; see [HabitDao] callers for how [dayBit] is derived from a date.
+     */
+    @Query(
+        """
+        SELECT * FROM habits WHERE isArchived = 0 AND kind = :kind
+        AND (scheduledDaysMask = 0 OR (scheduledDaysMask & :dayBit) != 0)
+        ORDER BY sortOrder ASC, createdAtEpochMillis ASC
+        """,
+    )
+    fun observeActiveHabitsByKindForDate(kind: String, dayBit: Int): Flow<List<HabitEntity>>
+
     @Query("SELECT * FROM habits WHERE id = :id")
     suspend fun getById(id: Long): HabitEntity?
 
@@ -42,34 +56,42 @@ interface HabitDao {
     @Query("SELECT MAX(sortOrder) FROM habits")
     suspend fun getMaxSortOrder(): Int?
 
+    /** Whether the user has any active GATING habit at all, regardless of which days it's due -- see [com.habitsfirst.androidclone.data.repository.HabitRepository.isDateFullyComplete]. */
+    @Query("SELECT COUNT(*) FROM habits WHERE isArchived = 0 AND kind = 'GATING'")
+    suspend fun getActiveGatingHabitCount(): Int
+
     /**
-     * Number of active GATING habits that do NOT yet have a completed
-     * [com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity] row for
-     * [date]. Zero means every gating habit is done -- the signal the app-blocker,
-     * streak calculation, and Home's "remaining habits" all key off of. TRACKED and
-     * ANTIHABIT habits never gate unlocking, so they're excluded here.
+     * Number of active GATING habits due on [dayBit]'s day that do NOT yet have a
+     * completed [com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity]
+     * row for [date]. Zero means every gating habit due today is done -- the signal the
+     * app-blocker, streak calculation, and Home's "remaining habits" all key off of.
+     * TRACKED and ANTIHABIT habits never gate unlocking, so they're excluded here, and
+     * a habit not due on [dayBit]'s day (see [observeActiveHabitsByKindForDate]) never
+     * counts as incomplete on it.
      */
     @Query(
         """
         SELECT COUNT(*) FROM habits h
         WHERE h.isArchived = 0 AND h.kind = 'GATING'
+        AND (h.scheduledDaysMask = 0 OR (h.scheduledDaysMask & :dayBit) != 0)
         AND NOT EXISTS (
             SELECT 1 FROM habit_completions c
             WHERE c.habitId = h.id AND c.date = :date AND c.isCompleted = 1
         )
         """,
     )
-    fun observeIncompleteHabitCountForDate(date: String): Flow<Int>
+    fun observeIncompleteHabitCountForDate(date: String, dayBit: Int): Flow<Int>
 
     @Query(
         """
         SELECT COUNT(*) FROM habits h
         WHERE h.isArchived = 0 AND h.kind = 'GATING'
+        AND (h.scheduledDaysMask = 0 OR (h.scheduledDaysMask & :dayBit) != 0)
         AND NOT EXISTS (
             SELECT 1 FROM habit_completions c
             WHERE c.habitId = h.id AND c.date = :date AND c.isCompleted = 1
         )
         """,
     )
-    suspend fun getIncompleteHabitCountForDate(date: String): Int
+    suspend fun getIncompleteHabitCountForDate(date: String, dayBit: Int): Int
 }

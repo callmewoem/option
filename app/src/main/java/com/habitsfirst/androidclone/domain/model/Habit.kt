@@ -1,9 +1,13 @@
 package com.habitsfirst.androidclone.domain.model
 
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
+
 /**
- * A habit the user tracks daily. Whether it gates their locked apps, is purely
- * tracked, or is an antihabit is controlled by [kind]; how its progress is measured
- * is controlled by [type].
+ * A habit the user tracks. Whether it gates their locked apps, is purely tracked, or
+ * is an antihabit is controlled by [kind]; how its progress is measured is controlled
+ * by [type]; which days it's due on is controlled by [scheduledDays].
  */
 data class Habit(
     val id: Long = 0L,
@@ -28,9 +32,30 @@ data class Habit(
      * TRACKED and are promoted one at a time by [com.habitsfirst.androidclone.data.repository.EaseInRepository].
      */
     val easeInOrder: Int? = null,
+    /**
+     * Days of the week this habit is due on. Empty (the default) means every day --
+     * only a non-empty set narrows it to specific days, e.g. "hoover" every Sunday.
+     * A GATING habit only counts toward that day's lock/streak on a day it's due.
+     */
+    val scheduledDays: Set<DayOfWeek> = emptySet(),
 ) {
     val displayTarget: String
         get() = if (!type.isMeasurable) "" else "$targetValue ${type.unit}"
+
+    val isDaily: Boolean get() = scheduledDays.isEmpty()
+
+    /** e.g. "Every day", "Every Sun", or "Every Mon, Wed, Fri". */
+    val scheduleLabel: String get() = scheduledDays.toScheduleLabel()
+
+    fun isDueOn(dayOfWeek: DayOfWeek): Boolean = isDaily || dayOfWeek in scheduledDays
+}
+
+/** e.g. "Every day", "Every Sun", or "Every Mon, Wed, Fri" -- empty means every day. */
+fun Set<DayOfWeek>.toScheduleLabel(): String {
+    if (isEmpty()) return "Every day"
+    val ordered = DayOfWeek.values().filter { it in this }
+        .joinToString(", ") { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    return "Every $ordered"
 }
 
 /**

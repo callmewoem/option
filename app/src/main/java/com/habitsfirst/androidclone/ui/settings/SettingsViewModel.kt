@@ -1,7 +1,9 @@
 package com.habitsfirst.androidclone.ui.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
@@ -9,7 +11,10 @@ import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
+import com.habitsfirst.androidclone.service.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -36,6 +41,10 @@ data class SettingsUiState(
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     val hardModeEnabled: Boolean = false,
     val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
+    /** False on any device without the Health Connect provider installed -- the whole section hides then. */
+    val healthConnectAvailable: Boolean = false,
+    val healthConnectPermissionsGranted: Boolean = false,
+    val healthConnectSyncEnabled: Boolean = false,
 )
 
 private data class ThemeAndTokens(
@@ -52,11 +61,13 @@ private data class ReminderSettings(
     val proofOfLife: PreferencesRepository.ProofOfLifeSettings,
 )
 
-/** Hard mode, the ease-in ramp's streak length, and the photo-verification API key -- grouped only to fit combine()'s 5-flow cap. */
+/** Hard mode, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
 private data class ExtraSettings(
     val hardModeEnabled: Boolean,
     val easeInStreakLength: Int,
     val anthropicApiKey: String?,
+    val healthConnectSyncEnabled: Boolean,
+    val healthConnectPermissionsGranted: Boolean,
 )
 
 @HiltViewModel
@@ -66,11 +77,20 @@ class SettingsViewModel @Inject constructor(
     private val bedtimeRepository: BedtimeRepository,
     private val lootboxRepository: LootboxRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
+    private val healthConnectManager: HealthConnectManager,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
+    /** A live permission check, not a stored preference -- refreshed via [refreshHealthConnectPermissions]. */
+    private val _healthConnectPermissionsGranted = MutableStateFlow(false)
+
+    init {
+        refreshHealthConnectPermissions()
+    }
+
     // kotlinx.coroutines.flow.combine's typed overloads top out at 5 flows, so the
-    // theme/token, reminder, and hard-mode/ease-in/API-key groups are paired up first,
-    // then combined at the end.
+    // theme/token, reminder, and hard-mode/ease-in/API-key/health-connect groups are
+    // paired up first, then combined at the end.
     private val themeAndTokens = combine(
         preferencesRepository.selectedThemeVariantId.map { ThemeVariant.fromId(it) },
         preferencesRepository.unlockedThemeVariantIds,
@@ -91,6 +111,8 @@ class SettingsViewModel @Inject constructor(
         preferencesRepository.isHardModeEnabled,
         preferencesRepository.easeInStreakLength,
         preferencesRepository.anthropicApiKey,
+        preferencesRepository.isHealthConnectSyncEnabled,
+        _healthConnectPermissionsGranted,
         ::ExtraSettings,
     )
 
@@ -119,6 +141,9 @@ class SettingsViewModel @Inject constructor(
             proofOfLifeWindowMinutes = rs.proofOfLife.windowMinutes,
             hardModeEnabled = extra.hardModeEnabled,
             easeInStreakLength = extra.easeInStreakLength,
+            healthConnectAvailable = healthConnectManager.isAvailable,
+            healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
+            healthConnectSyncEnabled = extra.healthConnectSyncEnabled,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -164,6 +189,28 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             if (lootboxRepository.consumeTaskSkipToken()) {
                 habitRepository.setProgress(habitId, targetValue, targetValue)
+            }
+        }
+    }
+
+    /** Re-checks whether the two Health Connect read permissions are actually granted -- call on screen resume, since a grant/revoke happens outside the app. */
+    fun refreshHealthConnectPermissions() {
+        viewModelScope.launch { _healthConnectPermissionsGranted.value = healthConnectManager.hasPermissions() }
+    }
+
+    /** Callback for the permission request launcher in [SettingsScreen] -- doesn't turn sync on by itself, that's still the separate toggle below. */
+    fun onHealthConnectPermissionResult(allGranted: Boolean) {
+        _healthConnectPermissionsGranted.value = allGranted
+    }
+
+    fun onHealthConnectSyncToggled(enabled: Boolean) {
+        viewModelScope.launch {
+            val allowed = enabled && healthConnectManager.hasPermissions()
+            preferencesRepository.setHealthConnectSyncEnabled(allowed)
+            if (allowed) {
+                WorkScheduler.scheduleHealthConnectSync(appContext)
+            } else {
+                WorkScheduler.cancelHealthConnectSync(appContext)
             }
         }
     }

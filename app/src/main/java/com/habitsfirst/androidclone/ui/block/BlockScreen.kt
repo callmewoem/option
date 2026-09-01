@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,10 +47,10 @@ fun BlockScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Bedtime is a hard curfew, not a habit gate -- never auto-dismiss for it just
-    // because today's habits happen to be done.
-    LaunchedEffect(state.allHabitsComplete, state.isBedtime) {
-        if (state.allHabitsComplete && !state.isBedtime) onAllHabitsComplete()
+    // Bedtime is a hard curfew and a permanent block never lifts -- neither auto-
+    // dismisses just because today's habits happen to be done.
+    LaunchedEffect(state.allHabitsComplete, state.isBedtime, state.isPermanent) {
+        if (state.allHabitsComplete && !state.isBedtime && !state.isPermanent) onAllHabitsComplete()
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -74,7 +75,11 @@ fun BlockScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(
-                        imageVector = if (state.isBedtime) Icons.Filled.Bedtime else Icons.Filled.Lock,
+                        imageVector = when {
+                            state.isBedtime -> Icons.Filled.Bedtime
+                            state.isPermanent -> Icons.Filled.Block
+                            else -> Icons.Filled.Lock
+                        },
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -82,26 +87,30 @@ fun BlockScreen(
             }
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = if (state.isBedtime) {
-                    stringResource(R.string.block_bedtime_title)
-                } else {
-                    stringResource(R.string.block_title, state.blockedAppLabel)
+                text = when {
+                    state.isBedtime -> stringResource(R.string.block_bedtime_title)
+                    state.isPermanent -> stringResource(R.string.block_permanent_title, state.blockedLabel)
+                    else -> stringResource(R.string.block_title, state.blockedLabel)
                 },
                 style = MaterialTheme.typography.headlineMedium,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (state.isBedtime) {
-                    stringResource(R.string.block_bedtime_subtitle)
-                } else {
-                    stringResource(R.string.block_subtitle)
+                text = when {
+                    state.isBedtime -> stringResource(R.string.block_bedtime_subtitle)
+                    state.isPermanent -> stringResource(
+                        R.string.block_permanent_subtitle,
+                        state.listName.orEmpty(),
+                    )
+                    state.isUrlBlock -> stringResource(R.string.block_url_subtitle)
+                    else -> stringResource(R.string.block_subtitle)
                 },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (state.isBedtime) {
+            if (state.isBedtime || state.isPermanent) {
                 Spacer(modifier = Modifier.weight(1f))
             } else {
                 LazyColumn(
