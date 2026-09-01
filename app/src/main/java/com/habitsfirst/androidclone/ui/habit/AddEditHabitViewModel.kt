@@ -6,7 +6,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.HabitRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.ui.navigation.Screen
@@ -25,6 +27,7 @@ import javax.inject.Inject
 data class AddEditHabitUiState(
     val habitId: Long = 0L,
     val name: String = "",
+    val kind: HabitKind = HabitKind.GATING,
     val type: HabitType = HabitType.STEPS,
     val targetValue: Int = HabitType.STEPS.defaultTarget(),
     val targetPackageName: String? = null,
@@ -34,6 +37,8 @@ data class AddEditHabitUiState(
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
+    /** Hard mode: this is an existing gating habit, so it can't be deleted or downgraded. */
+    val isKindLocked: Boolean = false,
     val installedApps: List<InstalledApp> = emptyList(),
     val savedSuccessfully: Boolean = false,
 ) {
@@ -57,22 +62,33 @@ class AddEditHabitViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val installedAppsProvider: InstalledAppsProvider,
     @ApplicationContext private val appContext: Context,
+    private val preferencesRepository: PreferencesRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val habitId: Long = savedStateHandle.get<String>(Screen.ARG_HABIT_ID)?.toLongOrNull() ?: 0L
+    private val initialKind: HabitKind = savedStateHandle.get<String>(Screen.ARG_KIND)
+        ?.let { runCatching { HabitKind.valueOf(it) }.getOrNull() }
+        ?: HabitKind.GATING
 
     private val _uiState = MutableStateFlow(
-        AddEditHabitUiState(habitId = habitId, isNew = habitId == 0L, canDelete = habitId != 0L),
+        AddEditHabitUiState(
+            habitId = habitId,
+            kind = initialKind,
+            isNew = habitId == 0L,
+            canDelete = habitId != 0L,
+        ),
     )
     val uiState: StateFlow<AddEditHabitUiState> = _uiState.asStateFlow()
 
     init {
         if (habitId != 0L) {
             viewModelScope.launch {
-                habitRepository.getHabit(habitId)?.let { habit ->
+                val habit = habitRepository.getHabit(habitId)
+                if (habit != null) {
                     _uiState.value = _uiState.value.copy(
                         name = habit.name,
+                        kind = habit.kind,
                         type = habit.type,
                         targetValue = habit.targetValue,
                         targetPackageName = habit.targetPackageName,
@@ -80,6 +96,14 @@ class AddEditHabitViewModel @Inject constructor(
                         verificationPrompt = habit.verificationPrompt.orEmpty(),
                         verificationExampleImagePath = habit.verificationExampleImagePath,
                     )
+                }
+                // Hard mode only ever locks an *existing* gate -- a habit already
+                // created as GATING before or during hard mode. New habits and other
+                // kinds are never restricted.
+                if (habit?.kind == HabitKind.GATING) {
+                    preferencesRepository.isHardModeEnabled.collect { hardMode ->
+                        _uiState.value = _uiState.value.copy(canDelete = !hardMode, isKindLocked = hardMode)
+                    }
                 }
             }
         }
@@ -91,6 +115,11 @@ class AddEditHabitViewModel @Inject constructor(
 
     fun onNameChanged(name: String) {
         _uiState.value = _uiState.value.copy(name = name)
+    }
+
+    fun onKindChanged(kind: HabitKind) {
+        if (_uiState.value.isKindLocked) return
+        _uiState.value = _uiState.value.copy(kind = kind)
     }
 
     fun onTypeChanged(type: HabitType) {
@@ -140,6 +169,7 @@ class AddEditHabitViewModel @Inject constructor(
                 Habit(
                     id = state.habitId,
                     name = state.name.trim(),
+                    kind = state.kind,
                     type = state.type,
                     targetValue = if (!state.type.isMeasurable) 1 else state.targetValue,
                     targetPackageName = state.targetPackageName,
@@ -157,7 +187,7 @@ class AddEditHabitViewModel @Inject constructor(
     }
 
     fun onDelete() {
-        if (habitId == 0L) return
+        if (habitId == 0L || !_uiState.value.canDelete) return
         viewModelScope.launch {
             habitRepository.deleteHabit(habitId)
             _uiState.value = _uiState.value.copy(savedSuccessfully = true)

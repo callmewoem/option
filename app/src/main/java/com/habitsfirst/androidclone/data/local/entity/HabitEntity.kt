@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 
 @Entity(tableName = "habits")
@@ -21,6 +22,9 @@ data class HabitEntity(
     val verificationPrompt: String? = null,
     /** [HabitType.IMAGE_VERIFICATION]: path to a saved example photo, if any. */
     val verificationExampleImagePath: String? = null,
+    val kind: String = HabitKind.GATING.name,
+    val expiresAfterDate: String? = null,
+    val easeInOrder: Int? = null,
 )
 
 fun HabitEntity.toDomain(): Habit = Habit(
@@ -34,6 +38,9 @@ fun HabitEntity.toDomain(): Habit = Habit(
     createdAtEpochMillis = createdAtEpochMillis,
     verificationPrompt = verificationPrompt,
     verificationExampleImagePath = verificationExampleImagePath,
+    kind = runCatching { HabitKind.valueOf(kind) }.getOrDefault(HabitKind.GATING),
+    expiresAfterDate = expiresAfterDate,
+    easeInOrder = easeInOrder,
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -48,4 +55,7 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     isArchived = isArchived,
     verificationPrompt = verificationPrompt,
     verificationExampleImagePath = verificationExampleImagePath,
+    kind = kind.name,
+    expiresAfterDate = expiresAfterDate,
+    easeInOrder = easeInOrder,
 )

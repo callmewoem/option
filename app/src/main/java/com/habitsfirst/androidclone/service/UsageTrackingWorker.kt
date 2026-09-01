@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.habitsfirst.androidclone.data.repository.EaseInRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -21,9 +22,16 @@ class UsageTrackingWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val habitRepository: HabitRepository,
+    private val easeInRepository: EaseInRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // Piggybacks on this worker's existing 15-min cadence to clean up any makeup
+        // habit (see PenaltyRepository) whose one-day expiry has passed, and to check
+        // whether the ease-in ramp's next habit is ready to graduate to GATING.
+        habitRepository.archiveExpiredHabits()
+        easeInRepository.maybeGraduateNextHabit()
+
         val usageStatsManager =
             applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
                 ?: return Result.failure()

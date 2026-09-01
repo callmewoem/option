@@ -1,5 +1,6 @@
 package com.habitsfirst.androidclone.util
 
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -7,6 +8,8 @@ import com.habitsfirst.androidclone.domain.model.InstalledApp
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +44,27 @@ class InstalledAppsProvider @Inject constructor(
             }
             .sortedBy { it.label.lowercase() }
             .toList()
+    }
+
+    /**
+     * Today's per-app foreground minutes, for the app picker's "Most used" sort.
+     * Returns an empty map (never throws) if usage access hasn't been granted --
+     * [android.app.usage.UsageStatsManager] just yields no data rather than failing,
+     * so callers see every app tie at zero and the list falls back to its existing order.
+     */
+    suspend fun getTodayUsageMinutes(): Map<String, Int> = withContext(Dispatchers.IO) {
+        val usageStatsManager =
+            context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return@withContext emptyMap()
+
+        val startOfDay = LocalDate.now(ZoneId.systemDefault())
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        val now = System.currentTimeMillis()
+
+        usageStatsManager.queryAndAggregateUsageStats(startOfDay, now)
+            .mapValues { (_, stats) -> (stats.totalTimeInForeground / 60_000L).toInt() }
     }
 
     fun getAppLabel(packageName: String): String = try {

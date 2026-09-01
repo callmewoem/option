@@ -33,4 +33,14 @@ object WorkScheduler {
             request,
         )
     }
+
+    /** Enqueues the periodic check that posts the "fill in today's todos" morning reminder. */
+    fun scheduleMorningTodoReminder(context: Context) {
+        val request = PeriodicWorkRequestBuilder<MorningReminderWorker>(15, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            MorningReminderWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
 }

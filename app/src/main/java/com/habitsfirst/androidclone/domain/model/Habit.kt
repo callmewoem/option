@@ -1,7 +1,9 @@
 package com.habitsfirst.androidclone.domain.model
 
 /**
- * A habit the user must complete each day to keep their locked apps unlocked.
+ * A habit the user tracks daily. Whether it gates their locked apps, is purely
+ * tracked, or is an antihabit is controlled by [kind]; how its progress is measured
+ * is controlled by [type].
  */
 data class Habit(
     val id: Long = 0L,
@@ -16,6 +18,16 @@ data class Habit(
     val verificationPrompt: String? = null,
     /** [IMAGE_VERIFICATION][HabitType.IMAGE_VERIFICATION]: path to a saved example photo, if any. */
     val verificationExampleImagePath: String? = null,
+    val kind: HabitKind = HabitKind.GATING,
+    /** If set, this habit auto-archives once the date has passed -- used for makeup habits. */
+    val expiresAfterDate: String? = null,
+    /**
+     * Position (0 = easiest) in an onboarding "ease-in" ramp, null if this habit isn't
+     * part of one. Habits with a non-null order were chosen together at onboarding and
+     * ranked by difficulty; only the lowest-order one starts GATING, the rest start
+     * TRACKED and are promoted one at a time by [com.habitsfirst.androidclone.data.repository.EaseInRepository].
+     */
+    val easeInOrder: Int? = null,
 ) {
     val displayTarget: String
         get() = if (!type.isMeasurable) "" else "$targetValue ${type.unit}"
@@ -23,6 +35,10 @@ data class Habit(
 
 /**
  * A habit's progress for a single calendar day.
+ *
+ * For [HabitKind.ANTIHABIT] habits, [isCompleted] means "a slip was logged for this
+ * day", not "done" -- callers rendering antihabit UI should invert the usual
+ * complete/incomplete color language (see [HabitKind] docs).
  */
 data class HabitProgress(
     val habit: Habit,

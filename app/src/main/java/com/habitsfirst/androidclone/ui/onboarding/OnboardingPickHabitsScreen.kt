@@ -3,20 +3,28 @@ package com.habitsfirst.androidclone.ui.onboarding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -60,7 +68,7 @@ fun OnboardingPickHabitsScreen(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 items(onboardingHabitTemplates, key = { it.name }) { template ->
-                    val checked = template in state.selectedTemplates
+                    val checked = template in state.selectedTemplateOrder
                     ListItem(
                         headlineContent = { Text(template.name) },
                         leadingContent = {
@@ -70,10 +78,54 @@ fun OnboardingPickHabitsScreen(
                             )
                         },
                         trailingContent = {
-                            androidx.compose.material3.Icon(template.type.icon(), contentDescription = null)
+                            Icon(template.type.icon(), contentDescription = null)
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                }
+
+                if (state.selectedTemplateOrder.size > 1) {
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+                            Text("Ease into it -- easiest first", style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Only #1 gates your apps right away. Each one after unlocks " +
+                                    "once the one before it is a consistent streak.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    itemsIndexed(state.selectedTemplateOrder, key = { _, template -> "order-${template.name}" }) { index, template ->
+                        ListItem(
+                            headlineContent = { Text(template.name) },
+                            leadingContent = {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { viewModel.onTemplateReordered(template, -1) },
+                                        enabled = index > 0,
+                                    ) {
+                                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move easier")
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.onTemplateReordered(template, 1) },
+                                        enabled = index < state.selectedTemplateOrder.lastIndex,
+                                    ) {
+                                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move harder")
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }

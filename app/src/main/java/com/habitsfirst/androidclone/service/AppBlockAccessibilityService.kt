@@ -4,8 +4,11 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.view.accessibility.AccessibilityEvent
+import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
+import com.habitsfirst.androidclone.data.repository.LootboxRepository
+import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.block.BlockOverlayActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -21,10 +24,14 @@ import javax.inject.Inject
 
 /**
  * Watches for foreground-app changes and, if the app the user just switched to is on
- * their block list and today's habits aren't all done yet, immediately covers it with
- * [BlockOverlayActivity]. This is the same "accessibility event -> overlay activity"
- * technique most Play Store app-blockers use, since Android has no public API to stop
- * an app from launching outright.
+ * their block list and it isn't currently allowed to be open, immediately covers it
+ * with [BlockOverlayActivity]. This is the same "accessibility event -> overlay
+ * activity" technique most Play Store app-blockers use, since Android has no public
+ * API to stop an app from launching outright.
+ *
+ * "Allowed to be open" now has more than one gate (see [evaluateLockState]): today's
+ * gating habits, any active penalty lock, the bedtime curfew, and a redeemed grace
+ * token that can bypass the first two (never the bedtime curfew).
  */
 @AndroidEntryPoint
 class AppBlockAccessibilityService : AccessibilityService() {
@@ -32,6 +39,12 @@ class AppBlockAccessibilityService : AccessibilityService() {
     @Inject lateinit var habitRepository: HabitRepository
 
     @Inject lateinit var blockedAppRepository: BlockedAppRepository
+
+    @Inject lateinit var penaltyRepository: PenaltyRepository
+
+    @Inject lateinit var bedtimeRepository: BedtimeRepository
+
+    @Inject lateinit var lootboxRepository: LootboxRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var blockedPackageNames: Set<String> = emptySet()
@@ -77,11 +90,27 @@ class AppBlockAccessibilityService : AccessibilityService() {
         if (packageName !in blockedPackageNames) return
 
         serviceScope.launch {
-            val allDone = habitRepository.areAllHabitsCompletedForDate()
-            if (!allDone) {
-                showBlockScreen(packageName)
+            when (val lockState = evaluateLockState()) {
+                LockState.Unlocked -> Unit
+                is LockState.Locked -> showBlockScreen(packageName, lockState.isBedtime)
             }
         }
+    }
+
+    private sealed class LockState {
+        data object Unlocked : LockState()
+        data class Locked(val isBedtime: Boolean) : LockState()
+    }
+
+    private suspend fun evaluateLockState(): LockState {
+        if (bedtimeRepository.isWithinBedtimeWindowNow()) return LockState.Locked(isBedtime = true)
+
+        val graceActive = lootboxRepository.isGraceUnlockActive()
+        if (graceActive) return LockState.Unlocked
+
+        val habitsComplete = habitRepository.areAllHabitsCompletedForDate()
+        val penaltyActive = penaltyRepository.isPenaltyLockActive()
+        return if (!habitsComplete || penaltyActive) LockState.Locked(isBedtime = false) else LockState.Unlocked
     }
 
     private fun resolveHomePackageName(): String? {
@@ -91,10 +120,11 @@ class AppBlockAccessibilityService : AccessibilityService() {
         return resolveInfo?.activityInfo?.packageName
     }
 
-    private fun showBlockScreen(blockedPackageName: String) {
+    private fun showBlockScreen(blockedPackageName: String, isBedtime: Boolean) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(BlockOverlayActivity.EXTRA_PACKAGE_NAME, blockedPackageName)
+            putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
         }
         startActivity(intent)
     }

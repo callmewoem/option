@@ -1,12 +1,16 @@
 package com.habitsfirst.androidclone.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -14,18 +18,23 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +55,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.BuildConfig
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.domain.model.HabitKind
+import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.util.PermissionUtils
 
@@ -60,6 +71,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showSkipHabitDialog by remember { mutableStateOf(false) }
 
     // Permission grants happen in system Settings, outside this screen -- re-read them
     // whenever the user comes back so the rows reflect reality.
@@ -86,7 +98,7 @@ fun SettingsScreen(
             items(state.habits, key = { it.id }) { habit ->
                 ListItem(
                     headlineContent = { Text(habit.name) },
-                    supportingContent = { Text(habit.displayTarget.ifBlank { "Custom check-in" }) },
+                    supportingContent = { Text("${habit.kind.label} · ${habit.displayTarget.ifBlank { "Custom check-in" }}") },
                     leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
                     trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
                     modifier = Modifier
@@ -117,6 +129,124 @@ fun SettingsScreen(
                         .clickable(onClick = onManageApps),
                 )
                 HorizontalDivider()
+            }
+
+            item { SectionHeader("Theme") }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ThemeVariant.entries.forEach { variant ->
+                        val unlocked = variant in state.unlockedThemeVariants
+                        FilterChip(
+                            selected = state.selectedThemeVariant == variant,
+                            onClick = { viewModel.onThemeVariantSelected(variant) },
+                            enabled = unlocked,
+                            label = { Text(variant.displayName) },
+                            leadingIcon = if (!unlocked) {
+                                { Icon(Icons.Filled.Lock, contentDescription = "Locked", modifier = Modifier.size(16.dp)) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                }
+                Text(
+                    "Locked themes are won from the daily lootbox.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+            }
+
+            item { SectionHeader("Rewards") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Grace tokens") },
+                    supportingContent = { Text("1-minute unblock, redeemed from a lock screen") },
+                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null) },
+                    trailingContent = { Text("${state.graceTokenCount}", style = MaterialTheme.typography.titleMedium) },
+                )
+                ListItem(
+                    headlineContent = { Text("Task-skip tokens") },
+                    supportingContent = { Text("Force-completes one gating habit for today") },
+                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null) },
+                    trailingContent = { Text("${state.taskSkipTokenCount}", style = MaterialTheme.typography.titleMedium) },
+                )
+                if (state.taskSkipTokenCount > 0) {
+                    OutlinedButton(
+                        onClick = { showSkipHabitDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        Text("Skip a habit today")
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
+            item { SectionHeader("Bedtime lock") }
+            item {
+                BedtimeAndReminderSection(
+                    bedtimeEnabled = state.bedtimeEnabled,
+                    bedtimeStart = state.bedtimeStart,
+                    bedtimeEnd = state.bedtimeEnd,
+                    onBedtimeChanged = viewModel::onBedtimeChanged,
+                    morningReminderEnabled = state.morningReminderEnabled,
+                    morningReminderTime = state.morningReminderTime,
+                    onMorningReminderChanged = viewModel::onMorningReminderChanged,
+                )
+            }
+
+            item { SectionHeader("Hard mode") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Hard mode") },
+                    supportingContent = {
+                        Text(
+                            if (state.hardModeEnabled) {
+                                "Gates and blocked apps can only be added, never removed."
+                            } else {
+                                "Locks in your gates and blocked apps. Grants 5 grace tokens."
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                    trailingContent = {
+                        Switch(checked = state.hardModeEnabled, onCheckedChange = viewModel::onHardModeToggled)
+                    },
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
+            item { SectionHeader("Ease into it") }
+            item {
+                Text(
+                    "How many consistent days before onboarding's next habit unlocks",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(3, 5, 7).forEach { days ->
+                        FilterChip(
+                            selected = state.easeInStreakLength == days,
+                            onClick = { viewModel.onEaseInStreakLengthChanged(days) },
+                            label = { Text("$days days") },
+                        )
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
             }
 
             item { SectionHeader(stringResource(R.string.settings_permissions)) }
@@ -170,6 +300,106 @@ fun SettingsScreen(
             }
         }
     }
+
+    if (showSkipHabitDialog) {
+        val skippable = state.habits.filter { it.kind == HabitKind.GATING }
+        AlertDialog(
+            onDismissRequest = { showSkipHabitDialog = false },
+            title = { Text("Skip a habit today") },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                    items(skippable, key = { it.id }) { habit ->
+                        ListItem(
+                            headlineContent = { Text(habit.name) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.onSkipHabitToday(habit.id, habit.targetValue)
+                                    showSkipHabitDialog = false
+                                },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSkipHabitDialog = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun BedtimeAndReminderSection(
+    bedtimeEnabled: Boolean,
+    bedtimeStart: String,
+    bedtimeEnd: String,
+    onBedtimeChanged: (Boolean, String, String) -> Unit,
+    morningReminderEnabled: Boolean,
+    morningReminderTime: String,
+    onMorningReminderChanged: (Boolean, String) -> Unit,
+) {
+    var start by remember(bedtimeStart) { mutableStateOf(bedtimeStart) }
+    var end by remember(bedtimeEnd) { mutableStateOf(bedtimeEnd) }
+    var reminderTime by remember(morningReminderTime) { mutableStateOf(morningReminderTime) }
+
+    ListItem(
+        headlineContent = { Text("Enable bedtime lock") },
+        supportingContent = { Text("A hard curfew -- no habit or grace token unlocks it") },
+        trailingContent = {
+            Switch(
+                checked = bedtimeEnabled,
+                onCheckedChange = { onBedtimeChanged(it, start, end) },
+            )
+        },
+    )
+    if (bedtimeEnabled) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = start,
+                onValueChange = { start = it; onBedtimeChanged(bedtimeEnabled, it, end) },
+                label = { Text("Start (HH:mm)") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = end,
+                onValueChange = { end = it; onBedtimeChanged(bedtimeEnabled, start, it) },
+                label = { Text("End (HH:mm)") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
+        }
+    }
+    HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+
+    SectionHeader("Daily todos")
+    ListItem(
+        headlineContent = { Text("Morning reminder") },
+        supportingContent = { Text("Notifies you to fill in today's one-off tasks") },
+        trailingContent = {
+            Switch(
+                checked = morningReminderEnabled,
+                onCheckedChange = { onMorningReminderChanged(it, reminderTime) },
+            )
+        },
+    )
+    if (morningReminderEnabled) {
+        OutlinedTextField(
+            value = reminderTime,
+            onValueChange = { reminderTime = it; onMorningReminderChanged(morningReminderEnabled, it) },
+            label = { Text("Time (HH:mm)") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            singleLine = true,
+        )
+    }
+    HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
 }
 
 @Composable
