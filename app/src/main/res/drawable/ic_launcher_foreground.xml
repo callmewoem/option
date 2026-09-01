@@ -9,7 +9,7 @@
          adaptive-icon safe zone (the centered ~66dp circle). Stepped ascending heights
          read as a rising streak/bar-chart rather than three identical ticks, and the
          tallest bar picks up the accent's dark-theme secondary tone as a quiet signal
-         color -- the same role MossSecondary80 plays as `secondary` in the in-app
+         color, the same role MossSecondary80 plays as `secondary` in the in-app
          Moss dark scheme (see Theme.kt), kept as a literal hex here since the launcher
          icon doesn't follow the user's selected in-app theme. -->
     <path

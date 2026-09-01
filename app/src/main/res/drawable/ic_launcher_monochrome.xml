@@ -5,7 +5,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <!-- Themed-icon (Android 13+) layer: same three-bar mark as
-         ic_launcher_foreground, single-tone -- the system replaces this fill with
+         ic_launcher_foreground, single-tone. The system replaces this fill with
          the user's wallpaper-derived tint, so the actual color here is irrelevant. -->
     <path
         android:fillColor="#FFFFFF"
