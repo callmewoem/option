@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -36,16 +37,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -80,6 +85,16 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showSkipHabitDialog by remember { mutableStateOf(false) }
+    var themeCodeInput by remember { mutableStateOf("") }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val themeCodeMessage by viewModel.themeCodeMessage.collectAsStateWithLifecycle()
+    LaunchedEffect(themeCodeMessage) {
+        themeCodeMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onThemeCodeMessageShown()
+        }
+    }
 
     // Permission grants happen in system Settings, outside this screen -- re-read them
     // whenever the user comes back so the rows reflect reality.
@@ -105,8 +120,18 @@ fun SettingsScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        LazyColumn(contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 24.dp)) {
+        // Both insets matter here: without the top one, the TopAppBar visually and
+        // functionally covers the first section header/row underneath it -- with a
+        // single habit, that's the only habit, leaving nothing tappable to edit or
+        // delete it.
+        LazyColumn(
+            contentPadding = PaddingValues(
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 24.dp,
+            ),
+        ) {
             item { SectionHeader(stringResource(R.string.settings_habits)) }
             items(state.habits, key = { it.id }) { habit ->
                 ListItem(
@@ -190,11 +215,35 @@ fun SettingsScreen(
                     }
                 }
                 Text(
-                    "Locked themes are won from the daily lootbox.",
+                    "Locked themes are won from the daily lootbox -- or unlocked instantly with a code below.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = themeCodeInput,
+                        onValueChange = { themeCodeInput = it },
+                        label = { Text("Theme code") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.onRedeemThemeCode(themeCodeInput)
+                            themeCodeInput = ""
+                        },
+                        enabled = themeCodeInput.isNotBlank(),
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                    ) {
+                        Text("Redeem")
+                    }
+                }
                 HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
             }
 

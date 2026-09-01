@@ -65,3 +65,23 @@ val InkSecondary40 = Color(0xFFA6191A)
 val InkSecondary80 = Color(0xFFFFB3AE)
 val InkSecondary20 = Color(0xFF680002)
 val InkSecondary90 = Color(0xFFFFDAD5)
+
+/** Modern -- unlocked by default alongside Moss. A cool slate-blue signal, mustard demoted to secondary: the same brutalist shapes read calmer and more contemporary than the earthy variants. */
+val Slate30 = Color(0xFF1A3547)
+val Slate40 = Color(0xFF2C5069)
+val Slate80 = Color(0xFFA9CCDF)
+val Slate90 = Color(0xFFD1E6F0)
+val SlateSecondary40 = Color(0xFF8A5A00)
+val SlateSecondary80 = Color(0xFFFFC066)
+val SlateSecondary20 = Color(0xFF4D3000)
+val SlateSecondary90 = Color(0xFFFFE0A6)
+
+/** Receipt -- carbon-copy black on paper, a "past due" stamp red for signal. Neutral and cooler than Ink's warm near-black, and the red leans clean/scarlet rather than blood-rust. */
+val Carbon30 = Color(0xFF1A1A1A)
+val Carbon40 = Color(0xFF2B2B2B)
+val Carbon80 = Color(0xFFD6D6D6)
+val Carbon90 = Color(0xFFECECEC)
+val CarbonSecondary40 = Color(0xFFB3261E)
+val CarbonSecondary80 = Color(0xFFFFB4A9)
+val CarbonSecondary20 = Color(0xFF690500)
+val CarbonSecondary90 = Color(0xFFFFDAD4)

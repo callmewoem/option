@@ -64,7 +64,8 @@ class UrlBlockRepository @Inject constructor(
     fun observeBlockLists(): Flow<List<UrlBlockList>> = combine(
         blockListDao.observeAll(),
         blockedDomainDao.observeAll(),
-    ) { lists, domains ->
+        PremadeBlocklists.refreshSignal,
+    ) { lists, domains, _ ->
         val customCounts = domains.groupingBy { it.listId }.eachCount()
         lists.map { entity ->
             val count = if (entity.source == BlockListSource.CUSTOM) {
@@ -87,7 +88,8 @@ class UrlBlockRepository @Inject constructor(
     fun observeActiveDomainIndex(): Flow<Map<String, ActiveDomainBlock>> = combine(
         blockListDao.observeAll(),
         blockedDomainDao.observeAll(),
-    ) { lists, domains ->
+        PremadeBlocklists.refreshSignal,
+    ) { lists, domains, _ ->
         val customDomainsByList = domains.groupBy({ it.listId }, { it.domain })
         val index = mutableMapOf<String, ActiveDomainBlock>()
         val enabled = lists.filter { it.isEnabled }

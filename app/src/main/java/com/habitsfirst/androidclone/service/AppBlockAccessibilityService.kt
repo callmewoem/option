@@ -42,7 +42,11 @@ import javax.inject.Inject
  * foreground, [handleBrowserUrlChanged] reads its address bar (see
  * [BrowserUrlExtractor]) and, if the host matches an enabled block list, covers the
  * browser too -- gated the same way as apps, or unconditionally if that list is
- * [BlockMode.PERMANENT].
+ * [BlockMode.PERMANENT]. Unlike an app, a browser has no per-tab lock on Android --
+ * only per-app -- so before covering it, a [GLOBAL_ACTION_BACK] steps the active tab
+ * off the blocked page first. Otherwise the tab is left parked there and the *whole*
+ * browser re-covers itself the instant it's foregrounded again, for any reason,
+ * effectively hard-locking it rather than just that one navigation.
  */
 @AndroidEntryPoint
 class AppBlockAccessibilityService : AccessibilityService() {
@@ -152,6 +156,17 @@ class AppBlockAccessibilityService : AccessibilityService() {
                 evaluateLockState()
             }
             if (lockState is LockState.Locked) {
+                // Step the browser's *active tab* off the blocked page before covering it.
+                // Without this, the tab is left sitting on the blocked host, so simply
+                // backgrounding the overlay (Home, or Open Habits) doesn't actually escape
+                // it -- the next time this browser becomes foreground for *any* reason
+                // (switching back to it, even to reach a different tab), the address bar
+                // still reads the blocked host and the whole app gets covered again. That
+                // reads as the entire browser being hard-locked rather than just this one
+                // navigation, since there's no per-tab block on Android, only per-app.
+                // A back action only affects the current tab's history, so other tabs are
+                // untouched.
+                performGlobalAction(GLOBAL_ACTION_BACK)
                 showUrlBlockScreen(host, block.listName, lockState.isPermanent, lockState.isBedtime)
             }
         }

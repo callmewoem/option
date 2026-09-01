@@ -143,6 +143,7 @@ class OnboardingViewModel @Inject constructor(
             WorkScheduler.scheduleUsageTracking(appContext)
             WorkScheduler.scheduleMorningTodoReminder(appContext)
             WorkScheduler.scheduleProofOfLifeCheck(appContext)
+            WorkScheduler.scheduleBlocklistRefresh(appContext)
             _uiState.value = _uiState.value.copy(isFinishing = false, finished = true)
         }
     }

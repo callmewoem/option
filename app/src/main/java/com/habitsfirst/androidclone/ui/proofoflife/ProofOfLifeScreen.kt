@@ -83,7 +83,7 @@ fun ProofOfLifeScreen(
                 onRetake = viewModel::onRetake,
                 onSubmit = viewModel::onSubmit,
                 onOpenSettings = onOpenSettings,
-                promptText = "Take a photo (or pick one) that proves you're up right now.",
+                promptText = "Take a photo that proves you're up right now.",
             )
         }
     }

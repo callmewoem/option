@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,10 +45,12 @@ import com.habitsfirst.androidclone.util.ImageStore
 import java.io.File
 
 /**
- * The "take/pick a photo, submit it, show the vision-model verdict" flow shared by every
+ * The "take a photo, submit it, show the vision-model verdict" flow shared by every
  * photo-verification surface in the app -- a habit's daily proof photo and the proof-of-life
- * check-in alike. Screens own their own [android.net.Uri]-to-bytes plumbing and what
- * "approved" means; this composable only owns the capture UI and result rendering.
+ * check-in alike. Camera-only by design (see the comment at the capture button) -- no
+ * gallery picker, so a stored photo can't stand in for today's proof. Screens own their
+ * own [android.net.Uri]-to-bytes plumbing and what "approved" means; this composable only
+ * owns the capture UI and result rendering.
  */
 @Composable
 fun PhotoVerificationCapture(
@@ -63,7 +63,7 @@ fun PhotoVerificationCapture(
     onRetake: () -> Unit,
     onSubmit: () -> Unit,
     onOpenSettings: () -> Unit,
-    promptText: String = "Take a photo (or pick one) that proves you did this today.",
+    promptText: String = "Take a photo that proves you did this today.",
 ) {
     val context = LocalContext.current
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
@@ -82,10 +82,6 @@ fun PhotoVerificationCapture(
             takePictureLauncher.launch(uri)
         }
     }
-    val pickImageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri -> uri?.let(onImageCaptured) }
-
     fun launchCamera() {
         val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
@@ -101,21 +97,12 @@ fun PhotoVerificationCapture(
     if (capturedImagePath == null) {
         Text(text = promptText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { launchCamera() }) {
-                Icon(Icons.Filled.CameraAlt, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Take photo")
-            }
-            OutlinedButton(
-                onClick = {
-                    pickImageLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                },
-            ) {
-                Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Choose photo")
-            }
+        // Camera-only, deliberately: a gallery picker would let an old or unrelated photo
+        // stand in for today's proof, defeating the point of verification.
+        Button(onClick = { launchCamera() }) {
+            Icon(Icons.Filled.CameraAlt, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Take photo")
         }
     } else {
         AsyncImage(
