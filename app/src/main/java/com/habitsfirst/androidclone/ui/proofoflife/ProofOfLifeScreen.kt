@@ -1,12 +1,10 @@
-package com.habitsfirst.androidclone.ui.habit
+package com.habitsfirst.androidclone.ui.proofoflife
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
@@ -22,22 +20,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.ui.components.PhotoVerificationCapture
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageVerificationScreen(
+fun ProofOfLifeScreen(
     onDone: () -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: ImageVerificationViewModel = hiltViewModel(),
+    viewModel: ProofOfLifeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -48,7 +43,7 @@ fun ImageVerificationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.habit?.name ?: "Verify") },
+                title = { Text("Morning check-in") },
                 navigationIcon = {
                     IconButton(onClick = onDone) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -65,31 +60,18 @@ fun ImageVerificationScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            val habit = state.habit
-            if (habit != null && (!habit.verificationPrompt.isNullOrBlank() || habit.verificationExampleImagePath != null)) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = "What counts as done", style = MaterialTheme.typography.titleSmall)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        if (!habit.verificationPrompt.isNullOrBlank()) {
-                            Text(text = habit.verificationPrompt, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        habit.verificationExampleImagePath?.let { path ->
-                            Spacer(modifier = Modifier.height(8.dp))
-                            AsyncImage(
-                                model = path,
-                                contentDescription = "Example photo",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(160.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
-                            )
-                        }
-                    }
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = "Prove you're up", style = MaterialTheme.typography.titleSmall)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "A quick photo of your kitchen, bathroom, or the view outside -- " +
+                            "not your bed and not a screen.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
-                Spacer(modifier = Modifier.height(20.dp))
             }
+            Spacer(modifier = Modifier.height(20.dp))
 
             PhotoVerificationCapture(
                 capturedImagePath = state.capturedImagePath,
@@ -101,6 +83,7 @@ fun ImageVerificationScreen(
                 onRetake = viewModel::onRetake,
                 onSubmit = viewModel::onSubmit,
                 onOpenSettings = onOpenSettings,
+                promptText = "Take a photo (or pick one) that proves you're up right now.",
             )
         }
     }

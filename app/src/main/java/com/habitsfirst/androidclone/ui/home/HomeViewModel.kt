@@ -8,6 +8,7 @@ import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
+import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.data.repository.TodoRepository
 import com.habitsfirst.androidclone.domain.model.BlockedApp
 import com.habitsfirst.androidclone.domain.model.HabitKind
@@ -37,12 +38,17 @@ data class HomeUiState(
     val blockedApps: List<BlockedApp> = emptyList(),
     val streakDays: Int = 0,
     val easeInStatus: EaseInStatus? = null,
+    /** True when the check-in is enabled and the user hasn't confirmed it yet today. */
+    val proofOfLifeDue: Boolean = false,
 ) {
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
     val allDone: Boolean get() = totalCount > 0 && completedCount == totalCount
     val pendingTodos: List<Todo> get() = todos.filterNot { it.isDone }
 }
+
+/** The ease-in ramp's streak length and proof-of-life due-ness -- grouped only to fit combine()'s 5-flow cap. */
+private data class HomeMiscState(val easeInStreakLength: Int, val proofOfLifeDue: Boolean)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -52,6 +58,7 @@ class HomeViewModel @Inject constructor(
     private val penaltyRepository: PenaltyRepository,
     private val todoRepository: TodoRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val proofOfLifeRepository: ProofOfLifeRepository,
 ) : ViewModel() {
 
     /** Bumped whenever a completion changes, so the streak (which needs a DB round trip) recomputes. */
@@ -68,13 +75,21 @@ class HomeViewModel @Inject constructor(
         ::Triple,
     )
 
+    private val miscFlow = combine(
+        preferencesRepository.easeInStreakLength,
+        proofOfLifeRepository.settings,
+        proofOfLifeRepository.isConfirmedTodayFlow,
+    ) { easeInStreakLength, proofOfLifeSettings, confirmedToday ->
+        HomeMiscState(easeInStreakLength, proofOfLifeDue = proofOfLifeSettings.enabled && !confirmedToday)
+    }
+
     val uiState: StateFlow<HomeUiState> = combine(
         kindsFlow,
         blockedAppRepository.observeBlockedApps(),
         streakRefreshTrigger,
         todoRepository.observeForToday(),
-        preferencesRepository.easeInStreakLength,
-    ) { (gating, tracked, antihabits), blockedApps, _, todos, easeInStreakLength ->
+        miscFlow,
+    ) { (gating, tracked, antihabits), blockedApps, _, todos, misc ->
         HomeUiState(
             isLoading = false,
             gating = gating,
@@ -83,7 +98,8 @@ class HomeViewModel @Inject constructor(
             todos = todos,
             blockedApps = blockedApps,
             streakDays = habitRepository.computeCurrentStreak(),
-            easeInStatus = habitRepository.getEaseInStatus(easeInStreakLength),
+            easeInStatus = habitRepository.getEaseInStatus(misc.easeInStreakLength),
+            proofOfLifeDue = misc.proofOfLifeDue,
         )
     }.stateIn(
         scope = viewModelScope,

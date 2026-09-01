@@ -44,6 +44,11 @@ class PreferencesRepository @Inject constructor(
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
         val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
         val EASE_IN_STREAK_LENGTH = intPreferencesKey("ease_in_streak_length")
+        val PROOF_OF_LIFE_ENABLED = booleanPreferencesKey("proof_of_life_enabled")
+        val PROOF_OF_LIFE_TIME = stringPreferencesKey("proof_of_life_time") // "HH:mm"
+        val PROOF_OF_LIFE_WINDOW_MINUTES = intPreferencesKey("proof_of_life_window_minutes")
+        val PROOF_OF_LIFE_CONFIRMED_DATE = stringPreferencesKey("proof_of_life_confirmed_date")
+        val PROOF_OF_LIFE_LAST_PENALIZED_DATE = stringPreferencesKey("proof_of_life_last_penalized_date")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -246,8 +251,43 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[Keys.EASE_IN_STREAK_LENGTH] = days.coerceIn(1, 30) }
     }
 
+    // -- Proof-of-life morning check-in -------------------------------------------------
+
+    data class ProofOfLifeSettings(val enabled: Boolean, val time: String, val windowMinutes: Int)
+
+    val proofOfLifeSettings: Flow<ProofOfLifeSettings> = dataStore.data.map {
+        ProofOfLifeSettings(
+            enabled = it[Keys.PROOF_OF_LIFE_ENABLED] ?: false,
+            time = it[Keys.PROOF_OF_LIFE_TIME] ?: "08:00",
+            windowMinutes = it[Keys.PROOF_OF_LIFE_WINDOW_MINUTES] ?: DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
+        )
+    }
+
+    suspend fun setProofOfLifeSettings(enabled: Boolean, time: String, windowMinutes: Int) {
+        dataStore.edit {
+            it[Keys.PROOF_OF_LIFE_ENABLED] = enabled
+            it[Keys.PROOF_OF_LIFE_TIME] = time
+            it[Keys.PROOF_OF_LIFE_WINDOW_MINUTES] = windowMinutes.coerceIn(5, 240)
+        }
+    }
+
+    /** The last date a proof-of-life photo was approved -- "today" means already checked in. */
+    val proofOfLifeConfirmedDate: Flow<String?> = dataStore.data.map { it[Keys.PROOF_OF_LIFE_CONFIRMED_DATE] }
+
+    suspend fun setProofOfLifeConfirmedDate(date: String) {
+        dataStore.edit { it[Keys.PROOF_OF_LIFE_CONFIRMED_DATE] = date }
+    }
+
+    /** Guards [PenaltyRepository]'s missed-check-in penalty against firing more than once a day. */
+    val proofOfLifeLastPenalizedDate: Flow<String?> = dataStore.data.map { it[Keys.PROOF_OF_LIFE_LAST_PENALIZED_DATE] }
+
+    suspend fun setProofOfLifeLastPenalizedDate(date: String) {
+        dataStore.edit { it[Keys.PROOF_OF_LIFE_LAST_PENALIZED_DATE] = date }
+    }
+
     companion object {
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5
+        const val DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES = 30
     }
 }

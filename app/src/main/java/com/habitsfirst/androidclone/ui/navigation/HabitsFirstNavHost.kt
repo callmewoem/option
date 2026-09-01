@@ -26,6 +26,7 @@ import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickAppsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickHabitsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
+import com.habitsfirst.androidclone.ui.proofoflife.ProofOfLifeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
 
 @Composable
@@ -84,6 +85,7 @@ fun HabitsFirstNavHost() {
                 onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onOpenHabit = { habitId -> navController.navigate(Screen.MeditationTimer.createRoute(habitId)) },
                 onVerifyHabit = { habitId -> navController.navigate(Screen.VerifyHabit.createRoute(habitId)) },
+                onCheckIn = { navController.navigate(Screen.ProofOfLife.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
             )
@@ -147,6 +149,12 @@ fun HabitsFirstNavHost() {
             arguments = listOf(navArgument(Screen.ARG_HABIT_ID) { type = NavType.StringType }),
         ) {
             ImageVerificationScreen(
+                onDone = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+            )
+        }
+        composable(Screen.ProofOfLife.route) {
+            ProofOfLifeScreen(
                 onDone = { navController.popBackStack() },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
             )

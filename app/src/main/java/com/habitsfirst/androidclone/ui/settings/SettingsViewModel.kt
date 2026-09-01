@@ -6,6 +6,7 @@ import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
+import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,6 +31,9 @@ data class SettingsUiState(
     val bedtimeEnd: String = "06:30",
     val morningReminderEnabled: Boolean = true,
     val morningReminderTime: String = "08:00",
+    val proofOfLifeEnabled: Boolean = false,
+    val proofOfLifeTime: String = "08:00",
+    val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     val hardModeEnabled: Boolean = false,
     val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
 )
@@ -41,9 +45,11 @@ private data class ThemeAndTokens(
     val taskSkipTokens: Int,
 )
 
+/** Bedtime, the morning todo reminder, and the morning proof-of-life check-in -- everything keyed off "today's morning". */
 private data class ReminderSettings(
     val bedtime: PreferencesRepository.BedtimeSettings,
     val morning: PreferencesRepository.MorningReminderSettings,
+    val proofOfLife: PreferencesRepository.ProofOfLifeSettings,
 )
 
 /** Hard mode, the ease-in ramp's streak length, and the photo-verification API key -- grouped only to fit combine()'s 5-flow cap. */
@@ -59,6 +65,7 @@ class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val bedtimeRepository: BedtimeRepository,
     private val lootboxRepository: LootboxRepository,
+    private val proofOfLifeRepository: ProofOfLifeRepository,
 ) : ViewModel() {
 
     // kotlinx.coroutines.flow.combine's typed overloads top out at 5 flows, so the
@@ -76,6 +83,7 @@ class SettingsViewModel @Inject constructor(
     private val reminderSettings = combine(
         bedtimeRepository.settings,
         preferencesRepository.morningTodoReminderSettings,
+        proofOfLifeRepository.settings,
         ::ReminderSettings,
     )
 
@@ -106,6 +114,9 @@ class SettingsViewModel @Inject constructor(
             bedtimeEnd = rs.bedtime.end,
             morningReminderEnabled = rs.morning.enabled,
             morningReminderTime = rs.morning.time,
+            proofOfLifeEnabled = rs.proofOfLife.enabled,
+            proofOfLifeTime = rs.proofOfLife.time,
+            proofOfLifeWindowMinutes = rs.proofOfLife.windowMinutes,
             hardModeEnabled = extra.hardModeEnabled,
             easeInStreakLength = extra.easeInStreakLength,
         )
@@ -133,6 +144,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onMorningReminderChanged(enabled: Boolean, time: String) {
         viewModelScope.launch { preferencesRepository.setMorningTodoReminderSettings(enabled, time) }
+    }
+
+    fun onProofOfLifeChanged(enabled: Boolean, time: String, windowMinutes: Int) {
+        viewModelScope.launch { proofOfLifeRepository.setProofOfLife(enabled, time, windowMinutes) }
     }
 
     /** Enabling grants a batch of grace tokens to ease into it (see [PreferencesRepository.setHardModeEnabled]). */

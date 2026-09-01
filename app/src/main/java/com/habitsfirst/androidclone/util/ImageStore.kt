@@ -18,6 +18,7 @@ object ImageStore {
     private const val EXAMPLE_DIR = "habit_examples"
     private const val VERIFICATION_DIR = "habit_verifications"
     private const val CAPTURE_DIR = "verification_captures"
+    private const val SCRATCH_DIR = "scratch_images"
     private const val MAX_DIMENSION = 1024
     private const val JPEG_QUALITY = 82
 
@@ -41,6 +42,15 @@ object ImageStore {
             File(context.filesDir, VERIFICATION_DIR),
             "verify_${habitId}_${System.currentTimeMillis()}",
         )
+
+    /**
+     * Scales a picked/captured photo into a throwaway cache file -- for callers with
+     * nothing to keep once verification is done (e.g. proof-of-life), unlike
+     * [saveExampleImage]/[saveVerificationImage]'s durable `filesDir` storage. The
+     * caller is responsible for [deleteQuietly]-ing the result when it's no longer needed.
+     */
+    fun saveToCache(context: Context, source: Uri): String? =
+        saveScaledJpeg(context, source, File(context.cacheDir, SCRATCH_DIR), "scratch_${System.currentTimeMillis()}")
 
     fun readBytes(path: String): ByteArray? =
         try {
