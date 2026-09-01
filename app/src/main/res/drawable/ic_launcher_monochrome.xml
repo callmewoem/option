@@ -9,10 +9,10 @@
          the user's wallpaper-derived tint, so the actual color here is irrelevant. -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M25,48 h14 v36 h-14 z" />
+        android:pathData="M25,24 h14 v60 h-14 z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M47,34 h14 v50 h-14 z" />
+        android:pathData="M47,24 h14 v60 h-14 z" />
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M69,24 h14 v60 h-14 z" />
