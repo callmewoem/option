@@ -19,3 +19,10 @@ app/build/
 *.jks
 *.keystore
 keystore.properties
+
+# ...except the debug keystore: it's intentionally checked in (see
+# app/build.gradle.kts) so every debug build -- local or CI -- shares one stable
+# signature and can update over a previously installed build instead of needing
+# an uninstall first. Its passwords are the well-known Android debug defaults,
+# not a secret.
+!app/debug.keystore
