@@ -11,6 +11,7 @@ import com.habitsfirst.androidclone.data.local.entity.BlockedAppEntity
 import com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity
 import com.habitsfirst.androidclone.data.local.entity.HabitEntity
 import com.habitsfirst.androidclone.data.local.entity.StreakScarEntity
+import com.habitsfirst.androidclone.data.local.entity.TodoCompletionEntity
 import com.habitsfirst.androidclone.data.local.entity.TodoEntity
 
 @Database(
@@ -20,6 +21,7 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
         BlockedAppEntity::class,
         StreakScarEntity::class,
         TodoEntity::class,
+        TodoCompletionEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
@@ -28,10 +30,12 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // v3: added HabitEntity.easeInOrder (onboarding "ease into it" ramp).
     // v4: merge of the above two lines -- bumped past both so either prior install's
     // schema gets rebuilt.
+    // v5: added TodoEntity.repeatDaysMask + todo_completions, for day-of-week-recurring
+    // todos (e.g. "hoover" every Sunday).
     // No migration is written since the app hasn't shipped yet -- provideDatabase() in
     // di/AppModule.kt uses fallbackToDestructiveMigration(), which is fine pre-release
     // but must be replaced with a real Migration before this ships with real user data.
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
