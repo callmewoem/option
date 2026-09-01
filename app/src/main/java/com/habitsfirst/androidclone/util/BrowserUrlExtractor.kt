@@ -15,6 +15,9 @@ import android.view.accessibility.AccessibilityNodeInfo
  */
 object BrowserUrlExtractor {
 
+    /** Bound on the id-hint fallback's tree walk, so a deep/wide page can't stall the accessibility event thread. */
+    private const val MAX_FALLBACK_NODES_VISITED = 400
+
     /** Package name -> view-id suffixes (after "<package>:id/") its address bar is known to use, tried in order. */
     private val ADDRESS_BAR_ID_SUFFIXES: Map<String, List<String>> = mapOf(
         "com.android.chrome" to listOf("url_bar"),
@@ -45,15 +48,19 @@ object BrowserUrlExtractor {
     /** Every package this can plausibly read a URL from -- used to skip non-browser accessibility events cheaply. */
     val KNOWN_BROWSER_PACKAGES: Set<String> = ADDRESS_BAR_ID_SUFFIXES.keys
 
-    /** Best-effort current address-bar text for [packageName], or null if it can't be found (unknown browser, or the id moved). */
+    /** Best-effort current address-bar text for [packageName], or null if it can't be found at all. */
     fun findCurrentUrl(root: AccessibilityNodeInfo?, packageName: String): String? {
         if (root == null) return null
-        val suffixes = ADDRESS_BAR_ID_SUFFIXES[packageName] ?: return null
-        for (suffix in suffixes) {
-            val text = findFirstNonBlankText(root, "$packageName:id/$suffix")
-            if (text != null) return text
+        ADDRESS_BAR_ID_SUFFIXES[packageName]?.forEach { suffix ->
+            findFirstNonBlankText(root, "$packageName:id/$suffix")?.let { return it }
         }
-        return null
+        // The exact id above is a snapshot of one app version and does drift (a browser
+        // update renames its address-bar view), which would otherwise silently stop
+        // blocking for that browser until this list is updated. Fall back to any node
+        // whose own resource id still *looks* address-bar-ish, rather than trusting only
+        // an exact match -- still anchored to the widget's identity (not page content),
+        // so this doesn't risk matching arbitrary text on the loaded page.
+        return findFirstNonBlankTextByIdHint(root)
     }
 
     private fun findFirstNonBlankText(root: AccessibilityNodeInfo, viewId: String): String? {
@@ -64,6 +71,31 @@ object BrowserUrlExtractor {
             @Suppress("DEPRECATION")
             nodes.forEach { runCatching { it.recycle() } }
         }
+    }
+
+    /** Substrings of a resource-id's own name (after "<package>:id/") that read as an address bar across the browsers above. */
+    private val ADDRESS_BAR_ID_HINTS = listOf(
+        "url_bar", "url_field", "url_view", "url_edit", "url_title", "address_bar",
+        "address_editor", "addressbar", "omnibar", "location_bar", "toolbar_url",
+    )
+
+    /** Breadth-first scan, capped so a pathological tree can't stall the accessibility event thread. */
+    private fun findFirstNonBlankTextByIdHint(root: AccessibilityNodeInfo): String? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var visited = 0
+        while (queue.isNotEmpty() && visited < MAX_FALLBACK_NODES_VISITED) {
+            val node = queue.removeFirst()
+            visited++
+            val id = node.viewIdResourceName
+            if (id != null && ADDRESS_BAR_ID_HINTS.any { id.contains(it, ignoreCase = true) }) {
+                node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            }
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it) }
+            }
+        }
+        return null
     }
 
     /** Extracts a bare, lowercased host from address-bar text such as "https://x.com/path" or just "x.com". Null if nothing host-shaped is found. */

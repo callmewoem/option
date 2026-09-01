@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitType
 
 fun HabitType.icon(): ImageVector = when (this) {
@@ -16,7 +17,6 @@ fun HabitType.icon(): ImageVector = when (this) {
     HabitType.MEDITATION_MINUTES -> Icons.Filled.SelfImprovement
     HabitType.APP_USAGE_MINUTES -> Icons.Filled.PhoneAndroid
     HabitType.CUSTOM -> Icons.Filled.CheckCircle
-    HabitType.IMAGE_VERIFICATION -> Icons.Filled.CameraAlt
 }
 
 fun HabitType.label(): String = when (this) {
@@ -25,5 +25,7 @@ fun HabitType.label(): String = when (this) {
     HabitType.MEDITATION_MINUTES -> "Meditate"
     HabitType.APP_USAGE_MINUTES -> "Use an app"
     HabitType.CUSTOM -> "Custom check-in"
-    HabitType.IMAGE_VERIFICATION -> "Photo verification"
 }
+
+/** A habit's icon, overridden to a camera for a [Habit.requiresPhotoVerification] check-in. */
+fun Habit.icon(): ImageVector = if (requiresPhotoVerification) Icons.Filled.CameraAlt else type.icon()

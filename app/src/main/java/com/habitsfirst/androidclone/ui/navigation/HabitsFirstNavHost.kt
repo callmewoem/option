@@ -94,7 +94,9 @@ fun HabitsFirstNavHost() {
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
                 onSetUpPhotoVerification = {
-                    navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.IMAGE_VERIFICATION))
+                    navController.navigate(
+                        Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.CUSTOM, requiresPhoto = true),
+                    )
                 },
             )
         }
@@ -134,6 +136,10 @@ fun HabitsFirstNavHost() {
                 navArgument(Screen.ARG_TYPE) {
                     type = NavType.StringType
                     defaultValue = ""
+                },
+                navArgument(Screen.ARG_REQUIRES_PHOTO) {
+                    type = NavType.BoolType
+                    defaultValue = false
                 },
             ),
         ) {

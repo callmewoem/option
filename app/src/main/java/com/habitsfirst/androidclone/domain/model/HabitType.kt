@@ -19,18 +19,16 @@ enum class HabitType {
     /** Actually use a specific app (e.g. Duolingo) for a target number of minutes. */
     APP_USAGE_MINUTES,
 
-    /** A simple manual check-in with no automatic tracking. */
-    CUSTOM,
-
     /**
-     * Submit a photo as proof, checked against a description and/or an example photo
-     * by a vision model before the habit counts as done.
+     * A manual check-in with no automatic tracking -- optionally gated on submitting a
+     * proof photo (see [Habit.requiresPhotoVerification]) that's checked against a
+     * description and/or an example photo by a vision model before it counts as done.
      */
-    IMAGE_VERIFICATION;
+    CUSTOM;
 
     /** Whether this habit type accumulates a numeric value toward [Habit.targetValue]. */
     val isMeasurable: Boolean
-        get() = this != CUSTOM && this != IMAGE_VERIFICATION
+        get() = this != CUSTOM
 
     /** Whether this habit type needs a target app selected. */
     val requiresTargetApp: Boolean
@@ -40,6 +38,6 @@ enum class HabitType {
         get() = when (this) {
             STEPS -> "steps"
             EXERCISE_MINUTES, MEDITATION_MINUTES, APP_USAGE_MINUTES -> "min"
-            CUSTOM, IMAGE_VERIFICATION -> ""
+            CUSTOM -> ""
         }
 }
