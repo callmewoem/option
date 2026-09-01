@@ -11,5 +11,6 @@ class BootCompletedReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         WorkScheduler.scheduleUsageTracking(context.applicationContext)
         WorkScheduler.scheduleMorningTodoReminder(context.applicationContext)
+        WorkScheduler.scheduleProofOfLifeCheck(context.applicationContext)
     }
 }

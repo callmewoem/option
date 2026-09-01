@@ -55,6 +55,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.BuildConfig
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.ui.components.icon
@@ -200,6 +201,10 @@ fun SettingsScreen(
                     morningReminderEnabled = state.morningReminderEnabled,
                     morningReminderTime = state.morningReminderTime,
                     onMorningReminderChanged = viewModel::onMorningReminderChanged,
+                    proofOfLifeEnabled = state.proofOfLifeEnabled,
+                    proofOfLifeTime = state.proofOfLifeTime,
+                    proofOfLifeWindowMinutes = state.proofOfLifeWindowMinutes,
+                    onProofOfLifeChanged = viewModel::onProofOfLifeChanged,
                 )
             }
 
@@ -337,10 +342,15 @@ private fun BedtimeAndReminderSection(
     morningReminderEnabled: Boolean,
     morningReminderTime: String,
     onMorningReminderChanged: (Boolean, String) -> Unit,
+    proofOfLifeEnabled: Boolean,
+    proofOfLifeTime: String,
+    proofOfLifeWindowMinutes: Int,
+    onProofOfLifeChanged: (Boolean, String, Int) -> Unit,
 ) {
     var start by remember(bedtimeStart) { mutableStateOf(bedtimeStart) }
     var end by remember(bedtimeEnd) { mutableStateOf(bedtimeEnd) }
     var reminderTime by remember(morningReminderTime) { mutableStateOf(morningReminderTime) }
+    var checkInTime by remember(proofOfLifeTime) { mutableStateOf(proofOfLifeTime) }
 
     ListItem(
         headlineContent = { Text("Enable bedtime lock") },
@@ -400,6 +410,56 @@ private fun BedtimeAndReminderSection(
         )
     }
     HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+
+    SectionHeader("Morning check-in")
+    Text(
+        "A daily photo proving you're up -- miss the window and apps stay locked " +
+            "${ProofOfLifeRepository.PENALTY_MINUTES} minutes longer.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    ListItem(
+        headlineContent = { Text("Enable check-in") },
+        trailingContent = {
+            Switch(
+                checked = proofOfLifeEnabled,
+                onCheckedChange = { onProofOfLifeChanged(it, checkInTime, proofOfLifeWindowMinutes) },
+            )
+        },
+    )
+    if (proofOfLifeEnabled) {
+        OutlinedTextField(
+            value = checkInTime,
+            onValueChange = { checkInTime = it; onProofOfLifeChanged(proofOfLifeEnabled, it, proofOfLifeWindowMinutes) },
+            label = { Text("Time (HH:mm)") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            singleLine = true,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Grace window",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(15, 30, 60).forEach { minutes ->
+                FilterChip(
+                    selected = proofOfLifeWindowMinutes == minutes,
+                    onClick = { onProofOfLifeChanged(proofOfLifeEnabled, checkInTime, minutes) },
+                    label = { Text("$minutes min") },
+                )
+            }
+        }
+    }
 }
 
 @Composable

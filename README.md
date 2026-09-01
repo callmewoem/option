@@ -82,7 +82,11 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
     inline on Home (there's no separate Todos tab). A periodic worker posts a
     reminder to fill them in once it's near your configured morning time (a
     ~15-minute-cadence check, not an exact alarm).
-11. Progress resets automatically at midnight because completion is stored keyed by
+11. **Morning check-in** (Settings, optional) -- a daily proof-of-life photo, due by a
+    configured time plus a grace window. Miss it and `PenaltyRepository` extends the
+    block lock, same as an antihabit slip. It's a thin wrapper around the same
+    capture/verify flow as photo verification below, not tied to any habit.
+12. Progress resets automatically at midnight because completion is stored keyed by
     calendar date, not as a flag that has to be cleared.
 
 ### Photo verification
@@ -98,6 +102,13 @@ you provide yourself in Settings → *Photo verification*; nothing is sent anywh
 until a key is set. Photos are stored locally under the app's own storage
 (`data/verification/`, `util/ImageStore.kt`) and never leave the device except as
 part of that one verification request.
+
+The morning check-in above shares this exact capture/verify UI
+(`ui/components/PhotoVerificationCapture.kt`) and the same `ImageVerificationClient`
+-- its own screen (`ui/proofoflife/`) just supplies a fixed prompt instead of a
+habit's own rules, and confirms `ProofOfLifeRepository` instead of a habit on
+approval. Its photos aren't kept once verified (`ImageStore.saveToCache`), since
+there's nothing to show again later -- just today's yes/no.
 
 ## Project structure
 
@@ -214,10 +225,8 @@ update to the same Play Store listing again, and it must never be committed
   `di/AppModule.kt`) rather than a real `Migration` -- fine pre-release, but must
   be replaced before this ships with real user data on device, or an update will
   silently wipe local habit/todo history.
-- Wake-up proof-of-life check-in (a mandatory task at your wake time, with a
-  penalty for missing it) and uninstall/bypass friction were deliberately left out
-  of this pass -- both are natural next additions to the penalty engine and the
-  bedtime lock already in place.
+- Uninstall/bypass friction was deliberately left out of this pass -- a natural
+  next addition alongside the penalty engine and bedtime lock already in place.
 - Home-screen habit reminder notifications beyond the morning todo reminder (the
   notification channel is created; scheduling per-habit reminders isn't wired up).
 - The morning todo reminder and lootbox-reveal notification icon both reuse the

@@ -43,4 +43,14 @@ object WorkScheduler {
             request,
         )
     }
+
+    /** Enqueues the periodic check that penalizes a missed proof-of-life check-in. */
+    fun scheduleProofOfLifeCheck(context: Context) {
+        val request = PeriodicWorkRequestBuilder<ProofOfLifeWorker>(15, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            ProofOfLifeWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
 }

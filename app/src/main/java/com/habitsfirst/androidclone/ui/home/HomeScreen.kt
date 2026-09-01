@@ -1,6 +1,7 @@
 package com.habitsfirst.androidclone.ui.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -67,6 +69,7 @@ fun HomeScreen(
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
     onVerifyHabit: (Long) -> Unit,
+    onCheckIn: () -> Unit,
     onOpenSettings: () -> Unit,
     onManageApps: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -133,6 +136,10 @@ fun HomeScreen(
 
             state.easeInStatus?.let { status ->
                 item { EaseInBanner(status) }
+            }
+
+            if (state.proofOfLifeDue) {
+                item { ProofOfLifeBanner(onClick = onCheckIn) }
             }
 
             item {
@@ -268,6 +275,40 @@ private fun EaseInBanner(status: EaseInStatus) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
+        }
+    }
+}
+
+@Composable
+private fun ProofOfLifeBanner(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Morning check-in due",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    text = "Tap to prove you're up before apps stay locked longer.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
         }
     }
 }
