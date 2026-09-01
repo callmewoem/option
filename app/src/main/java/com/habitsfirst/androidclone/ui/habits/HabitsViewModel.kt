@@ -20,18 +20,54 @@ import javax.inject.Inject
 /** Average gating-completion fraction for one day of the week, across the stats window. */
 data class DayOfWeekStat(val dayOfWeek: DayOfWeek, val averageFraction: Float)
 
+/** How far back the stats window looks. [weeks] drives every query; [label] is the chip text. */
+enum class StatsRange(val weeks: Long, val label: String) {
+    FOUR_WEEKS(4, "4w"),
+    TWELVE_WEEKS(12, "12w"),
+    TWENTY_WEEKS(20, "20w"),
+    YEAR(52, "1y"),
+}
+
 data class HabitsUiState(
     val isLoading: Boolean = true,
+    val range: StatsRange = StatsRange.TWENTY_WEEKS,
     val dayScores: Map<LocalDate, Float> = emptyMap(),
     val goldStarDates: Set<LocalDate> = emptySet(),
+    val scarredDates: Set<LocalDate> = emptySet(),
     val completionStats: List<HabitCompletionStat> = emptyList(),
     val dayOfWeekStats: List<DayOfWeekStat> = emptyList(),
+    /** Current unbroken streak of fully-complete days, same figure Home shows -- not bounded by [range]. */
+    val currentStreak: Int = 0,
+    /** Longest run of 100%-complete days found within [range]. */
+    val longestStreakInRange: Int = 0,
+    /** Count of 100%-complete days within [range]. */
+    val perfectDaysInRange: Int = 0,
+) {
+    val availableRanges: List<StatsRange> get() = StatsRange.entries
+}
+
+/** The heatmap/day-score data, paired with completion stats, loading state, and the perfect-day count derived from the same fetch -- split out only to keep [uiState]'s combine() within its 5-flow cap. */
+private data class ScoreData(
+    val dayScores: Map<LocalDate, Float>,
+    val completionStats: List<HabitCompletionStat>,
+    val isLoading: Boolean,
+    val perfectDaysInRange: Int,
+)
+
+/** Everything else the stats screen needs: gold stars, the selected range, streaks, and broken-streak dates. */
+private data class MetaData(
+    val goldStarDates: Set<LocalDate>,
+    val range: StatsRange,
+    val currentStreak: Int,
+    val scarredDates: Set<LocalDate>,
+    val longestStreakInRange: Int,
 )
 
 /**
- * Pure stats: the heatmap, completion rate by habit, and completion rate by day of
- * week. Managing the habit list (add/edit/delete) lives in Settings, not here --
- * doing a habit lives on Home. This screen has nothing to tap.
+ * Pure stats: the heatmap, streak summary, completion rate by habit, and completion
+ * rate by day of week, over a selectable window. Managing the habit list (add/edit/
+ * delete) lives in Settings, not here -- doing a habit lives on Home. This screen has
+ * nothing to tap besides the range selector.
  */
 @HiltViewModel
 class HabitsViewModel @Inject constructor(
@@ -42,22 +78,45 @@ class HabitsViewModel @Inject constructor(
     private val dayScores = MutableStateFlow<Map<LocalDate, Float>>(emptyMap())
     private val completionStats = MutableStateFlow<List<HabitCompletionStat>>(emptyList())
     private val isLoading = MutableStateFlow(true)
+    private val selectedRange = MutableStateFlow(StatsRange.TWENTY_WEEKS)
+    private val currentStreak = MutableStateFlow(0)
+    private val scarredDates = MutableStateFlow<Set<LocalDate>>(emptySet())
+    private val longestStreakInRange = MutableStateFlow(0)
+    private val perfectDaysInRange = MutableStateFlow(0)
 
-    val uiState: StateFlow<HabitsUiState> = combine(
-        dayScores,
+    private val scoreData = combine(dayScores, completionStats, isLoading, perfectDaysInRange, ::ScoreData)
+
+    private val metaData = combine(
         preferencesRepository.goldStarDates,
-        completionStats,
-        isLoading,
-    ) { scores, goldStars, stats, loading ->
-        HabitsUiState(
-            isLoading = loading,
-            dayScores = scores,
+        selectedRange,
+        currentStreak,
+        scarredDates,
+        longestStreakInRange,
+    ) { goldStars, range, streak, scarred, longest ->
+        MetaData(
             goldStarDates = goldStars.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toSet(),
-            completionStats = stats,
+            range = range,
+            currentStreak = streak,
+            scarredDates = scarred,
+            longestStreakInRange = longest,
+        )
+    }
+
+    val uiState: StateFlow<HabitsUiState> = combine(scoreData, metaData) { sd, md ->
+        HabitsUiState(
+            isLoading = sd.isLoading,
+            range = md.range,
+            dayScores = sd.dayScores,
+            goldStarDates = md.goldStarDates,
+            scarredDates = md.scarredDates,
+            completionStats = sd.completionStats,
             dayOfWeekStats = DayOfWeek.values().map { day ->
-                val values = scores.filterKeys { it.dayOfWeek == day }.values
+                val values = sd.dayScores.filterKeys { it.dayOfWeek == day }.values
                 DayOfWeekStat(day, if (values.isEmpty()) 0f else values.average().toFloat())
             },
+            currentStreak = md.currentStreak,
+            longestStreakInRange = md.longestStreakInRange,
+            perfectDaysInRange = sd.perfectDaysInRange,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HabitsUiState())
 
@@ -70,18 +129,43 @@ class HabitsViewModel @Inject constructor(
         }
     }
 
+    fun onRangeSelected(range: StatsRange) {
+        if (range == selectedRange.value) return
+        selectedRange.value = range
+        refreshStats()
+    }
+
     fun refreshStats() {
         viewModelScope.launch {
+            val range = selectedRange.value
             val end = DateProvider.todayString()
-            val start = DateProvider.toDateString(DateProvider.fromDateString(end).minusWeeks(WINDOW_WEEKS))
-            dayScores.value = habitRepository.getDayScoresInRange(start, end)
-                .mapKeys { DateProvider.fromDateString(it.key) }
+            val start = DateProvider.toDateString(DateProvider.fromDateString(end).minusWeeks(range.weeks))
+            val scores = habitRepository.getDayScoresInRange(start, end).mapKeys { DateProvider.fromDateString(it.key) }
+            dayScores.value = scores
             completionStats.value = habitRepository.getHabitCompletionStats(start, end)
+            scarredDates.value = habitRepository.getScarredDatesInRange(start, end)
+                .mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toSet()
+            currentStreak.value = habitRepository.computeCurrentStreak()
+            longestStreakInRange.value = longestRun(scores, DateProvider.fromDateString(start), DateProvider.fromDateString(end))
+            perfectDaysInRange.value = scores.values.count { it >= 1f }
             isLoading.value = false
         }
     }
 
-    companion object {
-        private const val WINDOW_WEEKS = 20L
+    /** Longest run of consecutive 100%-scored days between [start] and [end] inclusive. A date missing from [scores] (no activity logged) counts as incomplete, same as the heatmap's empty cell. */
+    private fun longestRun(scores: Map<LocalDate, Float>, start: LocalDate, end: LocalDate): Int {
+        var longest = 0
+        var current = 0
+        var cursor = start
+        while (!cursor.isAfter(end)) {
+            if ((scores[cursor] ?: 0f) >= 1f) {
+                current++
+                longest = maxOf(longest, current)
+            } else {
+                current = 0
+            }
+            cursor = cursor.plusDays(1)
+        }
+        return longest
     }
 }
