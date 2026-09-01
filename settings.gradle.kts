@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HabitsFirstClone"
+rootProject.name = "Locke"
 include(":app")

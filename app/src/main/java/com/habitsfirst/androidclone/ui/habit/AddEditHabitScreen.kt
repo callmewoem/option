@@ -56,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.components.label
@@ -113,6 +114,33 @@ fun AddEditHabitScreen(
                 label = { Text(stringResource(R.string.add_habit_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(text = "Kind", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HabitKind.entries.forEach { kind ->
+                    FilterChip(
+                        selected = state.kind == kind,
+                        onClick = { viewModel.onKindChanged(kind) },
+                        enabled = !state.isKindLocked,
+                        label = { Text(kind.label) },
+                    )
+                }
+            }
+            Text(
+                text = when {
+                    state.isKindLocked -> "Locked by Hard Mode"
+                    state.kind == HabitKind.GATING -> "Gates your locked apps."
+                    state.kind == HabitKind.TRACKED -> "Tracked only, never blocks."
+                    else -> "Log only when you slip."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(20.dp))

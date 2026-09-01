@@ -9,6 +9,8 @@ import com.habitsfirst.androidclone.data.local.AppDatabase
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
+import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
+import com.habitsfirst.androidclone.data.local.dao.TodoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,6 +39,12 @@ object AppModule {
 
     @Provides
     fun provideBlockedAppDao(db: AppDatabase): BlockedAppDao = db.blockedAppDao()
+
+    @Provides
+    fun provideStreakScarDao(db: AppDatabase): StreakScarDao = db.streakScarDao()
+
+    @Provides
+    fun provideTodoDao(db: AppDatabase): TodoDao = db.todoDao()
 
     @Provides
     @Singleton

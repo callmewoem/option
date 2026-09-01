@@ -1,5 +1,6 @@
 package com.habitsfirst.androidclone.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +20,10 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -29,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -40,18 +44,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.data.repository.EaseInStatus
+import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
+import com.habitsfirst.androidclone.domain.model.Todo
 import com.habitsfirst.androidclone.ui.components.HabitCard
+import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
+import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
 import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    navController: NavController,
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
     onVerifyHabit: (Long) -> Unit,
@@ -60,9 +72,18 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
+    var newTodoText by remember { mutableStateOf("") }
+
+    // Everything actionable today, tagged by kind so HabitCard can render its accent --
+    // this is the "do it all from Home" list; Habits/Todos are for managing the lists.
+    val combinedHabits: List<Pair<HabitProgress, HabitKind>> = state.gating.map { it to HabitKind.GATING } +
+        state.tracked.map { it to HabitKind.TRACKED } +
+        state.antihabits.map { it to HabitKind.ANTIHABIT }
 
     Scaffold(
+        bottomBar = { LockeBottomBar(navController) },
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(greetingRes())) },
@@ -110,6 +131,10 @@ fun HomeScreen(
                 )
             }
 
+            state.easeInStatus?.let { status ->
+                item { EaseInBanner(status) }
+            }
+
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -126,23 +151,54 @@ fun HomeScreen(
                 }
             }
 
-            if (state.habitProgress.isEmpty()) {
+            if (combinedHabits.isEmpty()) {
                 item { EmptyHabitsCard(onAddHabit) }
             } else {
-                items(state.habitProgress, key = { it.habit.id }) { progress ->
+                items(combinedHabits, key = { (progress, kind) -> "${kind.name}-${progress.habit.id}" }) { (progress, kind) ->
                     HabitCard(
                         progress = progress,
+                        kind = kind,
                         onClick = {
-                            when (progress.habit.type) {
-                                HabitType.CUSTOM ->
+                            when {
+                                kind == HabitKind.ANTIHABIT ->
+                                    viewModel.onToggleAntihabitSlip(progress.habit.id, progress.habit.name, !progress.isCompleted)
+                                progress.habit.type == HabitType.CUSTOM ->
                                     viewModel.onCustomHabitToggled(progress.habit.id, !progress.isCompleted)
-                                HabitType.MEDITATION_MINUTES -> onOpenHabit(progress.habit.id)
-                                HabitType.IMAGE_VERIFICATION -> onVerifyHabit(progress.habit.id)
+                                progress.habit.type == HabitType.MEDITATION_MINUTES -> onOpenHabit(progress.habit.id)
+                                progress.habit.type == HabitType.IMAGE_VERIFICATION -> onVerifyHabit(progress.habit.id)
                                 else -> progressDialogTarget = progress
                             }
                         },
                     )
                 }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(stringResource(R.string.todos_title), style = MaterialTheme.typography.titleLarge)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newTodoText,
+                        onValueChange = { newTodoText = it },
+                        label = { Text(stringResource(R.string.todos_add_hint)) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            viewModel.onAddTodo(newTodoText)
+                            newTodoText = ""
+                        },
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add")
+                    }
+                }
+            }
+
+            items(state.pendingTodos, key = { "todo-${it.id}" }) { todo ->
+                QuickTodoRow(todo = todo, onToggle = { viewModel.onToggleTodoDone(todo) })
             }
 
             item { Spacer(modifier = Modifier.height(4.dp)) }
@@ -158,6 +214,61 @@ fun HomeScreen(
                 progressDialogTarget = null
             },
         )
+    }
+
+    wonReward?.let { reward ->
+        LootboxRewardDialog(reward = reward, onDismiss = viewModel::onRewardDismissed)
+    }
+}
+
+@Composable
+private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = todo.isDone, onCheckedChange = { onToggle() })
+            Text(
+                text = todo.title,
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EaseInBanner(status: EaseInStatus) {
+    val remaining = (status.requiredStreak - status.activeHabitStreak).coerceAtLeast(0)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Filled.Spa, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            val dayWord = if (remaining == 1) "day" else "days"
+            Text(
+                text = "$remaining more $dayWord on \"${status.activeHabitName}\" unlocks \"${status.nextHabitName}\"",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
     }
 }
 
@@ -178,6 +289,8 @@ private fun SummaryCard(
                 MaterialTheme.colorScheme.surfaceVariant
             },
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
@@ -187,16 +300,6 @@ private fun SummaryCard(
                     stringResource(R.string.home_remaining_habits, total - completed, total)
                 },
                 style = MaterialTheme.typography.titleLarge,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (allDone) {
-                    stringResource(R.string.home_all_done_subtitle)
-                } else {
-                    "$lockedAppCount ${if (lockedAppCount == 1) "app" else "apps"} stay locked until you finish."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -229,12 +332,17 @@ private fun SummaryCard(
 
 @Composable
 private fun EmptyHabitsCard(onAddHabit: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onAddHabit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onAddHabit,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Add a habit to start locking your distracting apps behind it.",
+                text = "Tap to add one.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

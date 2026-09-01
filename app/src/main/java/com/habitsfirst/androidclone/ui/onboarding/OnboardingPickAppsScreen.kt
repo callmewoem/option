@@ -68,6 +68,11 @@ fun OnboardingPickAppsScreen(
                         val checked = app.packageName in state.selectedPackageNames
                         ListItem(
                             headlineContent = { Text(app.label) },
+                            supportingContent = if (state.isRecommended(app)) {
+                                { Text("Recommended", color = MaterialTheme.colorScheme.primary) }
+                            } else {
+                                null
+                            },
                             leadingContent = {
                                 Checkbox(
                                     checked = checked,
