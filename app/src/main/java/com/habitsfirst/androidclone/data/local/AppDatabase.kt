@@ -11,7 +11,7 @@ import com.habitsfirst.androidclone.data.local.entity.HabitEntity
 
 @Database(
     entities = [HabitEntity::class, HabitCompletionEntity::class, BlockedAppEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

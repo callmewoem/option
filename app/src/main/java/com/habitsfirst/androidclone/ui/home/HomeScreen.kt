@@ -54,6 +54,7 @@ import java.time.LocalTime
 fun HomeScreen(
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
+    onVerifyHabit: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     onManageApps: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -136,6 +137,7 @@ fun HomeScreen(
                                 HabitType.CUSTOM ->
                                     viewModel.onCustomHabitToggled(progress.habit.id, !progress.isCompleted)
                                 HabitType.MEDITATION_MINUTES -> onOpenHabit(progress.habit.id)
+                                HabitType.IMAGE_VERIFICATION -> onVerifyHabit(progress.habit.id)
                                 else -> progressDialogTarget = progress
                             }
                         },

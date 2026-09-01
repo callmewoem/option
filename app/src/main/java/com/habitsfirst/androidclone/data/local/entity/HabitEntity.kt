@@ -17,6 +17,10 @@ data class HabitEntity(
     val createdAtEpochMillis: Long,
     /** Soft-delete flag so historical [HabitCompletionEntity] rows stay meaningful. */
     val isArchived: Boolean = false,
+    /** [HabitType.IMAGE_VERIFICATION]: what a proof photo must show. */
+    val verificationPrompt: String? = null,
+    /** [HabitType.IMAGE_VERIFICATION]: path to a saved example photo, if any. */
+    val verificationExampleImagePath: String? = null,
 )
 
 fun HabitEntity.toDomain(): Habit = Habit(
@@ -28,6 +32,8 @@ fun HabitEntity.toDomain(): Habit = Habit(
     targetAppLabel = targetAppLabel,
     sortOrder = sortOrder,
     createdAtEpochMillis = createdAtEpochMillis,
+    verificationPrompt = verificationPrompt,
+    verificationExampleImagePath = verificationExampleImagePath,
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -40,4 +46,6 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     sortOrder = sortOrder,
     createdAtEpochMillis = createdAtEpochMillis,
     isArchived = isArchived,
+    verificationPrompt = verificationPrompt,
+    verificationExampleImagePath = verificationExampleImagePath,
 )

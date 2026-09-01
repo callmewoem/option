@@ -1,8 +1,11 @@
 package com.habitsfirst.androidclone.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,12 +14,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -24,11 +30,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -143,6 +153,14 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionHeader("Photo verification") }
+            item {
+                ApiKeyField(
+                    apiKey = state.anthropicApiKey,
+                    onApiKeyChanged = viewModel::onAnthropicApiKeyChanged,
+                )
+            }
+
             item { SectionHeader(stringResource(R.string.settings_about)) }
             item {
                 ListItem(
@@ -164,6 +182,42 @@ private fun SectionHeader(text: String) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     )
+}
+
+/** Where the user pastes their own Anthropic API key so [HabitType.IMAGE_VERIFICATION] habits can verify photos. */
+@Composable
+private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
+    var text by remember(apiKey) { mutableStateOf(apiKey.orEmpty()) }
+    var visible by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            text = "Habits with photo verification use your own Anthropic API key to check proof photos. " +
+                "Get one at console.anthropic.com.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("Anthropic API key") },
+            placeholder = { Text("sk-ant-...") },
+            singleLine = true,
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { visible = !visible }) {
+                    Icon(
+                        imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = if (visible) "Hide key" else "Show key",
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focus -> if (!focus.isFocused && text != apiKey.orEmpty()) onApiKeyChanged(text) },
+        )
+    }
 }
 
 @Composable

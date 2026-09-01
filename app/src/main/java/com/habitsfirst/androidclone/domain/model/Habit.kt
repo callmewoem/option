@@ -12,9 +12,13 @@ data class Habit(
     val targetAppLabel: String? = null,
     val sortOrder: Int = 0,
     val createdAtEpochMillis: Long = System.currentTimeMillis(),
+    /** [IMAGE_VERIFICATION][HabitType.IMAGE_VERIFICATION]: what a proof photo must show. */
+    val verificationPrompt: String? = null,
+    /** [IMAGE_VERIFICATION][HabitType.IMAGE_VERIFICATION]: path to a saved example photo, if any. */
+    val verificationExampleImagePath: String? = null,
 ) {
     val displayTarget: String
-        get() = if (type == HabitType.CUSTOM) "" else "$targetValue ${type.unit}"
+        get() = if (!type.isMeasurable) "" else "$targetValue ${type.unit}"
 }
 
 /**
@@ -26,7 +30,7 @@ data class HabitProgress(
     val isCompleted: Boolean,
 ) {
     val fraction: Float
-        get() = if (habit.type == HabitType.CUSTOM) {
+        get() = if (!habit.type.isMeasurable) {
             if (isCompleted) 1f else 0f
         } else {
             (currentValue.toFloat() / habit.targetValue.toFloat()).coerceIn(0f, 1f)

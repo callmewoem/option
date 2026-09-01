@@ -117,6 +117,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.accompanist.permissions)
     implementation(libs.coil.compose)
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)

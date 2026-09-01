@@ -25,6 +25,7 @@ class PreferencesRepository @Inject constructor(
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val CACHED_STREAK = intPreferencesKey("cached_streak")
         val CACHED_STREAK_DATE = stringPreferencesKey("cached_streak_date")
+        val ANTHROPIC_API_KEY = stringPreferencesKey("anthropic_api_key")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -49,6 +50,15 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit {
             it[Keys.CACHED_STREAK] = days
             it[Keys.CACHED_STREAK_DATE] = forDate
+        }
+    }
+
+    /** The user's own Anthropic API key, used to verify [com.habitsfirst.androidclone.domain.model.HabitType.IMAGE_VERIFICATION] photos. */
+    val anthropicApiKey: Flow<String?> = dataStore.data.map { it[Keys.ANTHROPIC_API_KEY] }
+
+    suspend fun setAnthropicApiKey(key: String?) {
+        dataStore.edit {
+            if (key.isNullOrBlank()) it.remove(Keys.ANTHROPIC_API_KEY) else it[Keys.ANTHROPIC_API_KEY] = key.trim()
         }
     }
 }

@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
+import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
 import com.habitsfirst.androidclone.ui.habit.MeditationTimerScreen
 import com.habitsfirst.androidclone.ui.home.HomeScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPermissionsScreen
@@ -79,6 +80,7 @@ fun HabitsFirstNavHost() {
             HomeScreen(
                 onAddHabit = { navController.navigate(Screen.AddHabit.route) },
                 onOpenHabit = { habitId -> navController.navigate(Screen.MeditationTimer.createRoute(habitId)) },
+                onVerifyHabit = { habitId -> navController.navigate(Screen.VerifyHabit.createRoute(habitId)) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
             )
@@ -121,6 +123,15 @@ fun HabitsFirstNavHost() {
             arguments = listOf(navArgument(Screen.ARG_HABIT_ID) { type = NavType.StringType }),
         ) {
             MeditationTimerScreen(onDone = { navController.popBackStack() })
+        }
+        composable(
+            route = Screen.VerifyHabit.route,
+            arguments = listOf(navArgument(Screen.ARG_HABIT_ID) { type = NavType.StringType }),
+        ) {
+            ImageVerificationScreen(
+                onDone = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+            )
         }
     }
 }

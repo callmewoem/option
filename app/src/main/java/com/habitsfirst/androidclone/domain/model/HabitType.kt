@@ -20,11 +20,17 @@ enum class HabitType {
     APP_USAGE_MINUTES,
 
     /** A simple manual check-in with no automatic tracking. */
-    CUSTOM;
+    CUSTOM,
+
+    /**
+     * Submit a photo as proof, checked against a description and/or an example photo
+     * by a vision model before the habit counts as done.
+     */
+    IMAGE_VERIFICATION;
 
     /** Whether this habit type accumulates a numeric value toward [Habit.targetValue]. */
     val isMeasurable: Boolean
-        get() = this != CUSTOM
+        get() = this != CUSTOM && this != IMAGE_VERIFICATION
 
     /** Whether this habit type needs a target app selected. */
     val requiresTargetApp: Boolean
@@ -34,6 +40,6 @@ enum class HabitType {
         get() = when (this) {
             STEPS -> "steps"
             EXERCISE_MINUTES, MEDITATION_MINUTES, APP_USAGE_MINUTES -> "min"
-            CUSTOM -> ""
+            CUSTOM, IMAGE_VERIFICATION -> ""
         }
 }

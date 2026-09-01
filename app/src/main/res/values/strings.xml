@@ -47,6 +47,7 @@
     <string name="habit_type_meditation">Meditate</string>
     <string name="habit_type_app_usage">Use an app</string>
     <string name="habit_type_custom">Custom check-in</string>
+    <string name="habit_type_image_verification">Photo verification</string>
 
     <!-- Block screen -->
     <string name="block_title">%1$s is locked</string>

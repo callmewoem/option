@@ -102,6 +102,33 @@ class HabitRepository @Inject constructor(
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
     }
 
+    /** Records a vision-model verdict on a submitted proof photo for an [HabitType.IMAGE_VERIFICATION] habit. */
+    suspend fun setImageVerificationResult(
+        habitId: Long,
+        approved: Boolean,
+        reasoning: String,
+        imagePath: String?,
+        date: String = DateProvider.todayString(),
+    ) {
+        val existing = completionDao.getCompletion(habitId, date)
+        completionDao.upsert(
+            HabitCompletionEntity(
+                id = existing?.id ?: 0L,
+                habitId = habitId,
+                date = date,
+                currentValue = if (approved) 1 else 0,
+                isCompleted = approved,
+                completedAtEpochMillis = when {
+                    approved && existing?.isCompleted != true -> System.currentTimeMillis()
+                    approved -> existing?.completedAtEpochMillis
+                    else -> null
+                },
+                verificationImagePath = imagePath,
+                verificationReasoning = reasoning,
+            ),
+        )
+    }
+
     /** Active habits that track time spent in a specific app, for the usage-tracking worker. */
     suspend fun getAppUsageHabitsOnce(): List<Habit> =
         habitDao.getActiveHabitsOnce()
