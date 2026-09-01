@@ -26,3 +26,7 @@ keystore.properties
 # an uninstall first. Its passwords are the well-known Android debug defaults,
 # not a secret.
 !app/debug.keystore
+
+# Temporary git worktrees created by background coding agents (Agent tool,
+# isolation: "worktree") -- not part of the repo, safe to ignore.
+/.claude/worktrees/
