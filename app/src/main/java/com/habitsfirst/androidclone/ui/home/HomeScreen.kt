@@ -213,6 +213,8 @@ fun HomeScreen(
                                 progress.habit.type == HabitType.TALLY ->
                                     viewModel.onTallyHabitToggled(progress.habit.id, !progress.isCompleted)
                                 progress.habit.type == HabitType.TIMED_MINUTES -> onOpenHabit(progress.habit.id)
+                                // Tracked automatically -- no manual correction, tapping does nothing.
+                                progress.habit.type == HabitType.APP_USAGE_MINUTES -> {}
                                 else -> progressDialogTarget = progress
                             }
                         },
