@@ -539,7 +539,6 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
     }
 }
 
-@Composable
 /**
  * Lets Walk-steps and Exercise habits sync from Health Connect instead of being logged
  * by hand, mirroring the "use an app for N minutes" habit's automatic tracking. Only
