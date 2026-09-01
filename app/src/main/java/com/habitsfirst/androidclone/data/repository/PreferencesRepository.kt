@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -55,6 +56,8 @@ class PreferencesRepository @Inject constructor(
         val PROOF_OF_LIFE_CONFIRMED_DATE = stringPreferencesKey("proof_of_life_confirmed_date")
         val PROOF_OF_LIFE_LAST_PENALIZED_DATE = stringPreferencesKey("proof_of_life_last_penalized_date")
         val HEALTH_CONNECT_SYNC_ENABLED = booleanPreferencesKey("health_connect_sync_enabled")
+        val SUBSCRIPTION_TIER = stringPreferencesKey("subscription_tier") // SubscriptionTier.name
+        val SUBSCRIPTION_EXPIRES_AT = longPreferencesKey("subscription_expires_at_epoch_millis")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -345,6 +348,26 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setHealthConnectSyncEnabled(enabled: Boolean) {
         dataStore.edit { it[Keys.HEALTH_CONNECT_SYNC_ENABLED] = enabled }
+    }
+
+    // -- Subscription / entitlement -----------------------------------------------------
+
+    /** Persisted result of the (future) purchase flow. See [com.habitsfirst.androidclone.data.billing.EntitlementRepository]. */
+    data class StoredSubscriptionState(val tier: SubscriptionTier, val expiresAtEpochMillis: Long?)
+
+    val subscriptionState: Flow<StoredSubscriptionState> = dataStore.data.map {
+        StoredSubscriptionState(
+            tier = SubscriptionTier.fromId(it[Keys.SUBSCRIPTION_TIER]),
+            expiresAtEpochMillis = it[Keys.SUBSCRIPTION_EXPIRES_AT],
+        )
+    }
+
+    /** Null [expiresAtEpochMillis] clears the key (e.g. for [SubscriptionTier.LIFETIME] or [SubscriptionTier.NONE], which never expire). */
+    suspend fun setSubscriptionState(tier: SubscriptionTier, expiresAtEpochMillis: Long?) {
+        dataStore.edit {
+            it[Keys.SUBSCRIPTION_TIER] = tier.name
+            if (expiresAtEpochMillis == null) it.remove(Keys.SUBSCRIPTION_EXPIRES_AT) else it[Keys.SUBSCRIPTION_EXPIRES_AT] = expiresAtEpochMillis
+        }
     }
 
     companion object {
