@@ -130,7 +130,7 @@ app/src/main/java/com/habitsfirst/androidclone/
 │   ├── settings/    Habits, apps, theme, rewards, bedtime, reminders, permissions
 │   ├── block/       The full-screen lock cover (habit checklist or bedtime curfew)
 │   ├── navigation/  NavHost, routes, shared bottom nav bar
-│   └── theme/       Eco-brutalist Material 3 theme (4 lootbox-unlockable variants)
+│   └── theme/       Eco-brutalist Material 3 theme (6 variants, 2 free/4 lootbox-unlockable)
 └── util/            Date handling, installed-app listing + usage stats, permission
                      helpers, curated "recommended apps" list
 ```
@@ -143,9 +143,9 @@ Navigation Compose, single-activity architecture.
 Eco-brutalist: flat concrete/paper neutrals, sharp 0dp corners everywhere (one shared
 `Shapes` token flattens every card/button/field/dialog app-wide), heavy stamped
 display type, monospace numeric/label readouts, outlined rather than shadowed cards.
-Four accent variants share that same shape/type language and only swap color --
-`Moss` (default), `Rust`, `Concrete`, `Ink` -- with everything but Moss won from the
-lootbox.
+Six accent variants share that same shape/type language and only swap color --
+`Moss` (default), `Modern`, `Rust`, `Concrete`, `Ink`, `Receipt` -- with `Moss` and
+`Modern` free and the rest won from the lootbox.
 
 ## Permissions and why
 

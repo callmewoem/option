@@ -106,7 +106,16 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        LazyColumn(contentPadding = PaddingValues(bottom = padding.calculateBottomPadding() + 24.dp)) {
+        // Both insets matter here: without the top one, the TopAppBar visually and
+        // functionally covers the first section header/row underneath it -- with a
+        // single habit, that's the only habit, leaving nothing tappable to edit or
+        // delete it.
+        LazyColumn(
+            contentPadding = PaddingValues(
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 24.dp,
+            ),
+        ) {
             item { SectionHeader(stringResource(R.string.settings_habits)) }
             items(state.habits, key = { it.id }) { habit ->
                 ListItem(

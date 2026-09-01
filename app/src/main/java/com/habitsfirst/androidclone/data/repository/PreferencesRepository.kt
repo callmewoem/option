@@ -120,9 +120,9 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[Keys.THEME_VARIANT] = variantId }
     }
 
-    /** Every variant the user has unlocked from the lootbox. "MOSS" is always available. */
+    /** Every variant the user has unlocked from the lootbox. "MOSS" and "MODERN" are always available, free. */
     val unlockedThemeVariantIds: Flow<Set<String>> =
-        dataStore.data.map { (it[Keys.UNLOCKED_THEME_VARIANTS] ?: emptySet()) + "MOSS" }
+        dataStore.data.map { (it[Keys.UNLOCKED_THEME_VARIANTS] ?: emptySet()) + setOf("MOSS", "MODERN") }
 
     suspend fun unlockThemeVariant(variantId: String) {
         dataStore.edit {

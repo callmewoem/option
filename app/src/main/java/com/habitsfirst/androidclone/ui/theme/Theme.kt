@@ -41,6 +41,20 @@ private fun lightSchemeFor(variant: ThemeVariant) = when (variant) {
         background = Concrete99, onBackground = Concrete10, surface = Concrete99, onSurface = Concrete10,
         surfaceVariant = Concrete95, onSurfaceVariant = Concrete30, error = Error40, outline = Concrete10,
     )
+    ThemeVariant.Modern -> lightColorScheme(
+        primary = Slate40, onPrimary = Concrete99, primaryContainer = Slate90, onPrimaryContainer = Slate30,
+        secondary = SlateSecondary40, onSecondary = Concrete99,
+        secondaryContainer = SlateSecondary90, onSecondaryContainer = SlateSecondary20,
+        background = Concrete99, onBackground = Concrete10, surface = Concrete99, onSurface = Concrete10,
+        surfaceVariant = Concrete95, onSurfaceVariant = Concrete30, error = Error40, outline = Concrete40,
+    )
+    ThemeVariant.Receipt -> lightColorScheme(
+        primary = Carbon40, onPrimary = Concrete99, primaryContainer = Carbon90, onPrimaryContainer = Carbon30,
+        secondary = CarbonSecondary40, onSecondary = Concrete99,
+        secondaryContainer = CarbonSecondary90, onSecondaryContainer = CarbonSecondary20,
+        background = Concrete99, onBackground = Concrete10, surface = Concrete99, onSurface = Concrete10,
+        surfaceVariant = Concrete95, onSurfaceVariant = Concrete30, error = Error40, outline = Concrete40,
+    )
 }
 
 private fun darkSchemeFor(variant: ThemeVariant) = when (variant) {
@@ -71,6 +85,20 @@ private fun darkSchemeFor(variant: ThemeVariant) = when (variant) {
         secondaryContainer = InkSecondary20, onSecondaryContainer = InkSecondary90,
         background = Concrete10, onBackground = Concrete90, surface = Concrete10, onSurface = Concrete90,
         surfaceVariant = Concrete20, onSurfaceVariant = Concrete90, error = Error80, outline = Concrete70,
+    )
+    ThemeVariant.Modern -> darkColorScheme(
+        primary = Slate80, onPrimary = Slate30, primaryContainer = Slate30, onPrimaryContainer = Slate90,
+        secondary = SlateSecondary80, onSecondary = SlateSecondary20,
+        secondaryContainer = SlateSecondary20, onSecondaryContainer = SlateSecondary90,
+        background = Concrete10, onBackground = Concrete90, surface = Concrete10, onSurface = Concrete90,
+        surfaceVariant = Concrete20, onSurfaceVariant = Concrete80, error = Error80, outline = Concrete60,
+    )
+    ThemeVariant.Receipt -> darkColorScheme(
+        primary = Carbon80, onPrimary = Carbon30, primaryContainer = Carbon30, onPrimaryContainer = Carbon90,
+        secondary = CarbonSecondary80, onSecondary = CarbonSecondary20,
+        secondaryContainer = CarbonSecondary20, onSecondaryContainer = CarbonSecondary90,
+        background = Concrete10, onBackground = Concrete90, surface = Concrete10, onSurface = Concrete90,
+        surfaceVariant = Concrete20, onSurfaceVariant = Concrete80, error = Error80, outline = Concrete60,
     )
 }
 
