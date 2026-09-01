@@ -46,7 +46,10 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // but must be replaced with a real Migration before this ships with real user data.
     // v7: added block_lists/blocked_domains for URL blocking (premade porn/social lists
     // plus user-defined custom lists).
-    version = 7,
+    // v8: folded HabitType.IMAGE_VERIFICATION into HabitType.CUSTOM as a
+    // HabitEntity.requiresPhotoVerification toggle, so photo proof is an option on a
+    // custom check-in rather than a separate habit type.
+    version = 8,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)

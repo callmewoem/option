@@ -33,6 +33,8 @@ data class AddEditHabitUiState(
     val targetValue: Int = HabitType.STEPS.defaultTarget(),
     val targetPackageName: String? = null,
     val targetAppLabel: String? = null,
+    /** [HabitType.CUSTOM] only: require a proof photo before a check-in counts as done. */
+    val requiresPhotoVerification: Boolean = false,
     val verificationPrompt: String = "",
     val verificationExampleImagePath: String? = null,
     /** Empty means every day -- see [Habit.scheduledDays]. */
@@ -49,7 +51,8 @@ data class AddEditHabitUiState(
         get() = name.isNotBlank() &&
             (type != HabitType.APP_USAGE_MINUTES || targetPackageName != null) &&
             (!type.isMeasurable || targetValue > 0) &&
-            (type != HabitType.IMAGE_VERIFICATION || verificationPrompt.isNotBlank() || verificationExampleImagePath != null)
+            (type != HabitType.CUSTOM || !requiresPhotoVerification ||
+                verificationPrompt.isNotBlank() || verificationExampleImagePath != null)
 }
 
 fun HabitType.defaultTarget(): Int = when (this) {
@@ -57,7 +60,7 @@ fun HabitType.defaultTarget(): Int = when (this) {
     HabitType.EXERCISE_MINUTES -> 30
     HabitType.MEDITATION_MINUTES -> 10
     HabitType.APP_USAGE_MINUTES -> 15
-    HabitType.CUSTOM, HabitType.IMAGE_VERIFICATION -> 1
+    HabitType.CUSTOM -> 1
 }
 
 @HiltViewModel
@@ -78,12 +81,17 @@ class AddEditHabitViewModel @Inject constructor(
     private val initialType: HabitType? = savedStateHandle.get<String>(Screen.ARG_TYPE)
         ?.let { runCatching { HabitType.valueOf(it) }.getOrNull() }
 
+    /** Paired with [initialType] == [HabitType.CUSTOM] for the photo-verification deep link. */
+    private val initialRequiresPhotoVerification: Boolean =
+        savedStateHandle.get<Boolean>(Screen.ARG_REQUIRES_PHOTO) ?: false
+
     private val _uiState = MutableStateFlow(
         AddEditHabitUiState(
             habitId = habitId,
             kind = initialKind,
             type = initialType ?: HabitType.STEPS,
             targetValue = (initialType ?: HabitType.STEPS).defaultTarget(),
+            requiresPhotoVerification = initialRequiresPhotoVerification,
             isNew = habitId == 0L,
             canDelete = habitId != 0L,
         ),
@@ -102,6 +110,7 @@ class AddEditHabitViewModel @Inject constructor(
                         targetValue = habit.targetValue,
                         targetPackageName = habit.targetPackageName,
                         targetAppLabel = habit.targetAppLabel,
+                        requiresPhotoVerification = habit.requiresPhotoVerification,
                         verificationPrompt = habit.verificationPrompt.orEmpty(),
                         verificationExampleImagePath = habit.verificationExampleImagePath,
                         scheduledDays = habit.scheduledDays,
@@ -138,7 +147,12 @@ class AddEditHabitViewModel @Inject constructor(
             targetValue = type.defaultTarget(),
             targetPackageName = if (type == HabitType.APP_USAGE_MINUTES) _uiState.value.targetPackageName else null,
             targetAppLabel = if (type == HabitType.APP_USAGE_MINUTES) _uiState.value.targetAppLabel else null,
+            requiresPhotoVerification = type == HabitType.CUSTOM && _uiState.value.requiresPhotoVerification,
         )
+    }
+
+    fun onRequiresPhotoVerificationToggled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(requiresPhotoVerification = enabled)
     }
 
     fun onTargetValueChanged(value: Int) {
@@ -196,11 +210,12 @@ class AddEditHabitViewModel @Inject constructor(
                     targetValue = if (!state.type.isMeasurable) 1 else state.targetValue,
                     targetPackageName = state.targetPackageName,
                     targetAppLabel = state.targetAppLabel,
+                    requiresPhotoVerification = state.type == HabitType.CUSTOM && state.requiresPhotoVerification,
                     verificationPrompt = state.verificationPrompt.trim().takeIf {
-                        state.type == HabitType.IMAGE_VERIFICATION && it.isNotBlank()
+                        state.type == HabitType.CUSTOM && state.requiresPhotoVerification && it.isNotBlank()
                     },
                     verificationExampleImagePath = state.verificationExampleImagePath.takeIf {
-                        state.type == HabitType.IMAGE_VERIFICATION
+                        state.type == HabitType.CUSTOM && state.requiresPhotoVerification
                     },
                     scheduledDays = state.scheduledDays,
                 ),

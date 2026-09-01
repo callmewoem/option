@@ -145,7 +145,7 @@ class HabitRepository @Inject constructor(
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
     }
 
-    /** Records a vision-model verdict on a submitted proof photo for an [HabitType.IMAGE_VERIFICATION] habit. */
+    /** Records a vision-model verdict on a submitted proof photo for a [Habit.requiresPhotoVerification] habit. */
     suspend fun setImageVerificationResult(
         habitId: Long,
         approved: Boolean,

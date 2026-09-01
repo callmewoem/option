@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -211,15 +212,38 @@ fun AddEditHabitScreen(
                 )
             }
 
-            if (state.type == HabitType.IMAGE_VERIFICATION) {
+            if (state.type == HabitType.CUSTOM) {
                 Spacer(modifier = Modifier.height(20.dp))
-                VerificationSetupSection(
-                    prompt = state.verificationPrompt,
-                    onPromptChanged = viewModel::onVerificationPromptChanged,
-                    exampleImagePath = state.verificationExampleImagePath,
-                    onExampleImagePicked = viewModel::onExampleImageSelected,
-                    onExampleImageCleared = viewModel::onExampleImageCleared,
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.onRequiresPhotoVerificationToggled(!state.requiresPhotoVerification) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Require a photo", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "A vision model checks a submitted proof photo before this counts as done.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.requiresPhotoVerification,
+                        onCheckedChange = viewModel::onRequiresPhotoVerificationToggled,
+                    )
+                }
+
+                if (state.requiresPhotoVerification) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    VerificationSetupSection(
+                        prompt = state.verificationPrompt,
+                        onPromptChanged = viewModel::onVerificationPromptChanged,
+                        exampleImagePath = state.verificationExampleImagePath,
+                        onExampleImagePicked = viewModel::onExampleImageSelected,
+                        onExampleImageCleared = viewModel::onExampleImageCleared,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -338,7 +362,7 @@ private fun FrequencyPicker(
     }
 }
 
-/** Habit-setup rules for [HabitType.IMAGE_VERIFICATION]: a description, an example photo, or both. */
+/** Setup for a [HabitType.CUSTOM] habit with photo verification on: a description, an example photo, or both. */
 @Composable
 private fun VerificationSetupSection(
     prompt: String,

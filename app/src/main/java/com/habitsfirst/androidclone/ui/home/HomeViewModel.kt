@@ -116,7 +116,7 @@ class HomeViewModel @Inject constructor(
         miscFlow,
     ) { (gating, tracked, antihabits), blockedApps, _, todos, misc ->
         val hasImageVerificationHabit =
-            (gating + tracked + antihabits).any { it.habit.type == HabitType.IMAGE_VERIFICATION }
+            (gating + tracked + antihabits).any { it.habit.type == HabitType.CUSTOM && it.habit.requiresPhotoVerification }
         HomeUiState(
             isLoading = false,
             gating = gating,

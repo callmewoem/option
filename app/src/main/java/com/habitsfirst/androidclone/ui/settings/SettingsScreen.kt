@@ -521,7 +521,7 @@ private fun SectionHeader(text: String) {
     )
 }
 
-/** Where the user pastes their own Anthropic API key so [HabitType.IMAGE_VERIFICATION] habits can verify photos. */
+/** Where the user pastes their own Anthropic API key so photo-verification habits can verify photos. */
 @Composable
 private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
     var text by remember(apiKey) { mutableStateOf(apiKey.orEmpty()) }

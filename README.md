@@ -52,11 +52,8 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
    - *Use an app for N minutes* (the "use Duolingo" style habit) -- tracked
      automatically via `UsageStatsManager`, refreshed every 15 minutes and again
      immediately after you leave the tracked app.
-   - *Custom check-in* -- a plain manual toggle.
-   - *Photo verification* -- you describe what counts as done, add an example
-     photo, or both; completing it means submitting today's proof photo, which a
-     Claude vision model checks against those rules before the habit counts as
-     done (see below).
+   - *Custom check-in* -- a plain manual toggle, or optionally gated on a proof
+     photo instead (see *Photo verification* below).
 6. **Stats tab** -- a GitHub-style heatmap (Canvas-drawn, shaded by the fraction of
    gating habits completed each day in 5 buckets like GitHub's, with a cosmetic
    gold-star overlay on days a lootbox awarded one; a day marked broken by a
@@ -91,10 +88,11 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 
 ### Photo verification
 
-A *Photo verification* habit is gated by a vision model instead of an honor-system
-toggle: when setting it up you write what a proof photo should show (e.g. "a made
-bed"), attach an example photo, or both. To complete it for the day, tap the habit,
-take or pick a photo, and submit it — `AnthropicImageVerificationClient` sends it
+A *Custom check-in* habit can require a proof photo instead of a manual honor-system
+toggle (`Habit.requiresPhotoVerification`) -- when setting it up you write what a
+proof photo should show (e.g. "a made bed"), attach an example photo, or both. To
+complete it for the day, tap the habit, take or pick a photo, and submit it —
+`AnthropicImageVerificationClient` sends it
 (downscaled, alongside the example photo if any) to the Claude Messages API and
 marks the habit done only if the model approves, showing its one-sentence reasoning
 either way. It calls the API directly from the device using an Anthropic API key
