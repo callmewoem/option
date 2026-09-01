@@ -47,7 +47,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -537,7 +536,7 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = text,
-            onValueChange = { text = it },
+            onValueChange = { text = it; onApiKeyChanged(it) },
             label = { Text("Anthropic API key") },
             placeholder = { Text("sk-ant-...") },
             singleLine = true,
@@ -550,9 +549,7 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
                     )
                 }
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { focus -> if (!focus.isFocused && text != apiKey.orEmpty()) onApiKeyChanged(text) },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
