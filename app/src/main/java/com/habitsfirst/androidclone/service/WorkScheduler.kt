@@ -55,7 +55,7 @@ object WorkScheduler {
         )
     }
 
-    /** Enqueues the periodic sync of steps/exercise habits from Health Connect. Only called once the user turns sync on in Settings (with permissions already granted). */
+    /** Enqueues the periodic sync of Steps habits from Health Connect. Only called once the user turns sync on in Settings (with permissions already granted). */
     fun scheduleHealthConnectSync(context: Context) {
         val request = PeriodicWorkRequestBuilder<HealthConnectSyncWorker>(30, TimeUnit.MINUTES).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
