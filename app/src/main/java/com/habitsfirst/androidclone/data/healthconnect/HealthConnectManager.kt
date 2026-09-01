@@ -3,10 +3,13 @@ package com.habitsfirst.androidclone.data.healthconnect
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -14,8 +17,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Thin wrapper around the Health Connect client for the one habit type that can sync
- * automatically: steps (see [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]).
+ * Thin wrapper around the Health Connect client for the habit types that can sync
+ * automatically: steps, workout minutes, and sleep hours (see
+ * [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]).
  *
  * Nothing here requests permissions -- that has to happen from an Activity via
  * [androidx.health.connect.client.PermissionController.createRequestPermissionResultContract],
@@ -54,16 +58,53 @@ class HealthConnectManager @Inject constructor(
         }.getOrDefault(0)
     }
 
+    /** Total workout minutes so far today, or 0 if unavailable, ungranted, or the read failed. */
+    suspend fun workoutMinutesToday(): Int {
+        val client = client ?: return 0
+        if (!hasPermissions()) return 0
+        return runCatching {
+            val result = client.aggregate(
+                AggregateRequest(setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL), todayRange()),
+            )
+            (result[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL] ?: Duration.ZERO).toMinutes().toInt()
+        }.getOrDefault(0)
+    }
+
+    /**
+     * Total sleep hours over the trailing 24 hours, or 0 if unavailable, ungranted, or the
+     * read failed. Uses a trailing window rather than [todayRange] because a sleep session
+     * that started before midnight would otherwise be mostly missed by a midnight-anchored
+     * query.
+     */
+    suspend fun recentSleepHours(): Int {
+        val client = client ?: return 0
+        if (!hasPermissions()) return 0
+        return runCatching {
+            val result = client.aggregate(
+                AggregateRequest(setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL), last24HoursRange()),
+            )
+            (result[SleepSessionRecord.SLEEP_DURATION_TOTAL] ?: Duration.ZERO).toHours().toInt()
+        }.getOrDefault(0)
+    }
+
     private fun todayRange(): TimeRangeFilter {
         val zone = ZoneId.systemDefault()
         val startOfDay = LocalDate.now(zone).atStartOfDay(zone).toInstant()
         return TimeRangeFilter.between(startOfDay, Instant.now())
     }
 
+    private fun last24HoursRange(): TimeRangeFilter =
+        TimeRangeFilter.between(Instant.now().minus(Duration.ofHours(24)), Instant.now())
+
     companion object {
-        /** Read-only, matching the `android.permission.health.READ_STEPS` manifest entry. */
+        /**
+         * Read-only, matching the `android.permission.health.READ_STEPS`,
+         * `READ_EXERCISE`, and `READ_SLEEP` manifest entries.
+         */
         val PERMISSIONS: Set<String> = setOf(
             HealthPermission.getReadPermission(StepsRecord::class),
+            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
         )
     }
 }

@@ -190,11 +190,14 @@ class HabitRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.type == HabitType.APP_USAGE_MINUTES && it.targetPackageName != null }
 
-    /** Active step habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
+    /**
+     * Active Health-Connect-backed habits (steps, workout minutes, sleep hours), for
+     * [com.habitsfirst.androidclone.service.HealthConnectSyncWorker].
+     */
     suspend fun getHealthConnectHabitsOnce(): List<Habit> =
         habitDao.getActiveHabitsOnce()
             .map { it.toDomain() }
-            .filter { it.type == HabitType.STEPS }
+            .filter { it.type in HEALTH_CONNECT_HABIT_TYPES }
 
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0
@@ -355,4 +358,9 @@ class HabitRepository @Inject constructor(
 
     /** `1 shl (dayOfWeek.value - 1)` for [date]'s day of week -- see [HabitEntity.scheduledDaysMask][com.habitsfirst.androidclone.data.local.entity.HabitEntity]. */
     private fun dayBitFor(date: String): Int = 1 shl (DateProvider.fromDateString(date).dayOfWeek.value - 1)
+
+    companion object {
+        /** Habit types that [com.habitsfirst.androidclone.service.HealthConnectSyncWorker] can sync. */
+        private val HEALTH_CONNECT_HABIT_TYPES = setOf(HabitType.STEPS, HabitType.WORKOUT_MINUTES, HabitType.SLEEP_HOURS)
+    }
 }
