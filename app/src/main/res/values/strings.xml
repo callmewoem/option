@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Locke</string>
-    <string name="accessibility_service_description">Locke uses this to notice when you open an app you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits.</string>
+    <string name="accessibility_service_description">Locke uses this to notice when you open an app, or browse to a website, you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits (or keep it blocked outright, for lists you\'ve set to never unlock).</string>
 
     <!-- Onboarding -->
     <string name="onboarding_welcome_title">Do your habits.\nThen use your apps.</string>
@@ -62,6 +62,9 @@
     <!-- Block screen -->
     <string name="block_title">%1$s is locked</string>
     <string name="block_subtitle">Finish these habits to unlock it for the rest of today.</string>
+    <string name="block_url_subtitle">Finish these habits to unlock this site for the rest of today.</string>
+    <string name="block_permanent_title">%1$s is blocked</string>
+    <string name="block_permanent_subtitle">Blocked by your \"%1$s\" list -- no habit or grace token unlocks it.</string>
     <string name="block_bedtime_title">It\'s bedtime</string>
     <string name="block_bedtime_subtitle">Locked apps stay locked until your bedtime window ends -- no habit checklist unlocks this one.</string>
     <string name="block_use_grace_token">Use a grace token (%1$d left) -- 1 min unlock</string>

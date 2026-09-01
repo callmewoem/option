@@ -14,6 +14,7 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Habits : Screen("habits")
     data object AppPicker : Screen("app_picker")
+    data object UrlBlockList : Screen("url_block_list")
     data object Settings : Screen("settings")
 
     data object AddHabit : Screen("habit/new?kind={kind}&type={type}") {

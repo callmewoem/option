@@ -14,9 +14,11 @@ import com.habitsfirst.androidclone.ui.theme.LockeTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * Full-screen "this app is locked" cover shown on top of a blocked app. Launched by
+ * Full-screen "this is locked" cover shown on top of a blocked app, or a browser
+ * showing a blocked site. Launched by
  * [com.habitsfirst.androidclone.service.AppBlockAccessibilityService] the instant the
- * user switches into a locked app with unfinished habits.
+ * user switches into a locked app, or navigates to a blocked host, that isn't
+ * currently allowed to be open.
  */
 @AndroidEntryPoint
 class BlockOverlayActivity : ComponentActivity() {
@@ -68,7 +70,13 @@ class BlockOverlayActivity : ComponentActivity() {
     }
 
     companion object {
-        const val EXTRA_PACKAGE_NAME = "extra_package_name"
+        /** The blocked app's package name, or the blocked host -- see [EXTRA_IS_URL_BLOCK]. */
+        const val EXTRA_TARGET = "extra_target"
+        const val EXTRA_IS_URL_BLOCK = "extra_is_url_block"
+        /** URL block only: which list matched. */
+        const val EXTRA_LIST_NAME = "extra_list_name"
+        /** URL block only: true when the matching list is [com.habitsfirst.androidclone.domain.model.BlockMode.PERMANENT]. */
+        const val EXTRA_IS_PERMANENT = "extra_is_permanent"
         const val EXTRA_IS_BEDTIME = "extra_is_bedtime"
     }
 }

@@ -29,6 +29,7 @@ import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
 import com.habitsfirst.androidclone.ui.proofoflife.ProofOfLifeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
+import com.habitsfirst.androidclone.ui.urlblock.UrlBlockScreen
 
 @Composable
 fun HabitsFirstNavHost() {
@@ -109,12 +110,17 @@ fun HabitsFirstNavHost() {
             AppPickerScreen(onBack = { navController.popBackStack() })
         }
 
+        composable(Screen.UrlBlockList.route) {
+            UrlBlockScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
+                onManageUrls = { navController.navigate(Screen.UrlBlockList.route) },
             )
         }
 

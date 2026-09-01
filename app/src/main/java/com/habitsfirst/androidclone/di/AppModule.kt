@@ -7,6 +7,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.habitsfirst.androidclone.data.local.AppDatabase
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
+import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
+import com.habitsfirst.androidclone.data.local.dao.BlockListDao
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
@@ -45,6 +47,12 @@ object AppModule {
 
     @Provides
     fun provideTodoDao(db: AppDatabase): TodoDao = db.todoDao()
+
+    @Provides
+    fun provideBlockListDao(db: AppDatabase): BlockListDao = db.blockListDao()
+
+    @Provides
+    fun provideBlockedDomainDao(db: AppDatabase): BlockedDomainDao = db.blockedDomainDao()
 
     @Provides
     @Singleton

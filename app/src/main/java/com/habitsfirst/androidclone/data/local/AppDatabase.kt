@@ -2,12 +2,17 @@ package com.habitsfirst.androidclone.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
+import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
+import com.habitsfirst.androidclone.data.local.dao.BlockListDao
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.dao.TodoDao
 import com.habitsfirst.androidclone.data.local.entity.BlockedAppEntity
+import com.habitsfirst.androidclone.data.local.entity.BlockedDomainEntity
+import com.habitsfirst.androidclone.data.local.entity.BlockListEntity
 import com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity
 import com.habitsfirst.androidclone.data.local.entity.HabitEntity
 import com.habitsfirst.androidclone.data.local.entity.StreakScarEntity
@@ -20,6 +25,8 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
         BlockedAppEntity::class,
         StreakScarEntity::class,
         TodoEntity::class,
+        BlockListEntity::class,
+        BlockedDomainEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
@@ -37,15 +44,20 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // No migration is written since the app hasn't shipped yet -- provideDatabase() in
     // di/AppModule.kt uses fallbackToDestructiveMigration(), which is fine pre-release
     // but must be replaced with a real Migration before this ships with real user data.
-    version = 6,
+    // v7: added block_lists/blocked_domains for URL blocking (premade porn/social lists
+    // plus user-defined custom lists).
+    version = 7,
     exportSchema = false,
 )
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
     abstract fun habitCompletionDao(): HabitCompletionDao
     abstract fun blockedAppDao(): BlockedAppDao
     abstract fun streakScarDao(): StreakScarDao
     abstract fun todoDao(): TodoDao
+    abstract fun blockListDao(): BlockListDao
+    abstract fun blockedDomainDao(): BlockedDomainDao
 
     companion object {
         const val DATABASE_NAME = "habits_first.db"

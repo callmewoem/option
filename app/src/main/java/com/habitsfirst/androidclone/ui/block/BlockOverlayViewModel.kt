@@ -17,7 +17,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class BlockUiState(
-    val blockedAppLabel: String = "",
+    val blockedLabel: String = "",
+    val isUrlBlock: Boolean = false,
+    val listName: String? = null,
+    val isPermanent: Boolean = false,
     val incompleteHabits: List<HabitProgress> = emptyList(),
     val allHabitsComplete: Boolean = false,
     val isBedtime: Boolean = false,
@@ -33,28 +36,35 @@ class BlockOverlayViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val blockedPackageName: String =
-        savedStateHandle[BlockOverlayActivity.EXTRA_PACKAGE_NAME] ?: ""
+    private val target: String = savedStateHandle[BlockOverlayActivity.EXTRA_TARGET] ?: ""
+    private val isUrlBlock: Boolean = savedStateHandle[BlockOverlayActivity.EXTRA_IS_URL_BLOCK] ?: false
+    private val listName: String? = savedStateHandle[BlockOverlayActivity.EXTRA_LIST_NAME]
+    private val isPermanent: Boolean = savedStateHandle[BlockOverlayActivity.EXTRA_IS_PERMANENT] ?: false
     private val isBedtime: Boolean = savedStateHandle[BlockOverlayActivity.EXTRA_IS_BEDTIME] ?: false
 
-    private val appLabel = MutableStateFlow(blockedPackageName)
+    // A URL block's target is already the host to display; an app block's is a
+    // package name, which needs resolving to its user-facing label.
+    private val blockedLabel = MutableStateFlow(target)
     private val graceRedeemed = MutableStateFlow(false)
 
     init {
-        if (blockedPackageName.isNotBlank()) {
-            appLabel.value = installedAppsProvider.getAppLabel(blockedPackageName)
+        if (!isUrlBlock && target.isNotBlank()) {
+            blockedLabel.value = installedAppsProvider.getAppLabel(target)
         }
     }
 
     val uiState: StateFlow<BlockUiState> = combine(
         habitRepository.observeTodayProgress(),
-        appLabel,
+        blockedLabel,
         lootboxRepository.graceTokenCount,
         graceRedeemed,
     ) { progress, label, graceTokens, redeemed ->
         val incomplete = progress.filterNot { it.isCompleted }
         BlockUiState(
-            blockedAppLabel = label,
+            blockedLabel = label,
+            isUrlBlock = isUrlBlock,
+            listName = listName,
+            isPermanent = isPermanent,
             incompleteHabits = incomplete,
             allHabitsComplete = progress.isNotEmpty() && incomplete.isEmpty(),
             isBedtime = isBedtime,
@@ -64,12 +74,18 @@ class BlockOverlayViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = BlockUiState(blockedAppLabel = blockedPackageName, isBedtime = isBedtime),
+        initialValue = BlockUiState(
+            blockedLabel = target,
+            isUrlBlock = isUrlBlock,
+            listName = listName,
+            isPermanent = isPermanent,
+            isBedtime = isBedtime,
+        ),
     )
 
-    /** Not offered during bedtime -- see [com.habitsfirst.androidclone.service.AppBlockAccessibilityService]. */
+    /** Not offered during bedtime or a permanent block -- see [com.habitsfirst.androidclone.service.AppBlockAccessibilityService]. */
     fun onRedeemGraceToken(onUnlocked: () -> Unit) {
-        if (isBedtime) return
+        if (isBedtime || isPermanent) return
         viewModelScope.launch {
             if (lootboxRepository.redeemGraceToken()) {
                 graceRedeemed.value = true

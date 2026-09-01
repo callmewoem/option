@@ -1,0 +1,45 @@
+# Locke premade block list: Social media
+# A curated list of major social networking, short-video, and messaging platforms.
+# One registrable domain per line -- matching walks up subdomains, so "instagram.com"
+# here also blocks "www.instagram.com" and "m.instagram.com".
+9gag.com
+badoo.com
+bereal.com
+clubhouse.com
+discord.com
+discordapp.com
+douyin.com
+facebook.com
+fb.com
+imgur.com
+instagram.com
+kakaotalk.com
+line.me
+linkedin.com
+mastodon.social
+meetme.com
+messenger.com
+myspace.com
+nextdoor.com
+ok.ru
+periscope.tv
+pinterest.com
+quora.com
+reddit.com
+snapchat.com
+tagged.com
+telegram.org
+threads.net
+tiktok.com
+tumblr.com
+twitch.tv
+twitter.com
+vk.com
+web.telegram.org
+web.whatsapp.com
+weheartit.com
+weibo.com
+whatsapp.com
+x.com
+xiaohongshu.com
+yikyak.com

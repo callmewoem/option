@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -74,6 +75,7 @@ fun SettingsScreen(
     onAddHabit: () -> Unit,
     onEditHabit: (Long) -> Unit,
     onManageApps: () -> Unit,
+    onManageUrls: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -143,6 +145,18 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(onClick = onManageApps),
+                )
+                HorizontalDivider()
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Blocked websites") },
+                    supportingContent = { Text("Premade porn/social lists, plus your own custom lists") },
+                    leadingContent = { Icon(Icons.Filled.Public, contentDescription = null) },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onManageUrls),
                 )
                 HorizontalDivider()
             }
