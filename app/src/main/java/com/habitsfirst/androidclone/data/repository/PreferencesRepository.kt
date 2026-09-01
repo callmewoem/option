@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -120,9 +121,11 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[Keys.THEME_VARIANT] = variantId }
     }
 
-    /** Every variant the user has unlocked from the lootbox. "MOSS" and "MODERN" are always available, free. */
+    /** Every variant the user has unlocked from the lootbox. [ThemeVariant.Moss] and [ThemeVariant.Modern] are always available, free. */
     val unlockedThemeVariantIds: Flow<Set<String>> =
-        dataStore.data.map { (it[Keys.UNLOCKED_THEME_VARIANTS] ?: emptySet()) + setOf("MOSS", "MODERN") }
+        dataStore.data.map {
+            (it[Keys.UNLOCKED_THEME_VARIANTS] ?: emptySet()) + setOf(ThemeVariant.Moss.name, ThemeVariant.Modern.name)
+        }
 
     suspend fun unlockThemeVariant(variantId: String) {
         dataStore.edit {

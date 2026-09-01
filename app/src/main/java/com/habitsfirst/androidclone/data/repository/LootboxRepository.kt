@@ -1,6 +1,8 @@
 package com.habitsfirst.androidclone.data.repository
 
 import com.habitsfirst.androidclone.domain.model.LootboxReward
+import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
+import com.habitsfirst.androidclone.domain.model.ThemeRedeemCode
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.util.DateProvider
 import kotlinx.coroutines.flow.Flow
@@ -72,6 +74,16 @@ class LootboxRepository @Inject constructor(
 
     suspend fun isGraceUnlockActive(): Boolean =
         preferencesRepository.graceUnlockUntilEpochMillis.first() > System.currentTimeMillis()
+
+    /** Unlocks whatever [code] grants (see [ThemeRedeemCode]), for players who don't want to wait on the lootbox. */
+    suspend fun redeemThemeCode(code: String): ThemeCodeResult {
+        val granted = ThemeRedeemCode.resolve(code) ?: return ThemeCodeResult.Invalid
+        val alreadyUnlocked = preferencesRepository.unlockedThemeVariantIds.first()
+        val newlyUnlocked = granted.filterNot { it.name in alreadyUnlocked }.toSet()
+        if (newlyUnlocked.isEmpty()) return ThemeCodeResult.AlreadyUnlocked
+        newlyUnlocked.forEach { preferencesRepository.unlockThemeVariant(it.name) }
+        return ThemeCodeResult.Unlocked(newlyUnlocked)
+    }
 
     companion object {
         private const val WEIGHT_GRACE_PERIOD = 50

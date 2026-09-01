@@ -10,6 +10,7 @@ import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.service.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,6 +18,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -83,6 +85,10 @@ class SettingsViewModel @Inject constructor(
 
     /** A live permission check, not a stored preference -- refreshed via [refreshHealthConnectPermissions]. */
     private val _healthConnectPermissionsGranted = MutableStateFlow(false)
+
+    /** One-shot feedback for the last theme-code redemption attempt; cleared by [onThemeCodeMessageShown] once shown. */
+    private val _themeCodeMessage = MutableStateFlow<String?>(null)
+    val themeCodeMessage: StateFlow<String?> = _themeCodeMessage.asStateFlow()
 
     init {
         refreshHealthConnectPermissions()
@@ -161,6 +167,23 @@ class SettingsViewModel @Inject constructor(
                 preferencesRepository.setSelectedThemeVariantId(variant.name)
             }
         }
+    }
+
+    /** Redeems a theme code (see [com.habitsfirst.androidclone.domain.model.ThemeRedeemCode]); result surfaces via [themeCodeMessage]. */
+    fun onRedeemThemeCode(code: String) {
+        if (code.isBlank()) return
+        viewModelScope.launch {
+            _themeCodeMessage.value = when (val result = lootboxRepository.redeemThemeCode(code)) {
+                is ThemeCodeResult.Unlocked ->
+                    "Unlocked ${result.variants.joinToString { it.displayName }}!"
+                ThemeCodeResult.AlreadyUnlocked -> "Already unlocked -- nothing new from that code."
+                ThemeCodeResult.Invalid -> "That code doesn't match anything."
+            }
+        }
+    }
+
+    fun onThemeCodeMessageShown() {
+        _themeCodeMessage.value = null
     }
 
     fun onBedtimeChanged(enabled: Boolean, start: String, end: String) {

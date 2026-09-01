@@ -91,8 +91,9 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 A *Custom check-in* habit can require a proof photo instead of a manual honor-system
 toggle (`Habit.requiresPhotoVerification`) -- when setting it up you write what a
 proof photo should show (e.g. "a made bed"), attach an example photo, or both. To
-complete it for the day, tap the habit, take or pick a photo, and submit it —
-`AnthropicImageVerificationClient` sends it
+complete it for the day, tap the habit, take a photo with the camera, and submit
+it — capture is camera-only by design, so a stored gallery photo can't stand in for
+today's proof. `AnthropicImageVerificationClient` sends it
 (downscaled, alongside the example photo if any) to the Claude Messages API and
 marks the habit done only if the model approves, showing its one-sentence reasoning
 either way. It calls the API directly from the device using an Anthropic API key
@@ -145,7 +146,8 @@ Eco-brutalist: flat concrete/paper neutrals, sharp 0dp corners everywhere (one s
 display type, monospace numeric/label readouts, outlined rather than shadowed cards.
 Six accent variants share that same shape/type language and only swap color --
 `Moss` (default), `Modern`, `Rust`, `Concrete`, `Ink`, `Receipt` -- with `Moss` and
-`Modern` free and the rest won from the lootbox.
+`Modern` free and the rest won from the lootbox, or unlocked instantly with a theme
+code entered in Settings → *Theme* (`domain/model/ThemeRedeemCode.kt`).
 
 ## Permissions and why
 
@@ -155,7 +157,7 @@ Six accent variants share that same shape/type language and only swap color --
 | Accessibility Service | Detects when you switch into a locked app so the cover can appear immediately. |
 | Display over other apps (`SYSTEM_ALERT_WINDOW`) | Lets the lock screen actually cover the app underneath. |
 | Notifications | Habit reminders, streak nudges, and the morning todo reminder (optional, toggleable in Settings). |
-| Camera | Lets you take a proof photo directly for a *photo verification* habit (picking one from your gallery works too, without this). |
+| Camera | Required for *photo verification* -- capture is camera-only, with no gallery-picker fallback, so a proof photo can't be swapped for an old one. |
 | Internet | Sends a submitted proof photo to the Claude API for *photo verification* habits — only used if you've set an API key in Settings, and only for that request. |
 
 All three special permissions are requested with plain-language explanations
