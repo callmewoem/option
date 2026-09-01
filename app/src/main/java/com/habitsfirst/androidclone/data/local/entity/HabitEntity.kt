@@ -19,11 +19,9 @@ data class HabitEntity(
     val createdAtEpochMillis: Long,
     /** Soft-delete flag so historical [HabitCompletionEntity] rows stay meaningful. */
     val isArchived: Boolean = false,
-    /** [HabitType.CUSTOM] only: require a proof photo before a check-in counts as done. */
-    val requiresPhotoVerification: Boolean = false,
-    /** Set only when [requiresPhotoVerification]: what a proof photo must show. */
+    /** [HabitType.PHOTO] only: what a proof photo must show. */
     val verificationPrompt: String? = null,
-    /** Set only when [requiresPhotoVerification]: path to a saved example photo, if any. */
+    /** [HabitType.PHOTO] only: path to a saved example photo, if any. */
     val verificationExampleImagePath: String? = null,
     val kind: String = HabitKind.GATING.name,
     val expiresAfterDate: String? = null,
@@ -47,7 +45,6 @@ fun HabitEntity.toDomain(): Habit = Habit(
     targetAppLabel = targetAppLabel,
     sortOrder = sortOrder,
     createdAtEpochMillis = createdAtEpochMillis,
-    requiresPhotoVerification = requiresPhotoVerification,
     verificationPrompt = verificationPrompt,
     verificationExampleImagePath = verificationExampleImagePath,
     kind = runCatching { HabitKind.valueOf(kind) }.getOrDefault(HabitKind.GATING),
@@ -66,7 +63,6 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     sortOrder = sortOrder,
     createdAtEpochMillis = createdAtEpochMillis,
     isArchived = isArchived,
-    requiresPhotoVerification = requiresPhotoVerification,
     verificationPrompt = verificationPrompt,
     verificationExampleImagePath = verificationExampleImagePath,
     kind = kind.name,

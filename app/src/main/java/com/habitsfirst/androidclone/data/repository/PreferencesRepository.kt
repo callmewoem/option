@@ -105,7 +105,7 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
-    /** The user's own Anthropic API key, used to verify photos for [com.habitsfirst.androidclone.domain.model.Habit.requiresPhotoVerification] habits. */
+    /** The user's own Anthropic API key, used to verify photos for [com.habitsfirst.androidclone.domain.model.HabitType.PHOTO] habits. */
     val anthropicApiKey: Flow<String?> = dataStore.data.map { it[Keys.ANTHROPIC_API_KEY] }
 
     suspend fun setAnthropicApiKey(key: String?) {

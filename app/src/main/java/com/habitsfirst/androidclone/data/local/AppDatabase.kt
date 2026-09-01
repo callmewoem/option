@@ -49,7 +49,12 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // v8: folded HabitType.IMAGE_VERIFICATION into HabitType.CUSTOM as a
     // HabitEntity.requiresPhotoVerification toggle, so photo proof is an option on a
     // custom check-in rather than a separate habit type.
-    version = 8,
+    // v9: simplified habit types -- EXERCISE_MINUTES and MEDITATION_MINUTES merged into
+    // one generic TIMED_MINUTES (built-in timer for anything timed); CUSTOM split back
+    // into two: PHOTO (was the requiresPhotoVerification toggle from v8, now always on
+    // for this type -- dropped HabitEntity.requiresPhotoVerification) and TALLY (the
+    // toggle-off case, a plain manual check-in).
+    version = 9,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)

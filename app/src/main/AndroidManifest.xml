@@ -17,7 +17,6 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
-    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
     <!-- Needed to call the vision model that checks image-verification proof photos -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Needed to take a proof photo for image-verification habits -->

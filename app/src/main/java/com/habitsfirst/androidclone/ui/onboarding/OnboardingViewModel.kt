@@ -32,10 +32,10 @@ data class HabitTemplate(
 
 val onboardingHabitTemplates = listOf(
     HabitTemplate("Walk 10,000 steps", HabitType.STEPS, 10_000),
-    HabitTemplate("Work out", HabitType.EXERCISE_MINUTES, 30),
-    HabitTemplate("Meditate", HabitType.MEDITATION_MINUTES, 10),
-    HabitTemplate("Read", HabitType.CUSTOM),
-    HabitTemplate("Make my bed", HabitType.CUSTOM),
+    HabitTemplate("Work out", HabitType.TIMED_MINUTES, 30),
+    HabitTemplate("Meditate", HabitType.TIMED_MINUTES, 10),
+    HabitTemplate("Read", HabitType.TALLY),
+    HabitTemplate("Make my bed", HabitType.TALLY),
 )
 
 data class OnboardingUiState(

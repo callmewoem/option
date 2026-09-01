@@ -35,7 +35,7 @@ class PenaltyRepository @Inject constructor(
         habitRepository.saveHabit(
             Habit(
                 name = "Makeup: $reason",
-                type = HabitType.CUSTOM,
+                type = HabitType.TALLY,
                 targetValue = 1,
                 kind = HabitKind.GATING,
                 expiresAfterDate = today,

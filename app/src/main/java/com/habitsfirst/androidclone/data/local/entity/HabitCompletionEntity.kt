@@ -19,7 +19,7 @@ data class HabitCompletionEntity(
     val currentValue: Int = 0,
     val isCompleted: Boolean = false,
     val completedAtEpochMillis: Long? = null,
-    /** Path to the proof photo submitted for a habit with [com.habitsfirst.androidclone.domain.model.Habit.requiresPhotoVerification]. */
+    /** Path to the proof photo submitted for a [com.habitsfirst.androidclone.domain.model.HabitType.PHOTO] habit. */
     val verificationImagePath: String? = null,
     /** The vision model's reasoning for approving or rejecting that photo. */
     val verificationReasoning: String? = null,

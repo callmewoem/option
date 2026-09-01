@@ -16,9 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -31,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -48,8 +53,9 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Pure stats: the heatmap, completion rate by habit, and by day of week. Doing a habit
- * lives on Home; managing the list lives in Settings -- there's nothing to tap here.
+ * Pure stats: a selectable-range streak summary, the heatmap, completion rate by
+ * habit, and by day of week. Doing a habit lives on Home; managing the list lives in
+ * Settings -- there's nothing to tap here besides the range chips.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,19 +91,42 @@ fun HabitsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.availableRanges.forEach { range ->
+                        FilterChip(
+                            selected = state.range == range,
+                            onClick = { viewModel.onRangeSelected(range) },
+                            label = { Text(range.label) },
+                        )
+                    }
+                }
+            }
+
+            item {
+                StreakSummaryRow(
+                    currentStreak = state.currentStreak,
+                    longestStreakInRange = state.longestStreakInRange,
+                    perfectDaysInRange = state.perfectDaysInRange,
+                    brokenStreaksInRange = state.scarredDates.size,
+                )
+            }
+
+            item {
                 val today = LocalDate.now()
                 // Canvas draws in a DrawScope, not a composable context, so these have
                 // to be resolved here and captured by value, not read inside colorForDate.
                 val primary = MaterialTheme.colorScheme.primary
                 val secondary = MaterialTheme.colorScheme.secondary
+                val error = MaterialTheme.colorScheme.error
                 val emptyColor = MaterialTheme.colorScheme.surfaceVariant
                 Heatmap(
-                    startDate = today.minusWeeks(20),
+                    startDate = today.minusWeeks(state.range.weeks),
                     endDate = today,
                     colorForDate = { date ->
                         val score = state.dayScores[date]
                         when {
                             date in state.goldStarDates -> secondary
+                            date in state.scarredDates -> error
                             score == null -> emptyColor
                             else -> heatmapFractionColor(score, primary)
                         }
@@ -122,10 +151,18 @@ fun HabitsScreen(
                         state.completionStats
                             .sortedWith(compareBy({ it.habit.kind.ordinal }, { -it.rate }))
                             .forEach { stat ->
+                                // For an ANTIHABIT, completedCount is the raw slip count -- invert it to
+                                // the clean-day count so the fraction shown matches the (already-inverted) bar.
+                                val doneCount = if (stat.habit.kind == HabitKind.ANTIHABIT) {
+                                    stat.totalDays - stat.completedCount
+                                } else {
+                                    stat.completedCount
+                                }
                                 HabitRateRow(
                                     name = stat.habit.name,
                                     rate = stat.rate,
                                     accent = stat.habit.kind.accentColor(),
+                                    countLabel = "$doneCount/${stat.totalDays}",
                                 )
                             }
                     }
@@ -143,6 +180,57 @@ fun HabitsScreen(
     }
 }
 
+/** Four at-a-glance streak figures for the selected range -- current streak isn't windowed, the other three are. */
+@Composable
+private fun StreakSummaryRow(
+    currentStreak: Int,
+    longestStreakInRange: Int,
+    perfectDaysInRange: Int,
+    brokenStreaksInRange: Int,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StatCard(label = "Streak", value = "$currentStreak", modifier = Modifier.weight(1f))
+        StatCard(label = "Longest", value = "$longestStreakInRange", modifier = Modifier.weight(1f))
+        StatCard(label = "Perfect days", value = "$perfectDaysInRange", modifier = Modifier.weight(1f))
+        StatCard(
+            label = "Broken",
+            value = "$brokenStreaksInRange",
+            valueColor = if (brokenStreaksInRange > 0) MaterialTheme.colorScheme.error else null,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun StatCard(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun KindLegend() {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -156,7 +244,7 @@ private fun KindLegend() {
 }
 
 @Composable
-private fun HabitRateRow(name: String, rate: Float, accent: Color) {
+private fun HabitRateRow(name: String, rate: Float, accent: Color, countLabel: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -185,6 +273,13 @@ private fun HabitRateRow(name: String, rate: Float, accent: Color) {
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = countLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(44.dp),
+        )
+        Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = "${(rate * 100).roundToInt()}%",
             style = MaterialTheme.typography.labelMedium,

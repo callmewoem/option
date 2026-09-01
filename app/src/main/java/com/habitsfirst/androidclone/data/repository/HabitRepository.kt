@@ -26,9 +26,11 @@ import javax.inject.Singleton
 /**
  * A habit's completion rate over a stats window. For an ANTIHABIT, [rate] is the
  * *clean* rate (days without a logged slip) -- the inverse of the raw completed-entry
- * count, since a completion row there means a slip, not a done day.
+ * count, since a completion row there means a slip, not a done day. [completedCount]
+ * and [totalDays] are the raw counts behind [rate] (still slip count / scheduled days
+ * for an ANTIHABIT, not yet inverted) -- e.g. for a "12/14" label alongside the bar.
  */
-data class HabitCompletionStat(val habit: Habit, val rate: Float)
+data class HabitCompletionStat(val habit: Habit, val rate: Float, val completedCount: Int, val totalDays: Int)
 
 /** Where an onboarding "ease into it" ramp currently stands -- see [Habit.easeInOrder]. */
 data class EaseInStatus(
@@ -141,11 +143,11 @@ class HabitRepository @Inject constructor(
         setProgress(habitId, (existing?.currentValue ?: 0) + delta, target, date)
     }
 
-    suspend fun setCustomHabitDone(habitId: Long, done: Boolean, date: String = DateProvider.todayString()) {
+    suspend fun setTallyHabitDone(habitId: Long, done: Boolean, date: String = DateProvider.todayString()) {
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
     }
 
-    /** Records a vision-model verdict on a submitted proof photo for a [Habit.requiresPhotoVerification] habit. */
+    /** Records a vision-model verdict on a submitted proof photo for a [HabitType.PHOTO] habit. */
     suspend fun setImageVerificationResult(
         habitId: Long,
         approved: Boolean,
@@ -188,11 +190,11 @@ class HabitRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.type == HabitType.APP_USAGE_MINUTES && it.targetPackageName != null }
 
-    /** Active steps/exercise habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
+    /** Active step habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
     suspend fun getHealthConnectHabitsOnce(): List<Habit> =
         habitDao.getActiveHabitsOnce()
             .map { it.toDomain() }
-            .filter { it.type == HabitType.STEPS || it.type == HabitType.EXERCISE_MINUTES }
+            .filter { it.type == HabitType.STEPS }
 
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0
@@ -234,7 +236,7 @@ class HabitRepository @Inject constructor(
             val completed = countsByHabit[habit.id]?.completedCount ?: 0
             val rawRate = if (totalDays <= 0) 0f else (completed.toFloat() / totalDays.toFloat()).coerceIn(0f, 1f)
             val rate = if (habit.kind == HabitKind.ANTIHABIT) 1f - rawRate else rawRate
-            HabitCompletionStat(habit, rate)
+            HabitCompletionStat(habit, rate, completedCount = completed, totalDays = totalDays.toInt())
         }
     }
 
@@ -256,6 +258,10 @@ class HabitRepository @Inject constructor(
      */
     suspend fun getCompletedDatesForHabit(habitId: Long, startDate: String, endDate: String): Set<String> =
         completionDao.getCompletedDatesForHabit(habitId, startDate, endDate).toSet()
+
+    /** Dates in range marked as a broken streak (see [com.habitsfirst.androidclone.data.local.entity.StreakScarEntity]) -- for the stats screen's "broken streaks" count. */
+    suspend fun getScarredDatesInRange(startDate: String, endDate: String): Set<String> =
+        streakScarDao.getScarredDatesInRange(startDate, endDate).toSet()
 
     // -- Onboarding "ease into it" ramp (see Habit.easeInOrder / EaseInRepository) -------
 

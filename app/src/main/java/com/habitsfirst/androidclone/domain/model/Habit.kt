@@ -18,11 +18,9 @@ data class Habit(
     val targetAppLabel: String? = null,
     val sortOrder: Int = 0,
     val createdAtEpochMillis: Long = System.currentTimeMillis(),
-    /** [CUSTOM][HabitType.CUSTOM] only: require a proof photo before a check-in counts as done. */
-    val requiresPhotoVerification: Boolean = false,
-    /** Set only when [requiresPhotoVerification]: what a proof photo must show. */
+    /** [PHOTO][HabitType.PHOTO] only: what a proof photo must show. */
     val verificationPrompt: String? = null,
-    /** Set only when [requiresPhotoVerification]: path to a saved example photo, if any. */
+    /** [PHOTO][HabitType.PHOTO] only: path to a saved example photo, if any. */
     val verificationExampleImagePath: String? = null,
     val kind: HabitKind = HabitKind.GATING,
     /** If set, this habit auto-archives once the date has passed -- used for makeup habits. */

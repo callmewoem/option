@@ -37,16 +37,16 @@ import com.habitsfirst.androidclone.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MeditationTimerScreen(
+fun TimedHabitTimerScreen(
     onDone: () -> Unit,
-    viewModel: MeditationTimerViewModel = hiltViewModel(),
+    viewModel: TimedHabitTimerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.habit?.name ?: "Meditate") },
+                title = { Text(state.habit?.name ?: "Timer") },
                 navigationIcon = {
                     IconButton(onClick = onDone) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))

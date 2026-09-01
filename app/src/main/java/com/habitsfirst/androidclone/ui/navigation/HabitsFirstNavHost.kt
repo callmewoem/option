@@ -19,7 +19,7 @@ import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
 import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
-import com.habitsfirst.androidclone.ui.habit.MeditationTimerScreen
+import com.habitsfirst.androidclone.ui.habit.TimedHabitTimerScreen
 import com.habitsfirst.androidclone.ui.habits.HabitsScreen
 import com.habitsfirst.androidclone.ui.home.HomeScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPermissionsScreen
@@ -88,15 +88,13 @@ fun HabitsFirstNavHost() {
             HomeScreen(
                 navController = navController,
                 onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
-                onOpenHabit = { habitId -> navController.navigate(Screen.MeditationTimer.createRoute(habitId)) },
+                onOpenHabit = { habitId -> navController.navigate(Screen.TimedHabitTimer.createRoute(habitId)) },
                 onVerifyHabit = { habitId -> navController.navigate(Screen.VerifyHabit.createRoute(habitId)) },
                 onCheckIn = { navController.navigate(Screen.ProofOfLife.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
                 onSetUpPhotoVerification = {
-                    navController.navigate(
-                        Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.CUSTOM, requiresPhoto = true),
-                    )
+                    navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.PHOTO))
                 },
             )
         }
@@ -137,16 +135,12 @@ fun HabitsFirstNavHost() {
                     type = NavType.StringType
                     defaultValue = ""
                 },
-                navArgument(Screen.ARG_REQUIRES_PHOTO) {
-                    type = NavType.BoolType
-                    defaultValue = false
-                },
             ),
         ) {
             AddEditHabitScreen(
                 onDone = { navController.popBackStack() },
-                onOpenMeditationTimer = { habitId ->
-                    navController.navigate(Screen.MeditationTimer.createRoute(habitId))
+                onOpenTimer = { habitId ->
+                    navController.navigate(Screen.TimedHabitTimer.createRoute(habitId))
                 },
             )
         }
@@ -156,16 +150,16 @@ fun HabitsFirstNavHost() {
         ) {
             AddEditHabitScreen(
                 onDone = { navController.popBackStack() },
-                onOpenMeditationTimer = { habitId ->
-                    navController.navigate(Screen.MeditationTimer.createRoute(habitId))
+                onOpenTimer = { habitId ->
+                    navController.navigate(Screen.TimedHabitTimer.createRoute(habitId))
                 },
             )
         }
         composable(
-            route = Screen.MeditationTimer.route,
+            route = Screen.TimedHabitTimer.route,
             arguments = listOf(navArgument(Screen.ARG_HABIT_ID) { type = NavType.StringType }),
         ) {
-            MeditationTimerScreen(onDone = { navController.popBackStack() })
+            TimedHabitTimerScreen(onDone = { navController.popBackStack() })
         }
         composable(
             route = Screen.VerifyHabit.route,

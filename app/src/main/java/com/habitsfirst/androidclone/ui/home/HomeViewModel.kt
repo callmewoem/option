@@ -116,7 +116,7 @@ class HomeViewModel @Inject constructor(
         miscFlow,
     ) { (gating, tracked, antihabits), blockedApps, _, todos, misc ->
         val hasImageVerificationHabit =
-            (gating + tracked + antihabits).any { it.habit.type == HabitType.CUSTOM && it.habit.requiresPhotoVerification }
+            (gating + tracked + antihabits).any { it.habit.type == HabitType.PHOTO }
         HomeUiState(
             isLoading = false,
             gating = gating,
@@ -136,9 +136,9 @@ class HomeViewModel @Inject constructor(
         initialValue = HomeUiState(),
     )
 
-    fun onCustomHabitToggled(habitId: Long, done: Boolean) {
+    fun onTallyHabitToggled(habitId: Long, done: Boolean) {
         viewModelScope.launch {
-            habitRepository.setCustomHabitDone(habitId, done)
+            habitRepository.setTallyHabitDone(habitId, done)
             streakRefreshTrigger.value++
             maybeAwardLootbox()
         }
