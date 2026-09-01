@@ -84,6 +84,7 @@
     <string name="add_habit_choose_type">Choose a habit type</string>
     <string name="add_habit_target_steps">Daily step goal</string>
     <string name="add_habit_target_minutes">Target minutes</string>
+    <string name="add_habit_target_hours">Target hours</string>
     <string name="add_habit_choose_app">Which app?</string>
     <string name="add_habit_name">Habit name</string>
     <string name="add_habit_save">Save habit</string>

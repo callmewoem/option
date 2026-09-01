@@ -158,7 +158,7 @@ fun AddEditHabitScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                HabitType.entries.take(3).forEach { type ->
+                HabitType.entries.take(4).forEach { type ->
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },
@@ -172,7 +172,7 @@ fun AddEditHabitScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                HabitType.entries.drop(3).forEach { type ->
+                HabitType.entries.drop(4).forEach { type ->
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },
@@ -190,10 +190,10 @@ fun AddEditHabitScreen(
                     label = {
                         Text(
                             stringResource(
-                                if (state.type == HabitType.STEPS) {
-                                    R.string.add_habit_target_steps
-                                } else {
-                                    R.string.add_habit_target_minutes
+                                when (state.type) {
+                                    HabitType.STEPS -> R.string.add_habit_target_steps
+                                    HabitType.SLEEP_HOURS -> R.string.add_habit_target_hours
+                                    else -> R.string.add_habit_target_minutes
                                 },
                             ),
                         )
