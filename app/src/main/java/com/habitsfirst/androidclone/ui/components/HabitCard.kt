@@ -71,6 +71,7 @@ fun HabitCard(
                 Text(text = habit.name, style = MaterialTheme.typography.titleMedium)
                 val subtitle = when (habit.type) {
                     HabitType.CUSTOM -> if (progress.isCompleted) "Done" else "Tap to mark done"
+                    HabitType.IMAGE_VERIFICATION -> if (progress.isCompleted) "Verified" else "Tap to verify with a photo"
                     else -> "${progress.currentValue} / ${habit.targetValue} ${habit.type.unit}"
                 }
                 Text(

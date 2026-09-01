@@ -32,14 +32,33 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
      automatically via `UsageStatsManager`, refreshed every 15 minutes and again
      immediately after you leave the tracked app.
    - *Custom check-in* — a plain manual toggle.
+   - *Photo verification* — you describe what counts as done, add an example
+     photo, or both; completing it means submitting today's proof photo, which a
+     Claude vision model checks against those rules before the habit counts as
+     done (see below).
 5. Progress resets automatically at midnight because completion is stored keyed by
    calendar date, not as a flag that has to be cleared.
+
+### Photo verification
+
+A *Photo verification* habit is gated by a vision model instead of an honor-system
+toggle: when setting it up you write what a proof photo should show (e.g. "a made
+bed"), attach an example photo, or both. To complete it for the day, tap the habit,
+take or pick a photo, and submit it — `AnthropicImageVerificationClient` sends it
+(downscaled, alongside the example photo if any) to the Claude Messages API and
+marks the habit done only if the model approves, showing its one-sentence reasoning
+either way. It calls the API directly from the device using an Anthropic API key
+you provide yourself in Settings → *Photo verification*; nothing is sent anywhere
+until a key is set. Photos are stored locally under the app's own storage
+(`data/verification/`, `util/ImageStore.kt`) and never leave the device except as
+part of that one verification request.
 
 ## Project structure
 
 ```
 app/src/main/java/com/habitsfirst/androidclone/
-├── data/            Room entities/DAOs, repositories, DataStore preferences
+├── data/            Room entities/DAOs, repositories, DataStore preferences,
+│                    verification/ (vision-model client for photo verification)
 ├── domain/model/    Plain Kotlin models (Habit, HabitType, BlockedApp, ...)
 ├── di/              Hilt modules
 ├── service/         AccessibilityService, WorkManager usage-tracking worker, boot receiver
@@ -66,6 +85,8 @@ Navigation Compose, single-activity architecture.
 | Accessibility Service | Detects when you switch into a locked app so the cover can appear immediately. |
 | Display over other apps (`SYSTEM_ALERT_WINDOW`) | Lets the lock screen actually cover the app underneath. |
 | Notifications | Habit reminders and streak nudges (optional, toggleable in Settings). |
+| Camera | Lets you take a proof photo directly for a *photo verification* habit (picking one from your gallery works too, without this). |
+| Internet | Sends a submitted proof photo to the Claude API for *photo verification* habits — only used if you've set an API key in Settings, and only for that request. |
 
 All three special permissions are requested with plain-language explanations
 during onboarding and can be revisited any time from Settings.

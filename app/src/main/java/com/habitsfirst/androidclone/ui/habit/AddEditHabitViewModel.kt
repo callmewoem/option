@@ -1,5 +1,7 @@
 package com.habitsfirst.androidclone.ui.habit
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,12 +10,16 @@ import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.ui.navigation.Screen
+import com.habitsfirst.androidclone.util.ImageStore
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class AddEditHabitUiState(
@@ -23,6 +29,8 @@ data class AddEditHabitUiState(
     val targetValue: Int = HabitType.STEPS.defaultTarget(),
     val targetPackageName: String? = null,
     val targetAppLabel: String? = null,
+    val verificationPrompt: String = "",
+    val verificationExampleImagePath: String? = null,
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
@@ -32,7 +40,8 @@ data class AddEditHabitUiState(
     val isValid: Boolean
         get() = name.isNotBlank() &&
             (type != HabitType.APP_USAGE_MINUTES || targetPackageName != null) &&
-            (type == HabitType.CUSTOM || targetValue > 0)
+            (!type.isMeasurable || targetValue > 0) &&
+            (type != HabitType.IMAGE_VERIFICATION || verificationPrompt.isNotBlank() || verificationExampleImagePath != null)
 }
 
 fun HabitType.defaultTarget(): Int = when (this) {
@@ -40,13 +49,14 @@ fun HabitType.defaultTarget(): Int = when (this) {
     HabitType.EXERCISE_MINUTES -> 30
     HabitType.MEDITATION_MINUTES -> 10
     HabitType.APP_USAGE_MINUTES -> 15
-    HabitType.CUSTOM -> 1
+    HabitType.CUSTOM, HabitType.IMAGE_VERIFICATION -> 1
 }
 
 @HiltViewModel
 class AddEditHabitViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val installedAppsProvider: InstalledAppsProvider,
+    @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -67,6 +77,8 @@ class AddEditHabitViewModel @Inject constructor(
                         targetValue = habit.targetValue,
                         targetPackageName = habit.targetPackageName,
                         targetAppLabel = habit.targetAppLabel,
+                        verificationPrompt = habit.verificationPrompt.orEmpty(),
+                        verificationExampleImagePath = habit.verificationExampleImagePath,
                     )
                 }
             }
@@ -98,6 +110,27 @@ class AddEditHabitViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(targetPackageName = app.packageName, targetAppLabel = app.label)
     }
 
+    fun onVerificationPromptChanged(prompt: String) {
+        _uiState.value = _uiState.value.copy(verificationPrompt = prompt)
+    }
+
+    /** Copies a picked example photo into app storage and stores its path. */
+    fun onExampleImageSelected(uri: Uri) {
+        val idForFile = if (habitId != 0L) habitId else System.currentTimeMillis()
+        viewModelScope.launch {
+            val path = withContext(Dispatchers.IO) { ImageStore.saveExampleImage(appContext, uri, idForFile) }
+            if (path != null) {
+                ImageStore.deleteQuietly(_uiState.value.verificationExampleImagePath)
+                _uiState.value = _uiState.value.copy(verificationExampleImagePath = path)
+            }
+        }
+    }
+
+    fun onExampleImageCleared() {
+        ImageStore.deleteQuietly(_uiState.value.verificationExampleImagePath)
+        _uiState.value = _uiState.value.copy(verificationExampleImagePath = null)
+    }
+
     fun onSave() {
         val state = _uiState.value
         if (!state.isValid || state.isSaving) return
@@ -108,9 +141,15 @@ class AddEditHabitViewModel @Inject constructor(
                     id = state.habitId,
                     name = state.name.trim(),
                     type = state.type,
-                    targetValue = if (state.type == HabitType.CUSTOM) 1 else state.targetValue,
+                    targetValue = if (!state.type.isMeasurable) 1 else state.targetValue,
                     targetPackageName = state.targetPackageName,
                     targetAppLabel = state.targetAppLabel,
+                    verificationPrompt = state.verificationPrompt.trim().takeIf {
+                        state.type == HabitType.IMAGE_VERIFICATION && it.isNotBlank()
+                    },
+                    verificationExampleImagePath = state.verificationExampleImagePath.takeIf {
+                        state.type == HabitType.IMAGE_VERIFICATION
+                    },
                 ),
             )
             _uiState.value = _uiState.value.copy(isSaving = false, savedSuccessfully = true)

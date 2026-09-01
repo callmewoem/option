@@ -16,6 +16,7 @@ import javax.inject.Inject
 data class SettingsUiState(
     val habits: List<Habit> = emptyList(),
     val notificationsEnabled: Boolean = true,
+    val anthropicApiKey: String? = null,
 )
 
 @HiltViewModel
@@ -27,11 +28,16 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = combine(
         habitRepository.observeHabits(),
         preferencesRepository.areNotificationsEnabled,
-    ) { habits, notificationsEnabled ->
-        SettingsUiState(habits = habits, notificationsEnabled = notificationsEnabled)
+        preferencesRepository.anthropicApiKey,
+    ) { habits, notificationsEnabled, apiKey ->
+        SettingsUiState(habits = habits, notificationsEnabled = notificationsEnabled, anthropicApiKey = apiKey)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun onNotificationsToggled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setNotificationsEnabled(enabled) }
+    }
+
+    fun onAnthropicApiKeyChanged(key: String) {
+        viewModelScope.launch { preferencesRepository.setAnthropicApiKey(key) }
     }
 }

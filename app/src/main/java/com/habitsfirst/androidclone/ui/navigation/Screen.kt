@@ -19,6 +19,9 @@ sealed class Screen(val route: String) {
     data object MeditationTimer : Screen("habit/{habitId}/meditate") {
         fun createRoute(habitId: Long) = "habit/$habitId/meditate"
     }
+    data object VerifyHabit : Screen("habit/{habitId}/verify") {
+        fun createRoute(habitId: Long) = "habit/$habitId/verify"
+    }
 
     companion object {
         const val ARG_HABIT_ID = "habitId"
