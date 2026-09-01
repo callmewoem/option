@@ -293,20 +293,36 @@ fun SettingsScreen(
 
             item { SectionHeader("Hard mode") }
             item {
+                val cooldownDaysLeft = daysUntil(state.hardModeToggleLockedUntilEpochMillis)
+                val toggleLocked = cooldownDaysLeft > 0
                 ListItem(
                     headlineContent = { Text("Hard mode") },
                     supportingContent = {
                         Text(
-                            if (state.hardModeEnabled) {
-                                "Gates and blocked apps can only be added, never removed."
-                            } else {
-                                "Locks in your gates and blocked apps. Grants 5 grace tokens."
+                            buildString {
+                                append(
+                                    if (state.hardModeEnabled) {
+                                        "Gates and blocked apps can only be added, never removed."
+                                    } else {
+                                        "Locks in your gates and blocked apps. Grants 5 grace tokens."
+                                    },
+                                )
+                                if (toggleLocked) {
+                                    append(
+                                        " Can't be toggled again for $cooldownDaysLeft more " +
+                                            if (cooldownDaysLeft == 1) "day." else "days.",
+                                    )
+                                }
                             },
                         )
                     },
                     leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
                     trailingContent = {
-                        Switch(checked = state.hardModeEnabled, onCheckedChange = viewModel::onHardModeToggled)
+                        Switch(
+                            checked = state.hardModeEnabled,
+                            onCheckedChange = viewModel::onHardModeToggled,
+                            enabled = !toggleLocked,
+                        )
                     },
                 )
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
@@ -556,6 +572,15 @@ private fun BedtimeAndReminderSection(
         }
     }
 }
+
+/** Whole days remaining until [untilEpochMillis], rounded up so "a few hours left" still reads as 1, not 0. 0 once it's passed. */
+private fun daysUntil(untilEpochMillis: Long): Int {
+    val millisLeft = untilEpochMillis - System.currentTimeMillis()
+    if (millisLeft <= 0) return 0
+    return ((millisLeft + MILLIS_PER_DAY - 1) / MILLIS_PER_DAY).toInt()
+}
+
+private const val MILLIS_PER_DAY = 24 * 60 * 60 * 1000L
 
 @Composable
 private fun SectionHeader(text: String) {
