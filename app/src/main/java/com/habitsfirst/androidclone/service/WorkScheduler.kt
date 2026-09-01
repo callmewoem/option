@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -67,5 +68,18 @@ object WorkScheduler {
     /** Stops the Health Connect sync worker -- called when the user turns sync back off in Settings. */
     fun cancelHealthConnectSync(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(HealthConnectSyncWorker.UNIQUE_PERIODIC_NAME)
+    }
+
+    /** Enqueues the periodic re-sync of the premade URL blocklists from their upstream source. */
+    fun scheduleBlocklistRefresh(context: Context) {
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        val request = PeriodicWorkRequestBuilder<BlocklistRefreshWorker>(3, TimeUnit.DAYS)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            BlocklistRefreshWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
     }
 }

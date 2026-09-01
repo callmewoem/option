@@ -24,6 +24,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
         WorkScheduler.scheduleUsageTracking(appContext)
         WorkScheduler.scheduleMorningTodoReminder(appContext)
         WorkScheduler.scheduleProofOfLifeCheck(appContext)
+        WorkScheduler.scheduleBlocklistRefresh(appContext)
 
         // Health Connect sync is opt-in (unlike the three above), so only re-assert it
         // if the user had actually turned it on before the reboot -- goAsync() keeps the

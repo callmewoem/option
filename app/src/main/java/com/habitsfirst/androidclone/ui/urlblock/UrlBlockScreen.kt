@@ -75,8 +75,9 @@ fun UrlBlockScreen(
             item { SectionHeader("Blanket lists") }
             item {
                 Text(
-                    "Curated starter lists. \"Unlock via gating\" opens once today's habits are done, " +
-                        "just like a blocked app -- \"Perma-blocked\" never opens, no habit or grace token gets past it.",
+                    "Comprehensive lists, kept current automatically. \"Unlock via gating\" opens once " +
+                        "today's habits are done, just like a blocked app -- \"Perma-blocked\" never opens, " +
+                        "no habit or grace token gets past it.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier

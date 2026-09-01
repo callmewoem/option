@@ -9,9 +9,10 @@ import com.habitsfirst.androidclone.domain.model.UrlBlockList
  * Settings for one URL block list. The two premade lists ([BlockListSource.PREMADE_PORN]/
  * [BlockListSource.PREMADE_SOCIAL]) are seeded once with fixed ids by
  * [com.habitsfirst.androidclone.data.repository.UrlBlockRepository] and only ever have
- * their [isEnabled]/[blockMode] changed here -- their domains live in the bundled asset
- * files, not this table. A [BlockListSource.CUSTOM] row's domains live in
- * [BlockedDomainEntity].
+ * their [isEnabled]/[blockMode] changed here -- their domains live in
+ * [com.habitsfirst.androidclone.util.PremadeBlocklists] (a bundled seed, kept current by
+ * periodic fetches from its upstream source), not this table. A [BlockListSource.CUSTOM]
+ * row's domains live in [BlockedDomainEntity].
  */
 @Entity(tableName = "block_lists", primaryKeys = ["id"])
 data class BlockListEntity(
