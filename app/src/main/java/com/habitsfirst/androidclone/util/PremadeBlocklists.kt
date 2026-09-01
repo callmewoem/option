@@ -5,8 +5,8 @@ import com.habitsfirst.androidclone.domain.model.BlockListSource
 
 /**
  * The two bundled "blanket" domain lists -- porn and social media -- read once from
- * `assets/blocklists/*.txt` and cached in memory for the life of the process. See
- * those files for provenance/curation notes. Each is a plain list of registrable
+ * text files under `assets/blocklists/` and cached in memory for the life of the
+ * process. See those files for provenance/curation notes. Each is a plain list of registrable
  * domains (one per line, '#' comments allowed); matching (in
  * [com.habitsfirst.androidclone.data.repository.UrlBlockRepository]) walks up a page's
  * host label by label, so a bundled entry like "pornhub.com" also catches
