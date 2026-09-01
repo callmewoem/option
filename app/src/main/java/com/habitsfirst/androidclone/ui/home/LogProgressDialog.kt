@@ -18,7 +18,8 @@ import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 
 /**
- * Quick manual entry for step counts -- the only habit type still logged this way.
+ * Quick manual entry for Health-Connect-backed habits (steps, workout minutes, sleep
+ * hours) that aren't auto-synced or don't have permission granted yet.
  * [com.habitsfirst.androidclone.domain.model.HabitType.APP_USAGE_MINUTES] tracks
  * automatically with no manual correction, and
  * [com.habitsfirst.androidclone.domain.model.HabitType.TIMED_MINUTES] habits use the
