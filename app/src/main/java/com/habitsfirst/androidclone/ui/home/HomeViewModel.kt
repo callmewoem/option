@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import javax.inject.Inject
 
 /**
@@ -131,13 +132,17 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onAddTodo(title: String) {
+    fun onAddTodo(title: String, repeatDays: Set<DayOfWeek> = emptySet()) {
         if (title.isBlank()) return
-        viewModelScope.launch { todoRepository.addTodo(title) }
+        viewModelScope.launch { todoRepository.addTodo(title, repeatDays = repeatDays) }
     }
 
     fun onToggleTodoDone(todo: Todo) {
-        viewModelScope.launch { todoRepository.setDone(todo.id, !todo.isDone) }
+        viewModelScope.launch { todoRepository.setDone(todo, !todo.isDone) }
+    }
+
+    fun onDeleteTodo(todo: Todo) {
+        viewModelScope.launch { todoRepository.delete(todo) }
     }
 
     fun refreshStreak() {

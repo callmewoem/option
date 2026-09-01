@@ -2,6 +2,7 @@ package com.habitsfirst.androidclone.ui.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.Card
@@ -29,6 +33,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,7 +65,10 @@ import com.habitsfirst.androidclone.domain.model.Todo
 import com.habitsfirst.androidclone.ui.components.HabitCard
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
+import java.time.DayOfWeek
 import java.time.LocalTime
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +86,7 @@ fun HomeScreen(
     val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
     var newTodoText by remember { mutableStateOf("") }
+    var newTodoRepeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
 
     // Everything actionable today, tagged by kind so HabitCard can render its accent --
     // this is the "do it all from Home" list; Habits/Todos are for managing the lists.
@@ -195,17 +204,33 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = {
-                            viewModel.onAddTodo(newTodoText)
+                            viewModel.onAddTodo(newTodoText, newTodoRepeatDays)
                             newTodoText = ""
+                            newTodoRepeatDays = emptySet()
                         },
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Add")
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                RepeatDaysPicker(
+                    selectedDays = newTodoRepeatDays,
+                    onToggleDay = { day ->
+                        newTodoRepeatDays = if (day in newTodoRepeatDays) {
+                            newTodoRepeatDays - day
+                        } else {
+                            newTodoRepeatDays + day
+                        }
+                    },
+                )
             }
 
             items(state.pendingTodos, key = { "todo-${it.id}" }) { todo ->
-                QuickTodoRow(todo = todo, onToggle = { viewModel.onToggleTodoDone(todo) })
+                QuickTodoRow(
+                    todo = todo,
+                    onToggle = { viewModel.onToggleTodoDone(todo) },
+                    onDelete = { viewModel.onDeleteTodo(todo) },
+                )
             }
 
             item { Spacer(modifier = Modifier.height(4.dp)) }
@@ -228,8 +253,28 @@ fun HomeScreen(
     }
 }
 
+/** Lets the user pick which days of the week a new todo recurs on; none selected means one-off. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit) {
+private fun RepeatDaysPicker(selectedDays: Set<DayOfWeek>, onToggleDay: (DayOfWeek) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        DayOfWeek.values().forEach { day ->
+            FilterChip(
+                selected = day in selectedDays,
+                onClick = { onToggleDay(day) },
+                label = { Text(day.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -242,14 +287,42 @@ private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Checkbox(checked = todo.isDone, onCheckedChange = { onToggle() })
-            Text(
-                text = todo.title,
-                style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = todo.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
+                )
+                if (todo.isRecurring) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Repeat,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.height(14.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = formatRepeatDays(todo.repeatDays),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.todos_delete))
+            }
         }
     }
+}
+
+/** e.g. "Every Sun", "Every Mon, Wed, Fri", or "Every day" when all seven are set. */
+private fun formatRepeatDays(days: Set<DayOfWeek>): String {
+    if (days.size == 7) return "Every day"
+    val ordered = DayOfWeek.values().filter { it in days }
+        .joinToString(", ") { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    return "Every $ordered"
 }
 
 @Composable

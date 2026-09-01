@@ -86,6 +86,7 @@
     <!-- Todos -->
     <string name="todos_title">Todos</string>
     <string name="todos_add_hint">New task</string>
+    <string name="todos_delete">Delete task</string>
     <string name="morning_reminder_title">Plan your day</string>
     <string name="morning_reminder_body">Add today\'s one-off tasks before you get going.</string>
 
