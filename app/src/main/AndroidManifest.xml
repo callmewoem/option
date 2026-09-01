@@ -54,6 +54,33 @@
             android:launchMode="singleInstance"
             android:theme="@style/Theme.HabitsFirst.Block" />
 
+        <!--
+          Health Connect's permission-grant flow refuses to grant anything at all unless
+          a rationale is declared: through Android 13, a plain activity handling
+          ACTION_SHOW_PERMISSIONS_RATIONALE (linked from its own grant screen); from
+          Android 14, the ViewPermissionUsageActivity alias below (linked from Health
+          Connect's own Settings > App permissions page) as well. Without both, tapping
+          "Grant" in Settings > Health Connect either does nothing or silently grants
+          nothing, which is why step sync looked broken.
+        -->
+        <activity
+            android:name=".ui.settings.PermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".ui.settings.PermissionsRationaleActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".service.AppBlockAccessibilityService"
             android:exported="true"
