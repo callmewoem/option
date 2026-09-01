@@ -2,7 +2,6 @@ package com.habitsfirst.androidclone.ui.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
@@ -25,7 +23,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material3.Card
@@ -68,10 +65,8 @@ import com.habitsfirst.androidclone.domain.model.Todo
 import com.habitsfirst.androidclone.ui.components.HabitCard
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
-import java.time.DayOfWeek
+import com.habitsfirst.androidclone.util.DateProvider
 import java.time.LocalTime
-import java.time.format.TextStyle
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,7 +85,7 @@ fun HomeScreen(
     val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
     var newTodoText by remember { mutableStateOf("") }
-    var newTodoRepeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
+    var newTodoDueTomorrow by remember { mutableStateOf(false) }
     // Which of the tour's steps is showing -- local only, since the tour is meant to be
     // stepped through in one sitting; onTourDismissed() is what actually persists that
     // it's done, so a process death mid-tour just restarts it rather than losing it.
@@ -240,24 +235,18 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = {
-                            viewModel.onAddTodo(newTodoText, newTodoRepeatDays)
+                            viewModel.onAddTodo(newTodoText, newTodoDueTomorrow)
                             newTodoText = ""
-                            newTodoRepeatDays = emptySet()
+                            newTodoDueTomorrow = false
                         },
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Add")
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                RepeatDaysPicker(
-                    selectedDays = newTodoRepeatDays,
-                    onToggleDay = { day ->
-                        newTodoRepeatDays = if (day in newTodoRepeatDays) {
-                            newTodoRepeatDays - day
-                        } else {
-                            newTodoRepeatDays + day
-                        }
-                    },
+                DueDatePicker(
+                    dueTomorrow = newTodoDueTomorrow,
+                    onDueTomorrowChanged = { newTodoDueTomorrow = it },
                 )
             }
 
@@ -289,23 +278,24 @@ fun HomeScreen(
     }
 }
 
-/** Lets the user pick which days of the week a new todo recurs on; none selected means one-off. */
+/** Lets the user pick whether a new todo is due today or tomorrow -- todos aren't day-dependent beyond that. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RepeatDaysPicker(selectedDays: Set<DayOfWeek>, onToggleDay: (DayOfWeek) -> Unit) {
+private fun DueDatePicker(dueTomorrow: Boolean, onDueTomorrowChanged: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        DayOfWeek.values().forEach { day ->
-            FilterChip(
-                selected = day in selectedDays,
-                onClick = { onToggleDay(day) },
-                label = { Text(day.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
-            )
-        }
+        FilterChip(
+            selected = !dueTomorrow,
+            onClick = { onDueTomorrowChanged(false) },
+            label = { Text("Today") },
+        )
+        FilterChip(
+            selected = dueTomorrow,
+            onClick = { onDueTomorrowChanged(true) },
+            label = { Text("Tomorrow") },
+        )
     }
 }
 
@@ -329,21 +319,12 @@ private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit, onDelete: () -> Unit)
                     style = MaterialTheme.typography.bodyLarge,
                     textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
                 )
-                if (todo.isRecurring) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Filled.Repeat,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.height(14.dp),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = formatRepeatDays(todo.repeatDays),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                if (!DateProvider.isToday(todo.date)) {
+                    Text(
+                        text = "Tomorrow",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             IconButton(onClick = onDelete) {
@@ -351,14 +332,6 @@ private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit, onDelete: () -> Unit)
             }
         }
     }
-}
-
-/** e.g. "Every Sun", "Every Mon, Wed, Fri", or "Every day" when all seven are set. */
-private fun formatRepeatDays(days: Set<DayOfWeek>): String {
-    if (days.size == 7) return "Every day"
-    val ordered = DayOfWeek.values().filter { it in days }
-        .joinToString(", ") { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
-    return "Every $ordered"
 }
 
 /** One stop on the first-run Home tour: what to notice, and why it's worth knowing. */

@@ -110,7 +110,11 @@ fun SettingsScreen(
             items(state.habits, key = { it.id }) { habit ->
                 ListItem(
                     headlineContent = { Text(habit.name) },
-                    supportingContent = { Text("${habit.kind.label} · ${habit.displayTarget.ifBlank { "Custom check-in" }}") },
+                    supportingContent = {
+                        val target = habit.displayTarget.ifBlank { "Custom check-in" }
+                        val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
+                        Text("${habit.kind.label} · $target${schedule.orEmpty()}")
+                    },
                     leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
                     trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
                     modifier = Modifier

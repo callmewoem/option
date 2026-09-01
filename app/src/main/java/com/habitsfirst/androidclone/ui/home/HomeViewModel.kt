@@ -24,19 +24,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.DayOfWeek
 import javax.inject.Inject
 
 /**
  * Everything doable in one sitting, first thing in the morning: today's gating,
- * tracked and antihabit entries and today's todos, all completable inline -- Habits
- * and Todos are for managing lists, Home is for finishing them.
+ * tracked and antihabit entries and this and tomorrow's todos, all completable
+ * inline -- Habits and Todos are for managing lists, Home is for finishing them.
  */
 data class HomeUiState(
     val isLoading: Boolean = true,
     val gating: List<HabitProgress> = emptyList(),
     val tracked: List<HabitProgress> = emptyList(),
     val antihabits: List<HabitProgress> = emptyList(),
+    /** Due today or tomorrow -- see [Todo]. */
     val todos: List<Todo> = emptyList(),
     val blockedApps: List<BlockedApp> = emptyList(),
     val streakDays: Int = 0,
@@ -112,7 +112,7 @@ class HomeViewModel @Inject constructor(
         kindsFlow,
         blockedAppRepository.observeBlockedApps(),
         streakRefreshTrigger,
-        todoRepository.observeForToday(),
+        todoRepository.observeUpcoming(),
         miscFlow,
     ) { (gating, tracked, antihabits), blockedApps, _, todos, misc ->
         val hasImageVerificationHabit =
@@ -160,9 +160,9 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onAddTodo(title: String, repeatDays: Set<DayOfWeek> = emptySet()) {
+    fun onAddTodo(title: String, dueTomorrow: Boolean = false) {
         if (title.isBlank()) return
-        viewModelScope.launch { todoRepository.addTodo(title, repeatDays = repeatDays) }
+        viewModelScope.launch { todoRepository.addTodo(title, dueTomorrow = dueTomorrow) }
     }
 
     fun onToggleTodoDone(todo: Todo) {

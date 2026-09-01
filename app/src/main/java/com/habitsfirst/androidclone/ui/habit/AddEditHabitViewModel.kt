@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
 import javax.inject.Inject
 
 data class AddEditHabitUiState(
@@ -34,6 +35,8 @@ data class AddEditHabitUiState(
     val targetAppLabel: String? = null,
     val verificationPrompt: String = "",
     val verificationExampleImagePath: String? = null,
+    /** Empty means every day -- see [Habit.scheduledDays]. */
+    val scheduledDays: Set<DayOfWeek> = emptySet(),
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
@@ -101,6 +104,7 @@ class AddEditHabitViewModel @Inject constructor(
                         targetAppLabel = habit.targetAppLabel,
                         verificationPrompt = habit.verificationPrompt.orEmpty(),
                         verificationExampleImagePath = habit.verificationExampleImagePath,
+                        scheduledDays = habit.scheduledDays,
                     )
                 }
                 // Hard mode only ever locks an *existing* gate -- a habit already
@@ -149,6 +153,18 @@ class AddEditHabitViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(verificationPrompt = prompt)
     }
 
+    /** Toggling a day out of an empty (every-day) selection narrows it to just that day. */
+    fun onScheduledDayToggled(day: DayOfWeek) {
+        val current = _uiState.value.scheduledDays
+        _uiState.value = _uiState.value.copy(
+            scheduledDays = if (day in current) current - day else current + day,
+        )
+    }
+
+    fun onEveryDaySelected() {
+        _uiState.value = _uiState.value.copy(scheduledDays = emptySet())
+    }
+
     /** Copies a picked example photo into app storage and stores its path. */
     fun onExampleImageSelected(uri: Uri) {
         val idForFile = if (habitId != 0L) habitId else System.currentTimeMillis()
@@ -186,6 +202,7 @@ class AddEditHabitViewModel @Inject constructor(
                     verificationExampleImagePath = state.verificationExampleImagePath.takeIf {
                         state.type == HabitType.IMAGE_VERIFICATION
                     },
+                    scheduledDays = state.scheduledDays,
                 ),
             )
             _uiState.value = _uiState.value.copy(isSaving = false, savedSuccessfully = true)

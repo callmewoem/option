@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
+import java.time.DayOfWeek
 
 @Entity(tableName = "habits")
 data class HabitEntity(
@@ -25,7 +26,15 @@ data class HabitEntity(
     val kind: String = HabitKind.GATING.name,
     val expiresAfterDate: String? = null,
     val easeInOrder: Int? = null,
+    /** Bitmask over [DayOfWeek.value] (bit `value - 1`), see [toDayOfWeekSet]. 0 means every day. */
+    val scheduledDaysMask: Int = 0,
 )
+
+/** Shared by [HabitEntity.scheduledDaysMask] -- kept here since it's the only entity that still needs it. */
+fun Set<DayOfWeek>.toDaysMask(): Int = fold(0) { mask, day -> mask or (1 shl (day.value - 1)) }
+
+fun Int.toDayOfWeekSet(): Set<DayOfWeek> =
+    DayOfWeek.values().filterTo(mutableSetOf()) { (this shr (it.value - 1)) and 1 == 1 }
 
 fun HabitEntity.toDomain(): Habit = Habit(
     id = id,
@@ -41,6 +50,7 @@ fun HabitEntity.toDomain(): Habit = Habit(
     kind = runCatching { HabitKind.valueOf(kind) }.getOrDefault(HabitKind.GATING),
     expiresAfterDate = expiresAfterDate,
     easeInOrder = easeInOrder,
+    scheduledDays = scheduledDaysMask.toDayOfWeekSet(),
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -58,4 +68,5 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     kind = kind.name,
     expiresAfterDate = expiresAfterDate,
     easeInOrder = easeInOrder,
+    scheduledDaysMask = scheduledDays.toDaysMask(),
 )
