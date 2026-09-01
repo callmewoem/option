@@ -143,11 +143,11 @@ class HabitRepository @Inject constructor(
         setProgress(habitId, (existing?.currentValue ?: 0) + delta, target, date)
     }
 
-    suspend fun setCustomHabitDone(habitId: Long, done: Boolean, date: String = DateProvider.todayString()) {
+    suspend fun setTallyHabitDone(habitId: Long, done: Boolean, date: String = DateProvider.todayString()) {
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
     }
 
-    /** Records a vision-model verdict on a submitted proof photo for a [Habit.requiresPhotoVerification] habit. */
+    /** Records a vision-model verdict on a submitted proof photo for a [HabitType.PHOTO] habit. */
     suspend fun setImageVerificationResult(
         habitId: Long,
         approved: Boolean,
@@ -190,11 +190,11 @@ class HabitRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.type == HabitType.APP_USAGE_MINUTES && it.targetPackageName != null }
 
-    /** Active steps/exercise habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
+    /** Active step habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
     suspend fun getHealthConnectHabitsOnce(): List<Habit> =
         habitDao.getActiveHabitsOnce()
             .map { it.toDomain() }
-            .filter { it.type == HabitType.STEPS || it.type == HabitType.EXERCISE_MINUTES }
+            .filter { it.type == HabitType.STEPS }
 
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0

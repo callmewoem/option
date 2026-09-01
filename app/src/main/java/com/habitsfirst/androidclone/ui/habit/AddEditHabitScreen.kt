@@ -38,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -72,7 +71,7 @@ import java.util.Locale
 @Composable
 fun AddEditHabitScreen(
     onDone: () -> Unit,
-    onOpenMeditationTimer: (Long) -> Unit,
+    onOpenTimer: (Long) -> Unit,
     viewModel: AddEditHabitViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -215,38 +214,15 @@ fun AddEditHabitScreen(
                 )
             }
 
-            if (state.type == HabitType.CUSTOM) {
+            if (state.type == HabitType.PHOTO) {
                 Spacer(modifier = Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { viewModel.onRequiresPhotoVerificationToggled(!state.requiresPhotoVerification) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Require a photo", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "A vision model checks a submitted proof photo before this counts as done.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = state.requiresPhotoVerification,
-                        onCheckedChange = viewModel::onRequiresPhotoVerificationToggled,
-                    )
-                }
-
-                if (state.requiresPhotoVerification) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    VerificationSetupSection(
-                        prompt = state.verificationPrompt,
-                        onPromptChanged = viewModel::onVerificationPromptChanged,
-                        exampleImagePath = state.verificationExampleImagePath,
-                        onExampleImagePicked = viewModel::onExampleImageSelected,
-                        onExampleImageCleared = viewModel::onExampleImageCleared,
-                    )
-                }
+                VerificationSetupSection(
+                    prompt = state.verificationPrompt,
+                    onPromptChanged = viewModel::onVerificationPromptChanged,
+                    exampleImagePath = state.verificationExampleImagePath,
+                    onExampleImagePicked = viewModel::onExampleImageSelected,
+                    onExampleImageCleared = viewModel::onExampleImageCleared,
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -273,13 +249,13 @@ fun AddEditHabitScreen(
                 Text(stringResource(R.string.add_habit_save))
             }
 
-            if (!state.isNew && state.type == HabitType.MEDITATION_MINUTES) {
+            if (!state.isNew && state.type == HabitType.TIMED_MINUTES) {
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(
-                    onClick = { onOpenMeditationTimer(state.habitId) },
+                    onClick = { onOpenTimer(state.habitId) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Open meditation timer")
+                    Text("Open timer")
                 }
             }
         }
@@ -365,7 +341,7 @@ private fun FrequencyPicker(
     }
 }
 
-/** Setup for a [HabitType.CUSTOM] habit with photo verification on: a description, an example photo, or both. */
+/** Setup for a [HabitType.PHOTO] habit: a description of what counts, an example photo, or both. */
 @Composable
 private fun VerificationSetupSection(
     prompt: String,

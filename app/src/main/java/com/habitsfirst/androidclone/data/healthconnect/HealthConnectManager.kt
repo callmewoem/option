@@ -3,12 +3,10 @@ package com.habitsfirst.androidclone.data.healthconnect
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -16,8 +14,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Thin wrapper around the Health Connect client for the two habit types that can sync
- * automatically: steps and exercise minutes (see [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]).
+ * Thin wrapper around the Health Connect client for the one habit type that can sync
+ * automatically: steps (see [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]).
  *
  * Nothing here requests permissions -- that has to happen from an Activity via
  * [androidx.health.connect.client.PermissionController.createRequestPermissionResultContract],
@@ -56,18 +54,6 @@ class HealthConnectManager @Inject constructor(
         }.getOrDefault(0)
     }
 
-    /** Today's total logged exercise-session duration in minutes, or 0 if unavailable/ungranted. */
-    suspend fun todayExerciseMinutes(): Int {
-        val client = client ?: return 0
-        if (!hasPermissions()) return 0
-        return runCatching {
-            val result = client.aggregate(
-                AggregateRequest(setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL), todayRange()),
-            )
-            (result[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL] ?: Duration.ZERO).toMinutes().toInt()
-        }.getOrDefault(0)
-    }
-
     private fun todayRange(): TimeRangeFilter {
         val zone = ZoneId.systemDefault()
         val startOfDay = LocalDate.now(zone).atStartOfDay(zone).toInstant()
@@ -75,10 +61,9 @@ class HealthConnectManager @Inject constructor(
     }
 
     companion object {
-        /** Read-only, matching the two `android.permission.health.*` entries in the manifest. */
+        /** Read-only, matching the `android.permission.health.READ_STEPS` manifest entry. */
         val PERMISSIONS: Set<String> = setOf(
             HealthPermission.getReadPermission(StepsRecord::class),
-            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         )
     }
 }

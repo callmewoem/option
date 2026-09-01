@@ -33,7 +33,7 @@ data class ImageVerificationUiState(
     val isDone: Boolean = false,
 )
 
-/** Drives the "submit today's proof photo" flow for one [com.habitsfirst.androidclone.domain.model.Habit.requiresPhotoVerification] habit. */
+/** Drives the "submit today's proof photo" flow for one [com.habitsfirst.androidclone.domain.model.HabitType.PHOTO] habit. */
 @HiltViewModel
 class ImageVerificationViewModel @Inject constructor(
     private val habitRepository: HabitRepository,

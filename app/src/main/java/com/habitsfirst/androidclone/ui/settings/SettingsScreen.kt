@@ -629,10 +629,10 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
 }
 
 /**
- * Lets Walk-steps and Exercise habits sync from Health Connect instead of being logged
- * by hand, mirroring the "use an app for N minutes" habit's automatic tracking. Only
- * shown when [HealthConnectManager.isAvailable] -- the whole section is a no-op on a
- * device without the provider installed.
+ * Lets Steps habits sync from Health Connect instead of being logged by hand,
+ * mirroring the "use an app for N minutes" habit's automatic tracking. Only shown when
+ * [HealthConnectManager.isAvailable] -- the whole section is a no-op on a device
+ * without the provider installed.
  */
 @Composable
 private fun HealthConnectSection(
@@ -642,14 +642,14 @@ private fun HealthConnectSection(
     onSyncToggled: (Boolean) -> Unit,
 ) {
     Text(
-        "Sync Walk steps and Exercise habits from Health Connect instead of logging them by hand.",
+        "Sync Steps habits from Health Connect instead of logging them by hand.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     ListItem(
         headlineContent = { Text("Read permissions") },
-        supportingContent = { Text("Steps and exercise sessions, read-only") },
+        supportingContent = { Text("Step count, read-only") },
         trailingContent = {
             if (permissionsGranted) {
                 Text(

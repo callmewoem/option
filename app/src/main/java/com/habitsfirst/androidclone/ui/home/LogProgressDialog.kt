@@ -23,7 +23,7 @@ import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 
-/** Quick manual entry for step counts / exercise minutes / app-usage minutes. */
+/** Quick manual entry for step counts / app-usage minutes -- [HabitType.TIMED_MINUTES] habits use the timer screen instead. */
 @Composable
 fun LogProgressDialog(
     progress: HabitProgress,

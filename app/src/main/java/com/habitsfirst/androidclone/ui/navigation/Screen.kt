@@ -17,21 +17,16 @@ sealed class Screen(val route: String) {
     data object UrlBlockList : Screen("url_block_list")
     data object Settings : Screen("settings")
 
-    data object AddHabit : Screen("habit/new?kind={kind}&type={type}&requiresPhoto={requiresPhoto}") {
-        /**
-         * [type] preselects the new habit's type; [requiresPhoto] additionally
-         * pre-enables the photo-verification toggle on a [HabitType.CUSTOM] habit (e.g.
-         * deep-linking straight into a photo-verification setup) -- omit both to leave
-         * the form at its own defaults.
-         */
-        fun createRoute(kind: HabitKind = HabitKind.GATING, type: HabitType? = null, requiresPhoto: Boolean = false) =
-            "habit/new?kind=${kind.name}&type=${type?.name ?: ""}&requiresPhoto=$requiresPhoto"
+    data object AddHabit : Screen("habit/new?kind={kind}&type={type}") {
+        /** [type] preselects the new habit's type (e.g. deep-linking straight into a [HabitType.PHOTO] setup) -- omit to leave the form at its own default. */
+        fun createRoute(kind: HabitKind = HabitKind.GATING, type: HabitType? = null) =
+            "habit/new?kind=${kind.name}&type=${type?.name ?: ""}"
     }
     data object EditHabit : Screen("habit/{habitId}") {
         fun createRoute(habitId: Long) = "habit/$habitId"
     }
-    data object MeditationTimer : Screen("habit/{habitId}/meditate") {
-        fun createRoute(habitId: Long) = "habit/$habitId/meditate"
+    data object TimedHabitTimer : Screen("habit/{habitId}/timer") {
+        fun createRoute(habitId: Long) = "habit/$habitId/timer"
     }
     data object VerifyHabit : Screen("habit/{habitId}/verify") {
         fun createRoute(habitId: Long) = "habit/$habitId/verify"
@@ -42,6 +37,5 @@ sealed class Screen(val route: String) {
         const val ARG_HABIT_ID = "habitId"
         const val ARG_KIND = "kind"
         const val ARG_TYPE = "type"
-        const val ARG_REQUIRES_PHOTO = "requiresPhoto"
     }
 }

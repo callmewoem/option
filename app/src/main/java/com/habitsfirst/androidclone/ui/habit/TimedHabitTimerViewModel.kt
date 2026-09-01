@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class MeditationTimerUiState(
+data class TimedHabitTimerUiState(
     val habit: Habit? = null,
     val elapsedSeconds: Int = 0,
     val isRunning: Boolean = false,
@@ -27,16 +27,17 @@ data class MeditationTimerUiState(
     val isComplete: Boolean get() = targetSeconds > 0 && elapsedSeconds >= targetSeconds
 }
 
+/** Drives the built-in stopwatch for a [com.habitsfirst.androidclone.domain.model.HabitType.TIMED_MINUTES] habit -- meditation, a workout, anything else logged by timing it. */
 @HiltViewModel
-class MeditationTimerViewModel @Inject constructor(
+class TimedHabitTimerViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val habitId: Long = requireNotNull(savedStateHandle.get<String>(Screen.ARG_HABIT_ID)).toLong()
 
-    private val _uiState = MutableStateFlow(MeditationTimerUiState())
-    val uiState: StateFlow<MeditationTimerUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(TimedHabitTimerUiState())
+    val uiState: StateFlow<TimedHabitTimerUiState> = _uiState.asStateFlow()
 
     private var tickerJob: Job? = null
 

@@ -52,12 +52,11 @@
     <string name="home_manage_apps">Manage locked apps</string>
 
     <!-- Habit types -->
-    <string name="habit_type_steps">Walk steps</string>
-    <string name="habit_type_exercise">Exercise minutes</string>
-    <string name="habit_type_meditation">Meditate</string>
+    <string name="habit_type_timed">Timed</string>
     <string name="habit_type_app_usage">Use an app</string>
-    <string name="habit_type_custom">Custom check-in</string>
-    <string name="habit_type_image_verification">Photo verification</string>
+    <string name="habit_type_photo">Photo</string>
+    <string name="habit_type_tally">Tally</string>
+    <string name="habit_type_steps">Steps</string>
 
     <!-- Block screen -->
     <string name="block_title">%1$s is locked</string>
@@ -90,7 +89,7 @@
     <string name="add_habit_save">Save habit</string>
     <string name="add_habit_delete">Delete habit</string>
 
-    <!-- Meditation timer -->
+    <!-- Timed habit timer -->
     <string name="timer_start">Start</string>
     <string name="timer_pause">Pause</string>
     <string name="timer_reset">Reset</string>

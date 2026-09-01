@@ -45,15 +45,16 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
    of week) -- nothing to tap. Managing the habit list itself (add/edit/delete)
    lives in Settings.
 5. **Habit types** (independent of kind, above):
-   - *Walk N steps* / *Exercise N minutes* -- logged manually from Home (a
-     Health Connect-ready target package is already declared, so real step/workout
-     sync is a small follow-up rather than a rearchitecture).
-   - *Meditate N minutes* -- a built-in countdown timer.
+   - *Timed* -- N minutes of anything (a workout, meditating, whatever), tracked
+     with a built-in stopwatch.
    - *Use an app for N minutes* (the "use Duolingo" style habit) -- tracked
      automatically via `UsageStatsManager`, refreshed every 15 minutes and again
      immediately after you leave the tracked app.
-   - *Custom check-in* -- a plain manual toggle, or optionally gated on a proof
-     photo instead (see *Photo verification* below).
+   - *Photo* -- gated on a proof photo instead of an honor-system toggle (see
+     *Photo verification* below).
+   - *Tally* -- a plain manual check-in, no automatic tracking.
+   - *Walk N steps* -- synced from Health Connect once permission is granted in
+     Settings (manual fallback otherwise).
 6. **Stats tab** -- a GitHub-style heatmap (Canvas-drawn, shaded by the fraction of
    gating habits completed each day in 5 buckets like GitHub's, with a cosmetic
    gold-star overlay on days a lootbox awarded one; a day marked broken by a
@@ -88,9 +89,9 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 
 ### Photo verification
 
-A *Custom check-in* habit can require a proof photo instead of a manual honor-system
-toggle (`Habit.requiresPhotoVerification`) -- when setting it up you write what a
-proof photo should show (e.g. "a made bed"), attach an example photo, or both. To
+A *Photo* habit is gated on a proof photo instead of a manual honor-system toggle --
+when setting it up you write what a proof photo should show (e.g. "a made bed"),
+attach an example photo, or both. To
 complete it for the day, tap the habit, take a photo with the camera, and submit
 it — capture is camera-only by design, so a stored gallery photo can't stand in for
 today's proof. `AnthropicImageVerificationClient` sends it
@@ -212,10 +213,6 @@ update to the same Play Store listing again, and it must never be committed
 
 ## Known follow-ups
 
-- Wire real Health Connect reads for the steps/exercise habit types (the
-  dependency and manifest permissions are already in place; `HabitRepository`
-  already stores an absolute daily value, so a sync worker just needs to call
-  `setProgress` the same way `UsageTrackingWorker` does).
 - The Kotlin package (`com.habitsfirst.androidclone`) still reflects the app's
   original working name from before the rebrand to Locke -- cosmetic only
   (`applicationId`, class names, DB/DataStore file names), but worth a deliberate

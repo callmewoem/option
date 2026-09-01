@@ -95,7 +95,7 @@ fun HabitCard(
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
                         Icon(
-                            imageVector = habit.icon(),
+                            imageVector = habit.type.icon(),
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                             tint = if (isDone) accent else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -107,9 +107,9 @@ fun HabitCard(
                     Text(text = habit.name, style = MaterialTheme.typography.titleMedium)
                     val subtitle = when {
                         kind == HabitKind.ANTIHABIT -> if (isSlip) "Slipped" else null
-                        habit.type == HabitType.CUSTOM && habit.requiresPhotoVerification ->
+                        habit.type == HabitType.PHOTO ->
                             if (progress.isCompleted) "Verified" else "Tap to verify with a photo"
-                        habit.type == HabitType.CUSTOM -> null
+                        habit.type == HabitType.TALLY -> null
                         else -> "${progress.currentValue} / ${habit.targetValue} ${habit.type.unit}".trim()
                     }
                     if (subtitle != null) {

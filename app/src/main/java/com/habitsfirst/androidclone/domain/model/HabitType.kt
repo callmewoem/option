@@ -4,31 +4,31 @@ package com.habitsfirst.androidclone.domain.model
  * The kinds of habits Habits First can gate your apps behind.
  *
  * Each type defines how progress is measured and, in turn, how the app
- * figures out whether the habit is "done" for the day.
+ * figures out whether the habit is "done" for the day. Order here is display
+ * order in the type picker (see `AddEditHabitScreen`).
  */
 enum class HabitType {
-    /** Walk a target number of steps today (Health Connect, with manual fallback). */
-    STEPS,
-
-    /** Spend a target number of minutes exercising (manual timer or Health Connect). */
-    EXERCISE_MINUTES,
-
-    /** Spend a target number of minutes meditating using the built-in timer. */
-    MEDITATION_MINUTES,
+    /** Spend a target number of minutes on something, tracked with the built-in timer (workouts, meditation, anything else timed). */
+    TIMED_MINUTES,
 
     /** Actually use a specific app (e.g. Duolingo) for a target number of minutes. */
     APP_USAGE_MINUTES,
 
     /**
-     * A manual check-in with no automatic tracking -- optionally gated on submitting a
-     * proof photo (see [Habit.requiresPhotoVerification]) that's checked against a
+     * A manual check-in gated on submitting a proof photo that's checked against a
      * description and/or an example photo by a vision model before it counts as done.
      */
-    CUSTOM;
+    PHOTO,
+
+    /** A plain manual check-in, no automatic tracking or verification -- just tap it done. */
+    TALLY,
+
+    /** Walk a target number of steps today (Health Connect, with manual fallback). */
+    STEPS;
 
     /** Whether this habit type accumulates a numeric value toward [Habit.targetValue]. */
     val isMeasurable: Boolean
-        get() = this != CUSTOM
+        get() = this == TIMED_MINUTES || this == APP_USAGE_MINUTES || this == STEPS
 
     /** Whether this habit type needs a target app selected. */
     val requiresTargetApp: Boolean
@@ -37,7 +37,7 @@ enum class HabitType {
     val unit: String
         get() = when (this) {
             STEPS -> "steps"
-            EXERCISE_MINUTES, MEDITATION_MINUTES, APP_USAGE_MINUTES -> "min"
-            CUSTOM -> ""
+            TIMED_MINUTES, APP_USAGE_MINUTES -> "min"
+            PHOTO, TALLY -> ""
         }
 }

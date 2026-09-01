@@ -209,11 +209,10 @@ fun HomeScreen(
                             when {
                                 kind == HabitKind.ANTIHABIT ->
                                     viewModel.onToggleAntihabitSlip(progress.habit.id, progress.habit.name, !progress.isCompleted)
-                                progress.habit.type == HabitType.CUSTOM && progress.habit.requiresPhotoVerification ->
-                                    onVerifyHabit(progress.habit.id)
-                                progress.habit.type == HabitType.CUSTOM ->
-                                    viewModel.onCustomHabitToggled(progress.habit.id, !progress.isCompleted)
-                                progress.habit.type == HabitType.MEDITATION_MINUTES -> onOpenHabit(progress.habit.id)
+                                progress.habit.type == HabitType.PHOTO -> onVerifyHabit(progress.habit.id)
+                                progress.habit.type == HabitType.TALLY ->
+                                    viewModel.onTallyHabitToggled(progress.habit.id, !progress.isCompleted)
+                                progress.habit.type == HabitType.TIMED_MINUTES -> onOpenHabit(progress.habit.id)
                                 else -> progressDialogTarget = progress
                             }
                         },
