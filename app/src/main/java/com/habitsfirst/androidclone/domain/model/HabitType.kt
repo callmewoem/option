@@ -24,11 +24,18 @@ enum class HabitType {
     TALLY,
 
     /** Walk a target number of steps today (Health Connect, with manual fallback). */
-    STEPS;
+    STEPS,
+
+    /** Work out for a target number of minutes today (Health Connect, with manual fallback). */
+    WORKOUT_MINUTES,
+
+    /** Sleep a target number of hours (Health Connect, trailing 24h window, with manual fallback). */
+    SLEEP_HOURS;
 
     /** Whether this habit type accumulates a numeric value toward [Habit.targetValue]. */
     val isMeasurable: Boolean
-        get() = this == TIMED_MINUTES || this == APP_USAGE_MINUTES || this == STEPS
+        get() = this == TIMED_MINUTES || this == APP_USAGE_MINUTES || this == STEPS ||
+            this == WORKOUT_MINUTES || this == SLEEP_HOURS
 
     /** Whether this habit type needs a target app selected. */
     val requiresTargetApp: Boolean
@@ -37,7 +44,8 @@ enum class HabitType {
     val unit: String
         get() = when (this) {
             STEPS -> "steps"
-            TIMED_MINUTES, APP_USAGE_MINUTES -> "min"
+            TIMED_MINUTES, APP_USAGE_MINUTES, WORKOUT_MINUTES -> "min"
+            SLEEP_HOURS -> "hr"
             PHOTO, TALLY -> ""
         }
 }
