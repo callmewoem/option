@@ -42,6 +42,7 @@ data class SettingsUiState(
     val proofOfLifeTime: String = "08:00",
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     val hardModeEnabled: Boolean = false,
+    val hardModeToggleLockedUntilEpochMillis: Long = 0L,
     val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
     /** False on any device without the Health Connect provider installed -- the whole section hides then. */
     val healthConnectAvailable: Boolean = false,
@@ -63,9 +64,15 @@ private data class ReminderSettings(
     val proofOfLife: PreferencesRepository.ProofOfLifeSettings,
 )
 
+/** Hard mode's on/off state paired with its toggle-cooldown expiry -- split out only to keep [extraSettings] within combine()'s 5-flow cap. */
+private data class HardModeState(
+    val enabled: Boolean,
+    val toggleLockedUntilEpochMillis: Long,
+)
+
 /** Hard mode, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
 private data class ExtraSettings(
-    val hardModeEnabled: Boolean,
+    val hardMode: HardModeState,
     val easeInStreakLength: Int,
     val anthropicApiKey: String?,
     val healthConnectSyncEnabled: Boolean,
@@ -113,8 +120,14 @@ class SettingsViewModel @Inject constructor(
         ::ReminderSettings,
     )
 
-    private val extraSettings = combine(
+    private val hardModeState = combine(
         preferencesRepository.isHardModeEnabled,
+        preferencesRepository.hardModeToggleLockedUntilEpochMillis,
+        ::HardModeState,
+    )
+
+    private val extraSettings = combine(
+        hardModeState,
         preferencesRepository.easeInStreakLength,
         preferencesRepository.anthropicApiKey,
         preferencesRepository.isHealthConnectSyncEnabled,
@@ -145,7 +158,8 @@ class SettingsViewModel @Inject constructor(
             proofOfLifeEnabled = rs.proofOfLife.enabled,
             proofOfLifeTime = rs.proofOfLife.time,
             proofOfLifeWindowMinutes = rs.proofOfLife.windowMinutes,
-            hardModeEnabled = extra.hardModeEnabled,
+            hardModeEnabled = extra.hardMode.enabled,
+            hardModeToggleLockedUntilEpochMillis = extra.hardMode.toggleLockedUntilEpochMillis,
             easeInStreakLength = extra.easeInStreakLength,
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
@@ -198,7 +212,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { proofOfLifeRepository.setProofOfLife(enabled, time, windowMinutes) }
     }
 
-    /** Enabling grants a batch of grace tokens to ease into it (see [PreferencesRepository.setHardModeEnabled]). */
+    /**
+     * Enabling grants a batch of grace tokens to ease into it; either direction is a no-op while the previous
+     * toggle's cooldown is still active (see [PreferencesRepository.setHardModeEnabled]). The switch itself is
+     * disabled in [SettingsScreen] during the cooldown, so this is normally unreachable then anyway.
+     */
     fun onHardModeToggled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
     }

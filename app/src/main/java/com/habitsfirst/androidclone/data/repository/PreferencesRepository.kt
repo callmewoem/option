@@ -47,6 +47,7 @@ class PreferencesRepository @Inject constructor(
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
         val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
+        val HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("hard_mode_toggle_locked_until_epoch_millis")
         val EASE_IN_STREAK_LENGTH = intPreferencesKey("ease_in_streak_length")
         val PROOF_OF_LIFE_ENABLED = booleanPreferencesKey("proof_of_life_enabled")
         val PROOF_OF_LIFE_TIME = stringPreferencesKey("proof_of_life_time") // "HH:mm"
@@ -260,15 +261,36 @@ class PreferencesRepository @Inject constructor(
     /** Hard mode: gating habits and blocked apps can be added but never removed or loosened. */
     val isHardModeEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.HARD_MODE_ENABLED] ?: false }
 
-    /** Turning hard mode on grants a one-time batch of grace tokens to ease into it; turning it back off doesn't claw them back. */
-    suspend fun setHardModeEnabled(enabled: Boolean) {
+    /** Instant the next hard-mode toggle (either direction) becomes allowed. 0 = no cooldown pending. */
+    val hardModeToggleLockedUntilEpochMillis: Flow<Long> =
+        dataStore.data.map { it[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L }
+
+    /**
+     * Turning hard mode on grants a one-time batch of grace tokens to ease into it; turning it back off doesn't
+     * claw them back. Either direction starts a [HARD_MODE_TOGGLE_COOLDOWN_DAYS]-day cooldown before it can be
+     * toggled again -- otherwise hard mode's restrictions could just be switched off whenever they bite, and
+     * switching back on would even re-farm the entry grace tokens.
+     *
+     * Returns true if the toggle took effect, false if it was rejected because the cooldown from the last toggle
+     * hasn't expired yet.
+     */
+    suspend fun setHardModeEnabled(enabled: Boolean, nowEpochMillis: Long = System.currentTimeMillis()): Boolean {
+        var applied = false
         dataStore.edit { prefs ->
             val wasEnabled = prefs[Keys.HARD_MODE_ENABLED] ?: false
+            if (enabled == wasEnabled) return@edit
+            val lockedUntil = prefs[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L
+            if (nowEpochMillis < lockedUntil) return@edit
+
             prefs[Keys.HARD_MODE_ENABLED] = enabled
-            if (enabled && !wasEnabled) {
+            prefs[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] =
+                nowEpochMillis + HARD_MODE_TOGGLE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000L
+            if (enabled) {
                 prefs[Keys.GRACE_TOKEN_COUNT] = (prefs[Keys.GRACE_TOKEN_COUNT] ?: 0) + HARD_MODE_ENTRY_GRACE_TOKENS
             }
+            applied = true
         }
+        return applied
     }
 
     // -- Onboarding "ease into it" ramp ------------------------------------------------
@@ -327,6 +349,7 @@ class PreferencesRepository @Inject constructor(
 
     companion object {
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
+        const val HARD_MODE_TOGGLE_COOLDOWN_DAYS = 7
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5
         const val DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES = 30
     }
