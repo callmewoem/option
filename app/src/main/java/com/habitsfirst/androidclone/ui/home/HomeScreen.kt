@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -42,9 +43,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,6 +83,7 @@ fun HomeScreen(
     onCheckIn: () -> Unit,
     onOpenSettings: () -> Unit,
     onManageApps: () -> Unit,
+    onSetUpPhotoVerification: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,6 +91,10 @@ fun HomeScreen(
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
     var newTodoText by remember { mutableStateOf("") }
     var newTodoRepeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
+    // Which of the tour's steps is showing -- local only, since the tour is meant to be
+    // stepped through in one sitting; onTourDismissed() is what actually persists that
+    // it's done, so a process death mid-tour just restarts it rather than losing it.
+    var tourStep by remember { mutableIntStateOf(0) }
 
     // Everything actionable today, tagged by kind so HabitCard can render its accent --
     // this is the "do it all from Home" list; Habits/Todos are for managing the lists.
@@ -133,6 +141,22 @@ fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (state.showTour) {
+                item {
+                    HomeTourBanner(
+                        step = tourStep,
+                        onNext = {
+                            if (tourStep < HOME_TOUR_STEPS.lastIndex) {
+                                tourStep++
+                            } else {
+                                viewModel.onTourDismissed()
+                            }
+                        },
+                        onSkip = viewModel::onTourDismissed,
+                    )
+                }
+            }
+
             item {
                 SummaryCard(
                     completed = state.completedCount,
@@ -149,6 +173,18 @@ fun HomeScreen(
 
             if (state.proofOfLifeDue) {
                 item { ProofOfLifeBanner(onClick = onCheckIn) }
+            }
+
+            if (state.showPhotoVerificationPrompt) {
+                item {
+                    PhotoVerificationPromptBanner(
+                        onSetUp = {
+                            viewModel.onPhotoVerificationPromptDismissed()
+                            onSetUpPhotoVerification()
+                        },
+                        onDismiss = viewModel::onPhotoVerificationPromptDismissed,
+                    )
+                }
             }
 
             item {
@@ -325,6 +361,76 @@ private fun formatRepeatDays(days: Set<DayOfWeek>): String {
     return "Every $ordered"
 }
 
+/** One stop on the first-run Home tour: what to notice, and why it's worth knowing. */
+private data class TourStep(val title: String, val body: String)
+
+private val HOME_TOUR_STEPS = listOf(
+    TourStep(
+        title = "Your day at a glance",
+        body = "This card tracks what's left today, your streak, and how many apps are " +
+            "still locked -- it updates live as you complete habits below.",
+    ),
+    TourStep(
+        title = "Nothing here is fixed",
+        body = "Tap the lock icon above to add or remove locked apps anytime, and the + " +
+            "button to add a new habit -- onboarding was just a starting point.",
+    ),
+    TourStep(
+        title = "Finish for a reward",
+        body = "Complete every gating habit in a day and Locke opens a daily lootbox -- " +
+            "grace tokens, task-skip tokens, or a new theme accent.",
+    ),
+)
+
+/**
+ * A short, dismissible spotlight tour shown once on Home after onboarding -- same banner
+ * pattern as [EaseInBanner] and [ProofOfLifeBanner] rather than an overlay, so it reads as
+ * one more card in the list instead of blocking anything underneath it.
+ */
+@Composable
+private fun HomeTourBanner(step: Int, onNext: () -> Unit, onSkip: () -> Unit) {
+    val current = HOME_TOUR_STEPS[step]
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${step + 1}/${HOME_TOUR_STEPS.size} -- ${current.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onSkip) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Skip tour",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+            Text(
+                text = current.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onNext) {
+                    Text(if (step < HOME_TOUR_STEPS.lastIndex) "Next" else "Got it")
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EaseInBanner(status: EaseInStatus) {
     val remaining = (status.requiredStreak - status.activeHabitStreak).coerceAtLeast(0)
@@ -381,6 +487,61 @@ private fun ProofOfLifeBanner(onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A one-day-only nudge toward the flagship habit type: it needs a description and/or
+ * example photo, so it doesn't fit onboarding's quick-pick template list -- this is
+ * the deep link into setting one up instead, offered once and then left alone.
+ */
+@Composable
+private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        Icons.Filled.CameraAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Try photo verification",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Dismiss",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+            Text(
+                text = "One habit can be checked by AI instead of the honor system -- describe what a " +
+                    "proof photo should show and Locke verifies it for you. Set one up now, or skip it -- " +
+                    "it's always available later from Settings.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onSetUp) { Text("Set it up") }
             }
         }
     }

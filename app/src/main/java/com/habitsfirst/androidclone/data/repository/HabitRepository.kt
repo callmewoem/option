@@ -187,6 +187,12 @@ class HabitRepository @Inject constructor(
             .map { it.toDomain() }
             .filter { it.type == HabitType.APP_USAGE_MINUTES && it.targetPackageName != null }
 
+    /** Active steps/exercise habits, for [com.habitsfirst.androidclone.service.HealthConnectSyncWorker]. */
+    suspend fun getHealthConnectHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.STEPS || it.type == HabitType.EXERCISE_MINUTES }
+
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0
 

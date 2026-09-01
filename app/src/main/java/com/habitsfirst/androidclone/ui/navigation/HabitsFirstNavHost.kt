@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.habitsfirst.androidclone.domain.model.HabitKind
+import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
 import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
@@ -91,6 +92,9 @@ fun HabitsFirstNavHost() {
                 onCheckIn = { navController.navigate(Screen.ProofOfLife.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
+                onSetUpPhotoVerification = {
+                    navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.IMAGE_VERIFICATION))
+                },
             )
         }
 
@@ -120,6 +124,10 @@ fun HabitsFirstNavHost() {
                 navArgument(Screen.ARG_KIND) {
                     type = NavType.StringType
                     defaultValue = HabitKind.GATING.name
+                },
+                navArgument(Screen.ARG_TYPE) {
+                    type = NavType.StringType
+                    defaultValue = ""
                 },
             ),
         ) {

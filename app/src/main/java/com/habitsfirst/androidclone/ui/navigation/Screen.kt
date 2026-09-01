@@ -1,6 +1,7 @@
 package com.habitsfirst.androidclone.ui.navigation
 
 import com.habitsfirst.androidclone.domain.model.HabitKind
+import com.habitsfirst.androidclone.domain.model.HabitType
 
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
@@ -15,8 +16,10 @@ sealed class Screen(val route: String) {
     data object AppPicker : Screen("app_picker")
     data object Settings : Screen("settings")
 
-    data object AddHabit : Screen("habit/new?kind={kind}") {
-        fun createRoute(kind: HabitKind = HabitKind.GATING) = "habit/new?kind=${kind.name}"
+    data object AddHabit : Screen("habit/new?kind={kind}&type={type}") {
+        /** [type] preselects the new habit's type (e.g. deep-linking straight into a photo-verification setup) -- omit to leave it at the form's own default. */
+        fun createRoute(kind: HabitKind = HabitKind.GATING, type: HabitType? = null) =
+            "habit/new?kind=${kind.name}&type=${type?.name ?: ""}"
     }
     data object EditHabit : Screen("habit/{habitId}") {
         fun createRoute(habitId: Long) = "habit/$habitId"
@@ -32,5 +35,6 @@ sealed class Screen(val route: String) {
     companion object {
         const val ARG_HABIT_ID = "habitId"
         const val ARG_KIND = "kind"
+        const val ARG_TYPE = "type"
     }
 }

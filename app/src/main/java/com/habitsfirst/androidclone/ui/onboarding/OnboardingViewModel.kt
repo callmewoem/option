@@ -12,6 +12,7 @@ import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.habit.defaultTarget
+import com.habitsfirst.androidclone.util.DateProvider
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
 import com.habitsfirst.androidclone.util.RecommendedApps
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -138,6 +139,7 @@ class OnboardingViewModel @Inject constructor(
             }
 
             preferencesRepository.setOnboardingComplete(true)
+            preferencesRepository.setOnboardingCompletedDate(DateProvider.todayString())
             WorkScheduler.scheduleUsageTracking(appContext)
             WorkScheduler.scheduleMorningTodoReminder(appContext)
             WorkScheduler.scheduleProofOfLifeCheck(appContext)

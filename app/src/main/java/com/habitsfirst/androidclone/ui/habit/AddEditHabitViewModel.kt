@@ -71,10 +71,16 @@ class AddEditHabitViewModel @Inject constructor(
         ?.let { runCatching { HabitKind.valueOf(it) }.getOrNull() }
         ?: HabitKind.GATING
 
+    /** e.g. a "set up photo verification" deep link from Home -- absent (empty string) leaves the form at its own default type. */
+    private val initialType: HabitType? = savedStateHandle.get<String>(Screen.ARG_TYPE)
+        ?.let { runCatching { HabitType.valueOf(it) }.getOrNull() }
+
     private val _uiState = MutableStateFlow(
         AddEditHabitUiState(
             habitId = habitId,
             kind = initialKind,
+            type = initialType ?: HabitType.STEPS,
+            targetValue = (initialType ?: HabitType.STEPS).defaultTarget(),
             isNew = habitId == 0L,
             canDelete = habitId != 0L,
         ),

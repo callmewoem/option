@@ -13,8 +13,10 @@ import com.habitsfirst.androidclone.data.repository.TodoRepository
 import com.habitsfirst.androidclone.domain.model.BlockedApp
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
+import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.LootboxReward
 import com.habitsfirst.androidclone.domain.model.Todo
+import com.habitsfirst.androidclone.util.DateProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,6 +43,10 @@ data class HomeUiState(
     val easeInStatus: EaseInStatus? = null,
     /** True when the check-in is enabled and the user hasn't confirmed it yet today. */
     val proofOfLifeDue: Boolean = false,
+    /** True until the first-run spotlight tour has been stepped through or dismissed. */
+    val showTour: Boolean = false,
+    /** True only on the same calendar day onboarding finished, until dismissed or a photo-verification habit exists. */
+    val showPhotoVerificationPrompt: Boolean = false,
 ) {
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
@@ -48,8 +54,13 @@ data class HomeUiState(
     val pendingTodos: List<Todo> get() = todos.filterNot { it.isDone }
 }
 
-/** The ease-in ramp's streak length and proof-of-life due-ness -- grouped only to fit combine()'s 5-flow cap. */
-private data class HomeMiscState(val easeInStreakLength: Int, val proofOfLifeDue: Boolean)
+/** The ease-in ramp's streak length, proof-of-life due-ness, tour visibility, and the photo-verification prompt's date/dismissal eligibility -- grouped only to fit combine()'s 5-flow cap. */
+private data class HomeMiscState(
+    val easeInStreakLength: Int,
+    val proofOfLifeDue: Boolean,
+    val showTour: Boolean,
+    val photoVerificationPromptEligible: Boolean,
+)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -76,12 +87,25 @@ class HomeViewModel @Inject constructor(
         ::Triple,
     )
 
+    /** Eligible only on the same calendar day onboarding finished and only until dismissed -- whether a photo-verification habit already exists is checked separately, in [uiState], since it needs the habit list rather than a preference. */
+    private val photoVerificationPromptFlow = combine(
+        preferencesRepository.onboardingCompletedDate,
+        preferencesRepository.hasDismissedPhotoVerificationPrompt,
+    ) { completedDate, dismissed -> !dismissed && completedDate == DateProvider.todayString() }
+
     private val miscFlow = combine(
         preferencesRepository.easeInStreakLength,
         proofOfLifeRepository.settings,
         proofOfLifeRepository.isConfirmedTodayFlow,
-    ) { easeInStreakLength, proofOfLifeSettings, confirmedToday ->
-        HomeMiscState(easeInStreakLength, proofOfLifeDue = proofOfLifeSettings.enabled && !confirmedToday)
+        preferencesRepository.hasSeenHomeTour,
+        photoVerificationPromptFlow,
+    ) { easeInStreakLength, proofOfLifeSettings, confirmedToday, hasSeenTour, photoPromptEligible ->
+        HomeMiscState(
+            easeInStreakLength,
+            proofOfLifeDue = proofOfLifeSettings.enabled && !confirmedToday,
+            showTour = !hasSeenTour,
+            photoVerificationPromptEligible = photoPromptEligible,
+        )
     }
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -91,6 +115,8 @@ class HomeViewModel @Inject constructor(
         todoRepository.observeForToday(),
         miscFlow,
     ) { (gating, tracked, antihabits), blockedApps, _, todos, misc ->
+        val hasImageVerificationHabit =
+            (gating + tracked + antihabits).any { it.habit.type == HabitType.IMAGE_VERIFICATION }
         HomeUiState(
             isLoading = false,
             gating = gating,
@@ -101,6 +127,8 @@ class HomeViewModel @Inject constructor(
             streakDays = habitRepository.computeCurrentStreak(),
             easeInStatus = habitRepository.getEaseInStatus(misc.easeInStreakLength),
             proofOfLifeDue = misc.proofOfLifeDue,
+            showTour = misc.showTour,
+            showPhotoVerificationPrompt = misc.photoVerificationPromptEligible && !hasImageVerificationHabit,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -151,6 +179,16 @@ class HomeViewModel @Inject constructor(
 
     fun onRewardDismissed() {
         _wonReward.value = null
+    }
+
+    /** Called once the tour is stepped through to its end or skipped -- never shown again. */
+    fun onTourDismissed() {
+        viewModelScope.launch { preferencesRepository.setHasSeenHomeTour(true) }
+    }
+
+    /** Called on both an explicit dismiss and on tapping through to set one up -- either way, no need to keep nudging. */
+    fun onPhotoVerificationPromptDismissed() {
+        viewModelScope.launch { preferencesRepository.setHasDismissedPhotoVerificationPrompt(true) }
     }
 
     private suspend fun maybeAwardLootbox() {
