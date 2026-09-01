@@ -11,7 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,7 +41,11 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp)
+                // Clears the bottom-pinned button below on short screens once this
+                // scrolls, rather than letting content land underneath it.
+                .padding(bottom = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -62,6 +73,26 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(modifier = Modifier.height(32.dp))
+            // A quick, honest preview of what setup involves and what's waiting on the
+            // other side of it -- so "Get Started" isn't a leap into the unknown.
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                OnboardingFeatureRow(
+                    icon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    text = stringResource(R.string.onboarding_welcome_feature_lock),
+                )
+                OnboardingFeatureRow(
+                    icon = { Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    text = stringResource(R.string.onboarding_welcome_feature_photo),
+                )
+                OnboardingFeatureRow(
+                    icon = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    text = stringResource(R.string.onboarding_welcome_feature_rewards),
+                )
+            }
         }
 
         Button(

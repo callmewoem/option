@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +35,7 @@ import com.habitsfirst.androidclone.util.PermissionUtils
 
 @Composable
 fun OnboardingPermissionsScreen(
+    onBack: () -> Unit,
     onFinish: () -> Unit,
     viewModel: OnboardingViewModel,
 ) {
@@ -48,6 +51,7 @@ fun OnboardingPermissionsScreen(
     val hasOverlay = remember(refreshTick) { PermissionUtils.hasOverlayPermission(context) }
 
     Scaffold(
+        topBar = { OnboardingTopBar(step = 3, totalSteps = 3, onBack = onBack) },
         bottomBar = {
             Button(
                 onClick = {
@@ -66,6 +70,7 @@ fun OnboardingPermissionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(stringResource(R.string.onboarding_permissions_title), style = MaterialTheme.typography.headlineMedium)
@@ -97,6 +102,28 @@ fun OnboardingPermissionsScreen(
                 granted = hasOverlay,
                 onGrant = { context.startActivity(PermissionUtils.overlaySettingsIntent(context)) },
             )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Onboarding only sets up the basics (a handful of apps, a couple of
+            // starter habits) -- this is a deliberate pointer at the rest of what
+            // Locke can do, so it isn't left undiscovered in Settings.
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(R.string.onboarding_permissions_whats_next_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.onboarding_permissions_whats_next_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 

@@ -54,6 +54,7 @@ fun HabitsFirstNavHost() {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPickAppsScreen(
+                onBack = { navController.popBackStack() },
                 onContinue = { navController.navigate(Screen.OnboardingPickHabits.route) },
                 viewModel = onboardingViewModel,
             )
@@ -62,6 +63,7 @@ fun HabitsFirstNavHost() {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPickHabitsScreen(
+                onBack = { navController.popBackStack() },
                 onContinue = { navController.navigate(Screen.OnboardingPermissions.route) },
                 viewModel = onboardingViewModel,
             )
@@ -70,6 +72,7 @@ fun HabitsFirstNavHost() {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPermissionsScreen(
+                onBack = { navController.popBackStack() },
                 onFinish = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
