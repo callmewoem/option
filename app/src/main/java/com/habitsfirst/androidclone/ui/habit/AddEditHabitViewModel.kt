@@ -60,6 +60,8 @@ fun HabitType.defaultTarget(): Int = when (this) {
     HabitType.APP_USAGE_MINUTES -> 15
     HabitType.PHOTO -> 1
     HabitType.TALLY -> 1
+    HabitType.WORKOUT_MINUTES -> 30
+    HabitType.SLEEP_HOURS -> 8
 }
 
 @HiltViewModel
