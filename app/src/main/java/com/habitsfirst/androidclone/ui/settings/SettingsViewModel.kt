@@ -234,7 +234,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Re-checks whether the two Health Connect read permissions are actually granted -- call on screen resume, since a grant/revoke happens outside the app. */
+    /** Re-checks whether the Health Connect read permissions are actually granted -- call on screen resume, since a grant/revoke happens outside the app. */
     fun refreshHealthConnectPermissions() {
         viewModelScope.launch { _healthConnectPermissionsGranted.value = healthConnectManager.hasPermissions() }
     }
