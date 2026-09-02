@@ -53,5 +53,6 @@ class HealthConnectSyncWorker @AssistedInject constructor(
 
     companion object {
         const val UNIQUE_PERIODIC_NAME = "health_connect_sync_periodic"
+        const val ONE_OFF_NAME = "health_connect_sync_one_off"
     }
 }

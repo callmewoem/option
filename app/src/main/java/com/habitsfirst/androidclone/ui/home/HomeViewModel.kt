@@ -1,7 +1,10 @@
 package com.habitsfirst.androidclone.ui.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.EaseInStatus
 import com.habitsfirst.androidclone.data.repository.HabitRepository
@@ -16,12 +19,17 @@ import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.LootboxReward
 import com.habitsfirst.androidclone.domain.model.Todo
+import com.habitsfirst.androidclone.service.HealthConnectSyncWorker
+import com.habitsfirst.androidclone.service.UsageTrackingWorker
+import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.util.DateProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -47,6 +55,8 @@ data class HomeUiState(
     val showTour: Boolean = false,
     /** True only on the same calendar day onboarding finished, until dismissed or a photo-verification habit exists. */
     val showPhotoVerificationPrompt: Boolean = false,
+    /** True while the app-usage/Health-Connect one-off refresh kicked off on app open (or the manual refresh button) is still running. */
+    val isRefreshingDataDrivenHabits: Boolean = false,
 ) {
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
@@ -54,12 +64,13 @@ data class HomeUiState(
     val pendingTodos: List<Todo> get() = todos.filterNot { it.isDone }
 }
 
-/** The ease-in ramp's streak length, proof-of-life due-ness, tour visibility, and the photo-verification prompt's date/dismissal eligibility -- grouped only to fit combine()'s 5-flow cap. */
+/** The ease-in ramp's streak length, proof-of-life due-ness, tour visibility, the photo-verification prompt's date/dismissal eligibility, and whether the data-driven-habit refresh is in flight -- grouped only to fit combine()'s 5-flow cap. */
 private data class HomeMiscState(
     val easeInStreakLength: Int,
     val proofOfLifeDue: Boolean,
     val showTour: Boolean,
     val photoVerificationPromptEligible: Boolean,
+    val isRefreshingDataDrivenHabits: Boolean,
 )
 
 @HiltViewModel
@@ -71,6 +82,7 @@ class HomeViewModel @Inject constructor(
     private val todoRepository: TodoRepository,
     private val preferencesRepository: PreferencesRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     /** Bumped whenever a completion changes, so the streak (which needs a DB round trip) recomputes. */
@@ -78,6 +90,19 @@ class HomeViewModel @Inject constructor(
 
     private val _wonReward = MutableStateFlow<LootboxReward?>(null)
     val wonReward: StateFlow<LootboxReward?> = _wonReward
+
+    /**
+     * Whether either of the one-off refreshes kicked off by [refreshDataDrivenHabits] is
+     * still enqueued or running, so Home can show a spinner instead of a refresh that looks
+     * like it did nothing -- the actual progress numbers arrive separately, once the worker
+     * writes them and [kindsFlow] picks up the change.
+     */
+    private val isRefreshingFlow = combine(
+        WorkManager.getInstance(appContext).getWorkInfosForUniqueWorkFlow(UsageTrackingWorker.ONE_OFF_NAME),
+        WorkManager.getInstance(appContext).getWorkInfosForUniqueWorkFlow(HealthConnectSyncWorker.ONE_OFF_NAME),
+    ) { usageWork, healthConnectWork ->
+        (usageWork + healthConnectWork).any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
+    }
 
     // Paired first since kotlinx.coroutines.flow.combine tops out at 5 flows.
     private val kindsFlow = combine(
@@ -98,12 +123,14 @@ class HomeViewModel @Inject constructor(
         proofOfLifeRepository.isDueFlow,
         preferencesRepository.hasSeenHomeTour,
         photoVerificationPromptFlow,
-    ) { easeInStreakLength, proofOfLifeDue, hasSeenTour, photoPromptEligible ->
+        isRefreshingFlow,
+    ) { easeInStreakLength, proofOfLifeDue, hasSeenTour, photoPromptEligible, isRefreshing ->
         HomeMiscState(
             easeInStreakLength,
             proofOfLifeDue = proofOfLifeDue,
             showTour = !hasSeenTour,
             photoVerificationPromptEligible = photoPromptEligible,
+            isRefreshingDataDrivenHabits = isRefreshing,
         )
     }
 
@@ -128,12 +155,30 @@ class HomeViewModel @Inject constructor(
             proofOfLifeDue = misc.proofOfLifeDue,
             showTour = misc.showTour,
             showPhotoVerificationPrompt = misc.photoVerificationPromptEligible && !hasImageVerificationHabit,
+            isRefreshingDataDrivenHabits = misc.isRefreshingDataDrivenHabits,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(),
     )
+
+    init {
+        // Data-driven progress (app usage, Health Connect) otherwise only updates on the
+        // next 15/30-min periodic tick, so it can be stale first thing after opening the
+        // app -- catch it up right away rather than waiting.
+        refreshDataDrivenHabits()
+    }
+
+    /** Kicks off an immediate refresh of app-usage and (if enabled) Health-Connect-backed habit progress, instead of waiting for their periodic workers. Called on app open (see [init]) and from Home's manual refresh action. */
+    fun refreshDataDrivenHabits() {
+        viewModelScope.launch {
+            WorkScheduler.requestUsageRefreshNow(appContext)
+            if (preferencesRepository.isHealthConnectSyncEnabled.first()) {
+                WorkScheduler.requestHealthConnectRefreshNow(appContext)
+            }
+        }
+    }
 
     fun onTallyHabitToggled(habitId: Long, done: Boolean) {
         viewModelScope.launch {
