@@ -11,6 +11,7 @@ import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
+import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.navigation.Screen
 import com.habitsfirst.androidclone.util.ImageStore
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
@@ -237,6 +238,14 @@ class AddEditHabitViewModel @Inject constructor(
                     scheduledDays = state.scheduledDays,
                 ),
             )
+            // The periodic worker that reads UsageStatsManager is otherwise only ever
+            // enqueued once, at the end of onboarding -- an "Use an app" habit added
+            // later (the common case) would silently never get progress without this.
+            // enqueueUniquePeriodicWork's KEEP policy makes this a no-op if it's
+            // already running.
+            if (state.type == HabitType.APP_USAGE_MINUTES) {
+                WorkScheduler.scheduleUsageTracking(appContext)
+            }
             _uiState.value = _uiState.value.copy(isSaving = false, savedSuccessfully = true)
         }
     }
