@@ -70,6 +70,16 @@ object WorkScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(HealthConnectSyncWorker.UNIQUE_PERIODIC_NAME)
     }
 
+    /** Requested when Health Connect sync is on and progress needs to catch up sooner than the next 30-min tick -- see [requestUsageRefreshNow]. */
+    fun requestHealthConnectRefreshNow(context: Context) {
+        val request = OneTimeWorkRequestBuilder<HealthConnectSyncWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            HealthConnectSyncWorker.ONE_OFF_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request,
+        )
+    }
+
     /** Enqueues the periodic re-sync of the premade URL blocklists from their upstream source. */
     fun scheduleBlocklistRefresh(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
