@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.habitsfirst.androidclone.R
 
 /**
@@ -72,6 +73,19 @@ fun OnboardingTopBar(step: Int, totalSteps: Int, onBack: () -> Unit) {
         }
         Spacer(modifier = Modifier.height(16.dp))
     }
+}
+
+/**
+ * A short, all-caps label above a step's title -- "PART ONE -- THE LOCKS" and so on --
+ * that threads the three setup screens into one story instead of three unrelated forms.
+ */
+@Composable
+fun OnboardingKicker(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
+        color = MaterialTheme.colorScheme.primary,
+    )
 }
 
 /** One row in the welcome screen's "what Locke does" preview. */

@@ -51,6 +51,8 @@ fun OnboardingPickAppsScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+                OnboardingKicker(stringResource(R.string.onboarding_kicker_apps))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(stringResource(R.string.onboarding_pick_apps_title), style = MaterialTheme.typography.headlineMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

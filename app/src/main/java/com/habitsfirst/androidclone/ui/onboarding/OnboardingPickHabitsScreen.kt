@@ -56,6 +56,8 @@ fun OnboardingPickHabitsScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+                OnboardingKicker(stringResource(R.string.onboarding_kicker_habits))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(stringResource(R.string.onboarding_pick_habits_title), style = MaterialTheme.typography.headlineMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -100,11 +102,13 @@ fun OnboardingPickHabitsScreen(
                 if (state.selectedTemplateOrder.size > 1) {
                     item {
                         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
-                            Text("Ease into it -- easiest first", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.onboarding_pick_habits_ease_in_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "Only #1 gates your apps right away. Each one after unlocks " +
-                                    "once the one before it is a consistent streak.",
+                                stringResource(R.string.onboarding_pick_habits_ease_in_body),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

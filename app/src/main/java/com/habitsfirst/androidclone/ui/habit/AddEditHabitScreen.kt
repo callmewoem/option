@@ -162,6 +162,7 @@ fun AddEditHabitScreen(
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },
+                        enabled = !state.isKindLocked,
                         label = { Text(type.label(), maxLines = 1) },
                         leadingIcon = { Icon(type.icon(), contentDescription = null) },
                     )
@@ -176,10 +177,19 @@ fun AddEditHabitScreen(
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },
+                        enabled = !state.isKindLocked,
                         label = { Text(type.label(), maxLines = 1) },
                         leadingIcon = { Icon(type.icon(), contentDescription = null) },
                     )
                 }
+            }
+            if (state.isKindLocked) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Locked by Hard Mode",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             if (state.type.isMeasurable) {
@@ -198,6 +208,11 @@ fun AddEditHabitScreen(
                             ),
                         )
                     },
+                    supportingText = if (state.isKindLocked) {
+                        { Text("Locked by Hard Mode -- can only be raised") }
+                    } else {
+                        null
+                    },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -209,7 +224,8 @@ fun AddEditHabitScreen(
                 Text(text = stringResource(R.string.add_habit_choose_app), style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 AssistChip(
-                    onClick = { showAppPicker = true },
+                    onClick = { if (!state.isKindLocked) showAppPicker = true },
+                    enabled = !state.isKindLocked,
                     label = { Text(state.targetAppLabel ?: "Choose app") },
                 )
             }
@@ -222,6 +238,7 @@ fun AddEditHabitScreen(
                     exampleImagePath = state.verificationExampleImagePath,
                     onExampleImagePicked = viewModel::onExampleImageSelected,
                     onExampleImageCleared = viewModel::onExampleImageCleared,
+                    locked = state.isKindLocked,
                 )
             }
 
@@ -238,6 +255,7 @@ fun AddEditHabitScreen(
                 scheduledDays = state.scheduledDays,
                 onEveryDaySelected = viewModel::onEveryDaySelected,
                 onDayToggled = viewModel::onScheduledDayToggled,
+                locked = state.isKindLocked,
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -308,6 +326,11 @@ fun AddEditHabitScreen(
  * default) or specific days, e.g. "hoover" every Sunday. Tapping any day chip narrows
  * [scheduledDays] to just the selected days; tapping "Every day" clears it back to
  * empty, which [com.habitsfirst.androidclone.domain.model.Habit.isDaily] reads as due every day.
+ *
+ * @param locked Hard mode on a locked gate: a day already required (or "every day" already
+ * selected) can't be tapped off, since that would gate less often -- matches
+ * [AddEditHabitViewModel.onScheduledDayToggled]'s guard exactly so a disabled chip here always
+ * means the tap would otherwise be silently dropped.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -315,6 +338,7 @@ private fun FrequencyPicker(
     scheduledDays: Set<DayOfWeek>,
     onEveryDaySelected: () -> Unit,
     onDayToggled: (DayOfWeek) -> Unit,
+    locked: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -335,13 +359,28 @@ private fun FrequencyPicker(
             FilterChip(
                 selected = day in scheduledDays,
                 onClick = { onDayToggled(day) },
+                enabled = !(locked && (scheduledDays.isEmpty() || day in scheduledDays)),
                 label = { Text(day.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
             )
         }
     }
+    if (locked) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Locked by Hard Mode -- days can only be added",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
-/** Setup for a [HabitType.PHOTO] habit: a description of what counts, an example photo, or both. */
+/**
+ * Setup for a [HabitType.PHOTO] habit: a description of what counts, an example photo, or both.
+ *
+ * @param locked Hard mode on a locked gate: the verification criteria are frozen too, since
+ * swapping in an easier prompt or example photo would loosen the gate without touching its
+ * kind or type at all -- see [AddEditHabitViewModel.onVerificationPromptChanged] and friends.
+ */
 @Composable
 private fun VerificationSetupSection(
     prompt: String,
@@ -349,6 +388,7 @@ private fun VerificationSetupSection(
     exampleImagePath: String?,
     onExampleImagePicked: (Uri) -> Unit,
     onExampleImageCleared: () -> Unit,
+    locked: Boolean = false,
 ) {
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -366,8 +406,10 @@ private fun VerificationSetupSection(
     OutlinedTextField(
         value = prompt,
         onValueChange = onPromptChanged,
+        enabled = !locked,
         label = { Text("What counts as done? (optional)") },
         placeholder = { Text("e.g. \"A made bed with pillows arranged\"") },
+        supportingText = if (locked) { { Text("Locked by Hard Mode") } } else null,
         modifier = Modifier.fillMaxWidth(),
         minLines = 2,
     )
@@ -386,7 +428,7 @@ private fun VerificationSetupSection(
                     .size(72.dp)
                     .clip(RoundedCornerShape(12.dp)),
             )
-            IconButton(onClick = onExampleImageCleared) {
+            IconButton(onClick = onExampleImageCleared, enabled = !locked) {
                 Icon(Icons.Filled.Close, contentDescription = "Remove example photo")
             }
         }
@@ -397,6 +439,7 @@ private fun VerificationSetupSection(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
             },
+            enabled = !locked,
         ) {
             Icon(Icons.Filled.AddAPhoto, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))

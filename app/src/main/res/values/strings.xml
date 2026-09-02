@@ -4,23 +4,30 @@
     <string name="accessibility_service_description">Locke uses this to notice when you open an app, or browse to a website, you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits (or keep it blocked outright, for lists you\'ve set to never unlock).</string>
 
     <!-- Onboarding -->
+    <!-- The three setup screens after this one are framed as one story: lay the locks,
+         cut the keys, then hand them over. See each screen's OnboardingKicker line. -->
     <string name="onboarding_welcome_title">Do your habits.\nThen use your apps.</string>
-    <string name="onboarding_welcome_subtitle">Locke locks the apps that distract you most and only unlocks them once you\'ve finished your habits for the day.</string>
-    <string name="onboarding_welcome_feature_lock">Pick the apps to lock and the habits that unlock them -- takes about a minute</string>
-    <string name="onboarding_welcome_feature_photo">Habits can be honor-system, or photo-verified by AI so you can\'t fake it</string>
-    <string name="onboarding_welcome_feature_rewards">Streaks, a daily lootbox, and a bedtime curfew keep it going after today</string>
+    <string name="onboarding_welcome_subtitle">Right now, the apps that pull at your attention are one tap away, any time, for no reason at all. Locke changes the terms: it locks them down, and hands the key back only once you\'ve done what you actually meant to do today.</string>
+    <string name="onboarding_welcome_feature_lock">Set the locks and cut the keys yourself -- about a minute, start to finish</string>
+    <string name="onboarding_welcome_feature_photo">Take habits on the honor system, or require a photo an AI checks, so there\'s nothing to fake</string>
+    <string name="onboarding_welcome_feature_rewards">Streaks, a daily lootbox, and a bedtime curfew carry the discipline past today</string>
     <string name="onboarding_get_started">Get Started</string>
     <string name="onboarding_step_of">Step %1$d of %2$d</string>
+    <string name="onboarding_kicker_apps">Part one -- the locks</string>
     <string name="onboarding_pick_apps_title">What steals your time?</string>
-    <string name="onboarding_pick_apps_subtitle">Choose the apps you want locked until your habits are done. Nothing locks until you finish setup, and you can add or remove apps anytime from Settings.</string>
+    <string name="onboarding_pick_apps_subtitle">Name the apps you lose hours to, and they\'ll stay locked until today\'s habits are done. Nothing locks until setup is finished, and this list is never final -- add or remove apps anytime from Settings.</string>
     <string name="onboarding_pick_apps_selected_count">%1$d app selected</string>
     <string name="onboarding_pick_apps_selected_count_plural">%1$d apps selected</string>
     <string name="onboarding_pick_apps_none_selected">No apps selected yet -- that\'s fine, you can lock some later from Settings.</string>
+    <string name="onboarding_kicker_habits">Part two -- the keys</string>
     <string name="onboarding_pick_habits_title">What matters more?</string>
-    <string name="onboarding_pick_habits_subtitle">Pick the habits that unlock your apps. Check at least one to continue -- you can edit, add, or remove habits anytime later.</string>
-    <string name="onboarding_pick_habits_gating_explainer">Every habit you pick here gates your locked apps: miss it today and those apps stay locked. Want a habit that\'s just tracked, or an antihabit, or one verified by a proof photo? Add those later from Settings -- these five are just a quick start.</string>
-    <string name="onboarding_permissions_title">Almost there</string>
-    <string name="onboarding_permissions_subtitle">Locke needs a few permissions to lock apps and check your progress. All three are optional here -- skip any of them and finish setup anyway, then grant them later from Settings whenever you\'re ready. Until they\'re granted, Locke simply won\'t lock anything.</string>
+    <string name="onboarding_pick_habits_subtitle">Every habit you pick here is a key to the locks you just set. Check at least one to continue -- you can edit, add, or remove habits anytime later.</string>
+    <string name="onboarding_pick_habits_gating_explainer">Miss one of these today, and the apps it guards stay locked -- that\'s the deal. Want a habit that\'s just tracked, or an antihabit, or one a photo has to prove? Add those later from Settings; these five are just a running start.</string>
+    <string name="onboarding_pick_habits_ease_in_title">Ease in -- easiest first</string>
+    <string name="onboarding_pick_habits_ease_in_body">Only #1 gates your apps right away. Each one after it takes over once the habit before it is a consistent streak, so the full weight of Hard Mode never lands on day one.</string>
+    <string name="onboarding_kicker_permissions">Part three -- the handoff</string>
+    <string name="onboarding_permissions_title">Make it real</string>
+    <string name="onboarding_permissions_subtitle">Everything so far has been on paper. These three permissions are what let Locke actually see a blocked app open and put the lock screen in front of it. All are optional right now -- skip any and finish setup anyway, then grant them later from Settings. Until they\'re granted, nothing you set up above actually locks anything.</string>
     <string name="onboarding_permissions_whats_next_title">Worth exploring once you\'re in</string>
     <string name="onboarding_permissions_whats_next_body">Photo verification (add an Anthropic API key in Settings), a hard bedtime curfew, antihabits you pay a time penalty for slipping on, and the daily lootbox that hands out grace tokens and skip tokens -- all live in Settings, ready whenever you want them.</string>
     <string name="onboarding_continue">Continue</string>

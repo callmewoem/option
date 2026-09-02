@@ -95,14 +95,13 @@ class HomeViewModel @Inject constructor(
 
     private val miscFlow = combine(
         preferencesRepository.easeInStreakLength,
-        proofOfLifeRepository.settings,
-        proofOfLifeRepository.isConfirmedTodayFlow,
+        proofOfLifeRepository.isDueFlow,
         preferencesRepository.hasSeenHomeTour,
         photoVerificationPromptFlow,
-    ) { easeInStreakLength, proofOfLifeSettings, confirmedToday, hasSeenTour, photoPromptEligible ->
+    ) { easeInStreakLength, proofOfLifeDue, hasSeenTour, photoPromptEligible ->
         HomeMiscState(
             easeInStreakLength,
-            proofOfLifeDue = proofOfLifeSettings.enabled && !confirmedToday,
+            proofOfLifeDue = proofOfLifeDue,
             showTour = !hasSeenTour,
             photoVerificationPromptEligible = photoPromptEligible,
         )

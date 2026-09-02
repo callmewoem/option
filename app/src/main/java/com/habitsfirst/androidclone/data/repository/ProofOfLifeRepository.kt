@@ -2,9 +2,12 @@ package com.habitsfirst.androidclone.data.repository
 
 import com.habitsfirst.androidclone.util.DateProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Duration
 import java.time.LocalTime
@@ -44,6 +47,26 @@ class ProofOfLifeRepository @Inject constructor(
         preferencesRepository.setProofOfLifeConfirmedDate(DateProvider.todayString())
     }
 
+    /** Ticks once a minute so [isDueFlow] catches the clock crossing the configured time without needing a settings change or app restart. */
+    private val minuteTickFlow: Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(MINUTE_TICK_INTERVAL_MILLIS)
+        }
+    }
+
+    /**
+     * True once the configured check-in time has passed today and it's still unconfirmed --
+     * *not* just "enabled and unconfirmed", which would flag it due at any hour, including
+     * the middle of the night. Stays true for the rest of the day once past the target time
+     * (matching [checkAndPenalizeIfMissed]'s no-cutoff behavior), until confirmed or the date
+     * rolls over.
+     */
+    val isDueFlow: Flow<Boolean> = combine(settings, isConfirmedTodayFlow, minuteTickFlow) { s, confirmedToday, _ ->
+        val target = runCatching { LocalTime.parse(s.time) }.getOrDefault(LocalTime.of(8, 0))
+        s.enabled && !confirmedToday && !LocalTime.now().isBefore(target)
+    }
+
     /**
      * Called on the same ~15-minute cadence as the app's other periodic workers. Applies
      * [PenaltyRepository]'s block-extension penalty once per day once [windowMinutes] have
@@ -69,5 +92,6 @@ class ProofOfLifeRepository @Inject constructor(
 
     companion object {
         const val PENALTY_MINUTES = 30
+        private const val MINUTE_TICK_INTERVAL_MILLIS = 60_000L
     }
 }

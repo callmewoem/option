@@ -42,8 +42,14 @@ data class AddEditHabitUiState(
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
-    /** Hard mode: this is an existing gating habit, so it can't be deleted or downgraded. */
+    /**
+     * Hard mode: this is an existing gating habit, so it can't be deleted, downgraded, retyped,
+     * re-verified, or otherwise made easier -- see the per-field guards in the view model that
+     * key off this (target value can only go up, scheduled days can only be added, never removed).
+     */
     val isKindLocked: Boolean = false,
+    /** The target value as loaded from storage -- while [isKindLocked], [onTargetValueChanged] won't go below this. */
+    val originalTargetValue: Int = 0,
     val installedApps: List<InstalledApp> = emptyList(),
     val savedSuccessfully: Boolean = false,
 ) {
@@ -109,6 +115,7 @@ class AddEditHabitViewModel @Inject constructor(
                         verificationPrompt = habit.verificationPrompt.orEmpty(),
                         verificationExampleImagePath = habit.verificationExampleImagePath,
                         scheduledDays = habit.scheduledDays,
+                        originalTargetValue = habit.targetValue,
                     )
                 }
                 // Hard mode only ever locks an *existing* gate -- a habit already
@@ -137,6 +144,9 @@ class AddEditHabitViewModel @Inject constructor(
     }
 
     fun onTypeChanged(type: HabitType) {
+        // Hard mode: swapping a locked gate's type (e.g. photo verification down to a
+        // one-tap tally) would loosen it just as much as downgrading its kind would.
+        if (_uiState.value.isKindLocked) return
         _uiState.value = _uiState.value.copy(
             type = type,
             targetValue = type.defaultTarget(),
@@ -145,32 +155,49 @@ class AddEditHabitViewModel @Inject constructor(
         )
     }
 
+    /** Hard mode: a locked gate's target can be raised but never lowered below what it was when loaded. */
     fun onTargetValueChanged(value: Int) {
-        _uiState.value = _uiState.value.copy(targetValue = value.coerceAtLeast(1))
+        val state = _uiState.value
+        val floor = if (state.isKindLocked) state.originalTargetValue else 1
+        _uiState.value = state.copy(targetValue = value.coerceAtLeast(floor))
     }
 
     fun onTargetAppSelected(app: InstalledApp) {
+        // Hard mode: retargeting a locked APP_USAGE_MINUTES gate at an app the user
+        // barely opens would defeat it as surely as unblocking the app would.
+        if (_uiState.value.isKindLocked) return
         _uiState.value = _uiState.value.copy(targetPackageName = app.packageName, targetAppLabel = app.label)
     }
 
     fun onVerificationPromptChanged(prompt: String) {
+        // Hard mode: a locked PHOTO gate's verification criteria can't be softened either.
+        if (_uiState.value.isKindLocked) return
         _uiState.value = _uiState.value.copy(verificationPrompt = prompt)
     }
 
-    /** Toggling a day out of an empty (every-day) selection narrows it to just that day. */
+    /**
+     * Toggling a day out of an empty (every-day) selection narrows it to just that day.
+     * Hard mode: for a locked gate this can only ever add days, never remove one -- fewer
+     * required days means it gates less often, the same loosening a kind downgrade would be.
+     */
     fun onScheduledDayToggled(day: DayOfWeek) {
-        val current = _uiState.value.scheduledDays
-        _uiState.value = _uiState.value.copy(
+        val state = _uiState.value
+        val current = state.scheduledDays
+        if (state.isKindLocked && (day in current || current.isEmpty())) return
+        _uiState.value = state.copy(
             scheduledDays = if (day in current) current - day else current + day,
         )
     }
 
+    /** Resetting to every day only ever adds required days, so this is safe even for a locked gate. */
     fun onEveryDaySelected() {
         _uiState.value = _uiState.value.copy(scheduledDays = emptySet())
     }
 
     /** Copies a picked example photo into app storage and stores its path. */
     fun onExampleImageSelected(uri: Uri) {
+        // Hard mode: swapping out a locked gate's example photo is a verification-softening move too.
+        if (_uiState.value.isKindLocked) return
         val idForFile = if (habitId != 0L) habitId else System.currentTimeMillis()
         viewModelScope.launch {
             val path = withContext(Dispatchers.IO) { ImageStore.saveExampleImage(appContext, uri, idForFile) }
@@ -182,6 +209,7 @@ class AddEditHabitViewModel @Inject constructor(
     }
 
     fun onExampleImageCleared() {
+        if (_uiState.value.isKindLocked) return
         ImageStore.deleteQuietly(_uiState.value.verificationExampleImagePath)
         _uiState.value = _uiState.value.copy(verificationExampleImagePath = null)
     }

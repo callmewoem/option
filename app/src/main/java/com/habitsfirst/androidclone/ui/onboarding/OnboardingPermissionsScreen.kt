@@ -73,6 +73,8 @@ fun OnboardingPermissionsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
+            OnboardingKicker(stringResource(R.string.onboarding_kicker_permissions))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(stringResource(R.string.onboarding_permissions_title), style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
