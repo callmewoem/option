@@ -17,6 +17,7 @@ import androidx.navigation.navArgument
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
+import com.habitsfirst.androidclone.ui.diagnostics.DiagnosticsScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
 import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
 import com.habitsfirst.androidclone.ui.habit.TimedHabitTimerScreen
@@ -121,7 +122,12 @@ fun HabitsFirstNavHost() {
                 onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
                 onManageUrls = { navController.navigate(Screen.UrlBlockList.route) },
+                onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
             )
+        }
+
+        composable(Screen.Diagnostics.route) {
+            DiagnosticsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
