@@ -80,6 +80,7 @@ fun SettingsScreen(
     onEditHabit: (Long) -> Unit,
     onManageApps: () -> Unit,
     onManageUrls: () -> Unit,
+    onOpenDiagnostics: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -408,6 +409,17 @@ fun SettingsScreen(
             }
 
             item { SectionHeader(stringResource(R.string.settings_about)) }
+            item {
+                ListItem(
+                    headlineContent = { Text("Diagnostics") },
+                    supportingContent = { Text("Live app-usage tracking status, for testing why a habit's progress isn't updating") },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenDiagnostics),
+                )
+                HorizontalDivider()
+            }
             item {
                 ListItem(
                     headlineContent = { Text("Version") },

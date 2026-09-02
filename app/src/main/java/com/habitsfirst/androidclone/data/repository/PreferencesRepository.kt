@@ -58,6 +58,9 @@ class PreferencesRepository @Inject constructor(
         val HEALTH_CONNECT_SYNC_ENABLED = booleanPreferencesKey("health_connect_sync_enabled")
         val SUBSCRIPTION_TIER = stringPreferencesKey("subscription_tier") // SubscriptionTier.name
         val SUBSCRIPTION_EXPIRES_AT = longPreferencesKey("subscription_expires_at_epoch_millis")
+        val LAST_USAGE_SYNC_AT_EPOCH_MILLIS = longPreferencesKey("last_usage_sync_at_epoch_millis")
+        val LAST_USAGE_SYNC_HABIT_COUNT = intPreferencesKey("last_usage_sync_habit_count")
+        val LAST_USAGE_SYNC_ERROR = stringPreferencesKey("last_usage_sync_error")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -367,6 +370,34 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit {
             it[Keys.SUBSCRIPTION_TIER] = tier.name
             if (expiresAtEpochMillis == null) it.remove(Keys.SUBSCRIPTION_EXPIRES_AT) else it[Keys.SUBSCRIPTION_EXPIRES_AT] = expiresAtEpochMillis
+        }
+    }
+
+    // -- App-usage tracking diagnostics -------------------------------------------------
+
+    /**
+     * What [com.habitsfirst.androidclone.service.AppUsageSyncer]'s last run (periodic
+     * tick, the one-off "refresh now" job, or a manual run from Settings -> Diagnostics)
+     * actually did. Without this, there's no way to tell "the background worker never
+     * runs" apart from "it runs, finds nothing wrong, and there's a bug elsewhere" --
+     * both look identical from the outside (a habit stuck at 0 minutes) but need
+     * completely different fixes.
+     */
+    data class LastUsageSyncInfo(val atEpochMillis: Long?, val habitCount: Int, val error: String?)
+
+    val lastUsageSyncInfo: Flow<LastUsageSyncInfo> = dataStore.data.map {
+        LastUsageSyncInfo(
+            atEpochMillis = it[Keys.LAST_USAGE_SYNC_AT_EPOCH_MILLIS],
+            habitCount = it[Keys.LAST_USAGE_SYNC_HABIT_COUNT] ?: 0,
+            error = it[Keys.LAST_USAGE_SYNC_ERROR],
+        )
+    }
+
+    suspend fun recordUsageSyncOutcome(habitCount: Int, error: String?) {
+        dataStore.edit {
+            it[Keys.LAST_USAGE_SYNC_AT_EPOCH_MILLIS] = System.currentTimeMillis()
+            it[Keys.LAST_USAGE_SYNC_HABIT_COUNT] = habitCount
+            if (error == null) it.remove(Keys.LAST_USAGE_SYNC_ERROR) else it[Keys.LAST_USAGE_SYNC_ERROR] = error
         }
     }
 
