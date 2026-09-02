@@ -104,11 +104,27 @@
             </intent-filter>
         </receiver>
 
+        <!--
+          WorkManager's own manifest entry auto-initializes it via App Startup, with its
+          default WorkerFactory -- one that has no idea how to construct a Hilt-injected
+          Worker like UsageTrackingWorker (its constructor needs HabitRepository,
+          EaseInRepository, AppUsageSyncer, PreferencesRepository, none of which the
+          default factory can supply). That auto-init wins the race against
+          HabitsFirstApp's Configuration.Provider (which sets the correct
+          HiltWorkerFactory) UNLESS it's explicitly removed here, so every attempt to
+          construct that worker -- periodic or one-off, forever -- fails before doWork()
+          ever runs, with nothing but a generic WorkInfo.State.FAILED to show for it.
+        -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             android:exported="false"
-            tools:node="merge" />
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <!-- Lets the system camera app write a verification proof photo into our storage -->
         <provider

@@ -105,7 +105,13 @@ fun DiagnosticsScreen(
                 SectionCard(title = "Background worker") {
                     DiagnosticRow("Periodic (every ~15 min)", state.periodicWorkState)
                     DiagnosticRow("One-off (app open / leaving a tracked app)", state.oneOffWorkState)
-                    DiagnosticRow("Last automatic run", state.lastAutoSyncAtEpochMillis?.let(::formatTimestamp) ?: "never")
+                    // Recorded by AppUsageSyncer.sync() itself on every call, whether that
+                    // call came from the worker above or the "Run sync now" button below --
+                    // so a recent, clean value here does NOT by itself mean the *background*
+                    // worker succeeded. Cross-check against the worker states above: if
+                    // those say FAILED but this is recent and clean, only the manual button
+                    // is actually working.
+                    DiagnosticRow("Last run (any source)", state.lastAutoSyncAtEpochMillis?.let(::formatTimestamp) ?: "never")
                     DiagnosticRow("Habits it processed", state.lastAutoSyncHabitCount.toString())
                     state.lastAutoSyncError?.let { error ->
                         Spacer(modifier = Modifier.height(4.dp))
