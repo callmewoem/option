@@ -1,9 +1,12 @@
 package com.habitsfirst.androidclone.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import android.provider.Telephony
+import android.telecom.TelecomManager
 import android.view.accessibility.AccessibilityEvent
 import com.habitsfirst.androidclone.data.repository.ActiveDomainBlock
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
@@ -11,7 +14,9 @@ import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.UrlBlockRepository
+import com.habitsfirst.androidclone.domain.model.AppBlockMode
 import com.habitsfirst.androidclone.domain.model.BlockMode
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.ui.block.BlockOverlayActivity
@@ -47,6 +52,13 @@ import javax.inject.Inject
  * off the blocked page first. Otherwise the tab is left parked there and the *whole*
  * browser re-covers itself the instant it's foregrounded again, for any reason,
  * effectively hard-locking it rather than just that one navigation.
+ *
+ * App blocking has two readings of the same selected-package set, per
+ * [AppBlockMode]: [AppBlockMode.BLACKLIST] (default) locks the selected apps and
+ * leaves everything else alone; [AppBlockMode.WHITELIST] flips that -- the selected
+ * apps are always allowed and every other app gets locked, short of a small
+ * always-exempt set ([resolveEssentialPackageNames]) so the device stays usable
+ * (dialer, default messaging, Settings, the launcher, this app itself).
  */
 @AndroidEntryPoint
 class AppBlockAccessibilityService : AccessibilityService() {
@@ -63,19 +75,29 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     @Inject lateinit var urlBlockRepository: UrlBlockRepository
 
+    @Inject lateinit var preferencesRepository: PreferencesRepository
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var blockedPackageNames: Set<String> = emptySet()
+
+    /** The app picker's selected packages -- locked (blacklist) or exempt (whitelist) depending on [appBlockMode]. */
+    private var selectedPackageNames: Set<String> = emptySet()
+    private var appBlockMode: AppBlockMode = AppBlockMode.BLACKLIST
     private var appUsageTargetPackages: Set<String> = emptySet()
     private var activeDomainIndex: Map<String, ActiveDomainBlock> = emptyMap()
     private var lastForegroundPackage: String? = null
     private var homePackageName: String? = null
+    private var essentialPackageNames: Set<String> = emptySet()
     private val lastUrlCheckElapsedMs = mutableMapOf<String, Long>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         homePackageName = resolveHomePackageName()
+        essentialPackageNames = resolveEssentialPackageNames()
         blockedAppRepository.observeEnabledPackageNames()
-            .onEach { blockedPackageNames = it.toSet() }
+            .onEach { selectedPackageNames = it.toSet() }
+            .launchIn(serviceScope)
+        preferencesRepository.appBlockMode
+            .onEach { appBlockMode = it }
             .launchIn(serviceScope)
         habitRepository.observeHabits()
             .map { habits ->
@@ -125,7 +147,11 @@ class AppBlockAccessibilityService : AccessibilityService() {
             WorkScheduler.requestUsageRefreshNow(applicationContext)
         }
 
-        if (packageName !in blockedPackageNames) return
+        val isTargetedByBlockMode = when (appBlockMode) {
+            AppBlockMode.BLACKLIST -> packageName in selectedPackageNames
+            AppBlockMode.WHITELIST -> packageName !in selectedPackageNames && packageName !in essentialPackageNames
+        }
+        if (!isTargetedByBlockMode) return
 
         serviceScope.launch {
             when (val lockState = evaluateLockState()) {
@@ -195,6 +221,23 @@ class AppBlockAccessibilityService : AccessibilityService() {
         return resolveInfo?.activityInfo?.packageName
     }
 
+    /**
+     * Packages [AppBlockMode.WHITELIST] never locks, whatever the user did or didn't pick,
+     * so turning it on can't strand them without a way back to a phone call, a text, or
+     * Settings to fix their selection. The device's actual default dialer/SMS handler are
+     * resolved live (OEM builds vary); [ESSENTIAL_PACKAGE_NAME_FALLBACKS] covers Settings
+     * and those defaults' most common package names in case that lookup comes back empty.
+     */
+    private fun resolveEssentialPackageNames(): Set<String> {
+        val essential = mutableSetOf<String>()
+        runCatching {
+            (getSystemService(Context.TELECOM_SERVICE) as? TelecomManager)?.defaultDialerPackage
+        }.getOrNull()?.let { essential += it }
+        runCatching { Telephony.Sms.getDefaultSmsPackage(this) }.getOrNull()?.let { essential += it }
+        essential += ESSENTIAL_PACKAGE_NAME_FALLBACKS
+        return essential
+    }
+
     private fun showAppBlockScreen(blockedPackageName: String, isBedtime: Boolean) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -236,5 +279,14 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
         /** Minimum gap between two address-bar reads for the same browser -- content-changed events can fire in quick bursts (e.g. a loading page). */
         private const val URL_CHECK_THROTTLE_MS = 250L
+
+        /** Best-effort backstop for [resolveEssentialPackageNames] -- AOSP's own package names, which most OEMs keep as-is even when they ship a differently-named default dialer/messaging app. */
+        private val ESSENTIAL_PACKAGE_NAME_FALLBACKS = setOf(
+            "com.android.settings",
+            "com.android.dialer",
+            "com.google.android.dialer",
+            "com.android.messaging",
+            "com.google.android.apps.messaging",
+        )
     }
 }

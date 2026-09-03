@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.domain.model.AppBlockMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +61,48 @@ fun AppPickerScreen(
             }
 
             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+                item {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 16.dp),
+                    ) {
+                        AppBlockMode.entries.forEachIndexed { index, mode ->
+                            SegmentedButton(
+                                selected = state.appBlockMode == mode,
+                                onClick = { viewModel.onModeChanged(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(index, AppBlockMode.entries.size),
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (mode == AppBlockMode.BLACKLIST) {
+                                            R.string.app_block_mode_blacklist
+                                        } else {
+                                            R.string.app_block_mode_whitelist
+                                        },
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    Text(
+                        text = stringResource(
+                            if (state.appBlockMode == AppBlockMode.BLACKLIST) {
+                                R.string.app_block_mode_blacklist_description
+                            } else {
+                                R.string.app_block_mode_whitelist_description
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
                 item {
                     OutlinedTextField(
                         value = state.query,
@@ -90,7 +133,7 @@ fun AppPickerScreen(
                     }
                 }
                 items(state.filteredApps, key = { it.packageName }) { app ->
-                    val isBlocked = app.packageName in state.blockedPackageNames
+                    val isSelected = app.packageName in state.selectedPackageNames
                     val usageMinutes = state.usageMinutesByPackage[app.packageName] ?: 0
                     ListItem(
                         headlineContent = { Text(app.label) },
@@ -116,9 +159,9 @@ fun AppPickerScreen(
                         },
                         trailingContent = {
                             Switch(
-                                checked = isBlocked,
+                                checked = isSelected,
                                 onCheckedChange = { viewModel.onToggleApp(app, it) },
-                                enabled = !(isBlocked && state.isHardModeEnabled),
+                                enabled = !state.isToggleLockedByHardMode(isSelected),
                             )
                         },
                     )

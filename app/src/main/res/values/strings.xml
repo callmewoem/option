@@ -82,6 +82,10 @@
     <string name="settings_title">Settings</string>
     <string name="settings_habits">Habits</string>
     <string name="settings_blocked_apps">Locked apps</string>
+    <string name="app_block_mode_blacklist">Blacklist</string>
+    <string name="app_block_mode_whitelist">Whitelist</string>
+    <string name="app_block_mode_blacklist_description">Lock the apps you pick below -- everything else stays open.</string>
+    <string name="app_block_mode_whitelist_description">Lock every app except the ones you pick below -- those stay always open.</string>
     <string name="settings_permissions">Permissions</string>
     <string name="settings_about">About</string>
     <string name="settings_reset_streak_warning">Editing habits after today resets your current streak safeguard.</string>
