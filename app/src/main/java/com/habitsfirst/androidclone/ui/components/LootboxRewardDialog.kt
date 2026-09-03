@@ -3,11 +3,14 @@ package com.habitsfirst.androidclone.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material3.AlertDialog
@@ -58,14 +61,20 @@ fun LootboxRewardDialog(reward: LootboxReward, onDismiss: () -> Unit) {
         title = { Text("Daily lootbox!") },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Icon(
-                    imageVector = Icons.Filled.CardGiftcard,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .scale(scale),
-                )
+                        .size(80.dp)
+                        .scale(scale)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CardGiftcard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(reward.title(), style = MaterialTheme.typography.titleLarge)
                 Spacer(modifier = Modifier.height(4.dp))

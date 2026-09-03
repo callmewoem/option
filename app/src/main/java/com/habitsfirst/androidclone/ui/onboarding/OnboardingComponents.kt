@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,9 +28,8 @@ import com.habitsfirst.androidclone.R
 
 /**
  * Shared chrome for every onboarding step after the welcome screen: a back arrow (so
- * a choice made a screen ago is never a dead end) plus a flat, segmented step tracker
- * -- square blocks rather than a rounded Material [androidx.compose.material3.LinearProgressIndicator],
- * to match the brutalist shape language everywhere else in the app.
+ * a choice made a screen ago is never a dead end) plus a segmented step tracker with
+ * softly rounded ends, matching the app's shape language everywhere else.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,11 +61,12 @@ fun OnboardingTopBar(step: Int, totalSteps: Int, onBack: () -> Unit) {
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
+                        .clip(MaterialTheme.shapes.extraSmall)
                         .background(
                             if (index < step) {
                                 MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.surfaceVariant
+                                MaterialTheme.colorScheme.surfaceContainerHighest
                             },
                         ),
                 )
@@ -86,20 +87,4 @@ fun OnboardingKicker(text: String) {
         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
         color = MaterialTheme.colorScheme.primary,
     )
-}
-
-/** One row in the welcome screen's "what Locke does" preview. */
-@Composable
-fun OnboardingFeatureRow(icon: @Composable () -> Unit, text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.padding(end = 16.dp)) { icon() }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }

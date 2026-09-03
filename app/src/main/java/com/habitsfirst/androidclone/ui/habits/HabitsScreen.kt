@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -34,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -208,8 +208,8 @@ private fun StreakSummaryRow(
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -263,7 +263,8 @@ private fun HabitRateRow(name: String, rate: Float, accent: Color, countLabel: S
             modifier = Modifier
                 .weight(1f)
                 .height(14.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(MaterialTheme.shapes.extraSmall)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         ) {
             Box(
                 modifier = Modifier
@@ -301,6 +302,7 @@ private fun DayOfWeekChart(stats: List<DayOfWeekStat>, accent: Color) {
                         modifier = Modifier
                             .width(24.dp)
                             .height((4 + 60 * stat.averageFraction.coerceIn(0f, 1f)).dp)
+                            .clip(MaterialTheme.shapes.extraSmall)
                             .background(accent),
                     )
                 }

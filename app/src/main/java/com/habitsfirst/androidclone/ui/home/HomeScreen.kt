@@ -1,6 +1,7 @@
 package com.habitsfirst.androidclone.ui.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
@@ -38,6 +40,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -52,7 +55,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -537,6 +542,13 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
     }
 }
 
+/**
+ * The hero of Home: today's status at a glance -- a big monospace streak readout (this
+ * app's numbers are always stamped-label-style, never friendly UI type), how many
+ * gating habits are left, and how many apps are still locked. The single strongest
+ * "modern and intuitive" lever on this screen, since it's the first thing seen on
+ * every open and the thing every other card on the page supports.
+ */
 @Composable
 private fun SummaryCard(
     completed: Int,
@@ -545,53 +557,131 @@ private fun SummaryCard(
     lockedAppCount: Int,
     allDone: Boolean,
 ) {
+    val fraction = if (total > 0) completed.toFloat() / total else 1f
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (allDone) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant
+                MaterialTheme.colorScheme.surfaceContainer
             },
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = if (allDone) {
-                    stringResource(R.string.home_all_done_title)
-                } else {
-                    stringResource(R.string.home_remaining_habits, total - completed, total)
-                },
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (allDone) {
+                            stringResource(R.string.home_all_done_title)
+                        } else {
+                            stringResource(R.string.home_remaining_habits, total - completed, total)
+                        },
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = if (allDone) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                    if (allDone) {
+                        Text(
+                            text = stringResource(R.string.home_all_done_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
+                LockStatusChip(allDone = allDone, lockedAppCount = lockedAppCount)
+            }
+
+            if (!allDone && total > 0) {
+                Spacer(modifier = Modifier.height(14.dp))
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.LocalFireDepartment,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (allDone) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                            } else {
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.LocalFireDepartment,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = stringResource(R.string.home_streak_days, streakDays),
-                    style = MaterialTheme.typography.labelLarge,
+                    text = "$streakDays",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace),
+                    color = if (allDone) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                Icon(
-                    imageVector = if (allDone) Icons.Filled.LockOpen else Icons.Filled.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "$lockedAppCount locked",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = stringResource(if (streakDays == 1) R.string.home_streak_day_singular else R.string.home_streak_day_plural),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (allDone) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
         }
+    }
+}
+
+/** The small pill on [SummaryCard] showing how many apps are locked right now -- open or shut, at a glance. */
+@Composable
+private fun LockStatusChip(allDone: Boolean, lockedAppCount: Int) {
+    Row(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(
+                if (allDone) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                },
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = if (allDone) Icons.Filled.LockOpen else Icons.Filled.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = if (allDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "$lockedAppCount",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (allDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -600,17 +690,39 @@ private fun EmptyHabitsCard(onAddHabit: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onAddHabit,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Tap to add one.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Add the first one that gates your locked apps.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

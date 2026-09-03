@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
@@ -33,9 +34,10 @@ import com.habitsfirst.androidclone.domain.model.HabitType
 
 /**
  * Flat + bordered rather than elevated -- brutalism has no drop shadows, only outline.
- * [kind]'s accent bar down the left edge is the app's only "which list is this" signal
- * -- callers shouldn't need a descriptive section subtitle to tell Gating, Tracked and
- * Antihabit apart.
+ * [kind]'s accent color runs down the left edge *and*, once the habit is logged for the
+ * day, tints the whole card via [accentContainerColor] -- so "done" always reads in
+ * that kind's own hue (a completed antihabit slip stays alarming, not a generic green)
+ * instead of every kind converging on one identical "success" look.
  */
 @Composable
 fun HabitCard(
@@ -50,49 +52,60 @@ fun HabitCard(
     // the usual green-on-done mapping inverts.
     val isSlip = kind == HabitKind.ANTIHABIT && progress.isCompleted
     val isDone = progress.isCompleted && kind != HabitKind.ANTIHABIT
+    val isHighlighted = isSlip || isDone
 
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = when {
-                isSlip -> MaterialTheme.colorScheme.errorContainer
-                isDone -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surface
-            },
+            containerColor = if (isHighlighted) kind.accentContainerColor() else MaterialTheme.colorScheme.surface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(2.dp, if (isHighlighted) accent else MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(
                 modifier = Modifier
-                    .width(5.dp)
+                    .width(6.dp)
                     .fillMaxHeight()
                     .background(accent),
             )
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     if (kind == HabitKind.ANTIHABIT) {
-                        Icon(
-                            imageVector = if (isSlip) Icons.Filled.WarningAmber else Icons.Outlined.Circle,
-                            contentDescription = null,
-                            modifier = Modifier.size(28.dp),
-                            tint = if (isSlip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(
+                                    if (isSlip) {
+                                        MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
+                                    },
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (isSlip) Icons.Filled.WarningAmber else Icons.Outlined.Circle,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = if (isSlip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                            )
+                        }
                     } else {
                         CircularProgressIndicator(
                             progress = { progress.fraction },
                             modifier = Modifier.size(44.dp),
                             strokeWidth = 4.dp,
                             color = accent,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         )
                         Icon(
                             imageVector = habit.type.icon(),
@@ -106,7 +119,7 @@ fun HabitCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = habit.name, style = MaterialTheme.typography.titleMedium)
                     val subtitle = when {
-                        kind == HabitKind.ANTIHABIT -> if (isSlip) "Slipped" else null
+                        kind == HabitKind.ANTIHABIT -> if (isSlip) "Slipped today" else "Clean so far"
                         habit.type == HabitType.PHOTO ->
                             if (progress.isCompleted) "Verified" else "Tap to verify with a photo"
                         habit.type == HabitType.TALLY -> null
@@ -115,8 +128,12 @@ fun HabitCard(
                     if (subtitle != null) {
                         Text(
                             text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isHighlighted) {
+                                kind.onAccentContainerColor()
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     }
                 }
@@ -129,11 +146,8 @@ fun HabitCard(
                 Icon(
                     imageVector = trailingIcon,
                     contentDescription = if (progress.isCompleted) "Logged" else "Not logged",
-                    tint = when {
-                        isSlip -> MaterialTheme.colorScheme.error
-                        isDone -> accent
-                        else -> MaterialTheme.colorScheme.outline
-                    },
+                    modifier = Modifier.size(22.dp),
+                    tint = if (isHighlighted) accent else MaterialTheme.colorScheme.outline,
                 )
             }
         }

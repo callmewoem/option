@@ -54,7 +54,8 @@
     <string name="home_all_done_title">All done</string>
     <string name="home_all_done_subtitle">Unlocked for today.</string>
     <string name="home_remaining_habits">%1$d / %2$d left</string>
-    <string name="home_streak_days">%1$d day streak</string>
+    <string name="home_streak_day_singular">day streak</string>
+    <string name="home_streak_day_plural">days streak</string>
     <string name="home_add_habit">Add habit</string>
     <string name="home_refresh_data_driven_habits">Refresh app-usage and health data</string>
     <string name="home_manage_apps">Manage locked apps</string>
