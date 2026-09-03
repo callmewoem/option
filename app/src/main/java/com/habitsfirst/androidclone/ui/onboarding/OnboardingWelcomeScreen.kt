@@ -1,6 +1,5 @@
 package com.habitsfirst.androidclone.ui.onboarding
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,22 +24,19 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.habitsfirst.androidclone.R
-import com.habitsfirst.androidclone.ui.components.PerforatedDivider
-import com.habitsfirst.androidclone.ui.theme.Concrete10
+import com.habitsfirst.androidclone.ui.components.CatMood
+import com.habitsfirst.androidclone.ui.components.LockeCat
 
 @Composable
 fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
@@ -52,32 +48,17 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(top = 24.dp)
+                .padding(24.dp)
                 // Clears the bottom-pinned button below on short screens once this
                 // scrolls, rather than letting content land underneath it.
-                .padding(bottom = 100.dp),
+                .padding(bottom = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // The actual app mark (same vector as the launcher icon), square-edged to
-            // match the brutalist shape language rather than boxed in a circle.
-            Surface(
-                color = Concrete10,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.size(88.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_launcher_foreground),
-                        contentDescription = stringResource(R.string.app_name),
-                        modifier = Modifier.size(66.dp),
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            OnboardingKicker("New enrollment")
-            Spacer(modifier = Modifier.height(8.dp))
+            // Locke's own mascot greets you first -- a little warmth up front, before
+            // the "we're locking your apps" pitch that follows.
+            LockeCat(mood = CatMood.Curious, size = 96.dp)
+            Spacer(modifier = Modifier.height(28.dp))
             Text(
                 text = stringResource(R.string.onboarding_welcome_title),
                 style = MaterialTheme.typography.displaySmall,
@@ -90,78 +71,49 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(28.dp))
-            PerforatedDivider()
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             // A quick, honest preview of what setup involves and what's waiting on the
-            // other side of it -- so "Get Started" isn't a leap into the unknown. Numbered
-            // like docket entries rather than a bare bullet list.
+            // other side of it -- so "Get Started" isn't a leap into the unknown.
             Column(
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 OnboardingFeatureRow(
-                    index = 1,
                     icon = Icons.Filled.Lock,
                     text = stringResource(R.string.onboarding_welcome_feature_lock),
                 )
                 OnboardingFeatureRow(
-                    index = 2,
                     icon = Icons.Filled.CameraAlt,
                     text = stringResource(R.string.onboarding_welcome_feature_photo),
                 )
                 OnboardingFeatureRow(
-                    index = 3,
                     icon = Icons.Filled.Redeem,
                     text = stringResource(R.string.onboarding_welcome_feature_rewards),
                 )
             }
         }
 
-        Column(
+        Button(
+            onClick = onGetStarted,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(24.dp)
+                .height(52.dp),
+            colors = ButtonDefaults.buttonColors(),
         ) {
-            Button(
-                onClick = onGetStarted,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors = ButtonDefaults.buttonColors(),
-            ) {
-                Text(
-                    text = stringResource(R.string.onboarding_get_started),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "About a minute to set up -- change any of it later.",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Text(stringResource(R.string.onboarding_get_started), style = MaterialTheme.typography.titleMedium)
         }
     }
 }
 
-/**
- * One row in the welcome screen's "what Locke does" preview -- a docket-style index
- * number, an icon chip, and its explanation.
- */
+/** One row in the welcome screen's "what Locke does" preview -- an icon chip plus its explanation. */
 @Composable
-private fun OnboardingFeatureRow(index: Int, icon: ImageVector, text: String) {
+private fun OnboardingFeatureRow(icon: ImageVector, text: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = index.toString().padStart(2, '0'),
-            style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace),
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.width(24.dp),
-        )
         Box(
             modifier = Modifier
                 .size(44.dp)

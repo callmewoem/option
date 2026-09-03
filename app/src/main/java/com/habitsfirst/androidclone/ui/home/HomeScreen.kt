@@ -61,7 +61,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -71,17 +70,13 @@ import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.Todo
+import com.habitsfirst.androidclone.ui.components.CatMood
 import com.habitsfirst.androidclone.ui.components.HabitCard
+import com.habitsfirst.androidclone.ui.components.LockeCat
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
-import com.habitsfirst.androidclone.ui.components.PerforatedDivider
-import com.habitsfirst.androidclone.ui.components.StampBadge
-import com.habitsfirst.androidclone.ui.components.TicketNotches
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
 import com.habitsfirst.androidclone.util.DateProvider
-import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -551,12 +546,10 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
 }
 
 /**
- * The hero of Home, styled as today's issued "daily slip" -- ticket-notched edges, a
- * dashed tear line, a rubber-stamped "ALL CLEAR" the moment there's nothing left owed.
- * This is Locke's whole pitch made literal: you're not just checking a to-do list,
- * you're clearing an itemized bill before your apps unlock. The single strongest
- * "modern and intuitive" lever on this screen, since it's the first thing seen on
- * every open and the thing every other card on the page supports.
+ * The hero of Home: today's status at a glance, with [LockeCat] as a small companion
+ * reacting to it -- content once nothing's owed, curious the rest of the time. The
+ * single strongest lever on this screen, since it's the first thing seen on every open
+ * and the thing every other card on the page supports.
  */
 @Composable
 private fun SummaryCard(
@@ -567,7 +560,6 @@ private fun SummaryCard(
     allDone: Boolean,
 ) {
     val fraction = if (total > 0) completed.toFloat() / total else 1f
-    val pageBackground = MaterialTheme.colorScheme.background
     val onCard = if (allDone) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     val onCardMuted = if (allDone) {
         MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
@@ -575,70 +567,65 @@ private fun SummaryCard(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (allDone) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                },
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (allDone) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "DAILY SLIP · ${todaySlipDateLabel()}",
-                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
-                        color = onCardMuted,
+                        text = if (allDone) {
+                            stringResource(R.string.home_all_done_title)
+                        } else {
+                            stringResource(R.string.home_remaining_habits, total - completed, total)
+                        },
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = onCard,
                     )
-                    LockStatusChip(allDone = allDone, lockedAppCount = lockedAppCount)
+                    if (allDone) {
+                        Text(
+                            text = stringResource(R.string.home_all_done_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onCardMuted,
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = if (allDone) {
-                        stringResource(R.string.home_all_done_title)
-                    } else {
-                        stringResource(R.string.home_remaining_habits, total - completed, total)
-                    },
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = onCard,
+                Spacer(modifier = Modifier.width(12.dp))
+                LockeCat(
+                    mood = if (allDone) CatMood.Content else CatMood.Curious,
+                    size = 48.dp,
                 )
-                if (allDone) {
-                    Text(
-                        text = stringResource(R.string.home_all_done_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = onCardMuted,
-                    )
-                }
+            }
 
-                if (!allDone && total > 0) {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    LinearProgressIndicator(
-                        progress = { fraction },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(MaterialTheme.shapes.extraSmall),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        strokeCap = StrokeCap.Butt,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                PerforatedDivider(
-                    color = if (allDone) onCardMuted.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant,
+            if (!allDone && total > 0) {
+                Spacer(modifier = Modifier.height(14.dp))
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    strokeCap = StrokeCap.Butt,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+            }
 
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -673,30 +660,11 @@ private fun SummaryCard(
                         color = onCardMuted,
                     )
                 }
+                LockStatusChip(allDone = allDone, lockedAppCount = lockedAppCount)
             }
         }
-
-        if (allDone) {
-            StampBadge(
-                text = stringResource(R.string.home_all_clear_stamp),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 2.dp, end = 24.dp),
-                color = MaterialTheme.colorScheme.primary,
-                rotationDegrees = 9f,
-            )
-        }
-
-        // The "bitten" notches read as a ticket stub torn from a longer roll -- the
-        // punchline of "do your habits, then use your apps" made literal furniture.
-        TicketNotches(behindColor = pageBackground, modifier = Modifier.matchParentSize())
     }
 }
-
-/** "SEP 3" -- the daily slip's dateline, called at composition time like [greetingRes] below. */
-@Composable
-private fun todaySlipDateLabel(): String =
-    LocalDate.now().format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())).uppercase()
 
 /** The small pill on [SummaryCard] showing how many apps are locked right now -- open or shut, at a glance. */
 @Composable
@@ -744,19 +712,7 @@ private fun EmptyHabitsCard(onAddHabit: () -> Unit) {
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
+            LockeCat(mood = CatMood.Curious, size = 44.dp)
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)

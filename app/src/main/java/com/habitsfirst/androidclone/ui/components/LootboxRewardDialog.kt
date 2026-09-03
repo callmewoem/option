@@ -3,18 +3,11 @@ package com.habitsfirst.androidclone.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,27 +54,10 @@ fun LootboxRewardDialog(reward: LootboxReward, onDismiss: () -> Unit) {
         title = { Text("Daily lootbox!") },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .scale(scale)
-                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CardGiftcard,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(40.dp),
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                StampBadge(text = "Redeemed", color = MaterialTheme.colorScheme.primary, rotationDegrees = -5f)
+                LockeCat(mood = CatMood.Excited, size = 72.dp, modifier = Modifier.scale(scale))
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(reward.title(), style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(8.dp))
-                PerforatedDivider()
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     reward.description(),
                     style = MaterialTheme.typography.bodyMedium,

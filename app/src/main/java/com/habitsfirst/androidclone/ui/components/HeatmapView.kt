@@ -21,12 +21,10 @@ private val CellSize = 12.dp
 private val CellGap = 3.dp
 
 /**
- * A punch-card contribution grid -- one column per week, one row per day-of-week
- * (Sunday at top), one punched dot per day, colored by [colorForDate]. Circles rather
- * than GitHub's flat squares, in keeping with the app's ledger/receipt visual language
- * (a day either got its hole punched or it didn't). Purely a renderer -- callers decide
- * what a date's color means (continuous completion-fraction shading for the aggregate
- * heatmap, or a flat done/slipped/empty color for a single habit's strip).
+ * A dot-grid contribution grid: one column per week, one row per day-of-week (Sunday
+ * at top), colored by [colorForDate]. Purely a renderer -- callers decide what a date's
+ * color means (continuous completion-fraction shading for the aggregate heatmap, or a
+ * flat done/slipped/empty color for a single habit's strip).
  */
 @Composable
 fun Heatmap(
