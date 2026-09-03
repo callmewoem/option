@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,10 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -71,9 +74,15 @@ import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.Todo
 import com.habitsfirst.androidclone.ui.components.HabitCard
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
+import com.habitsfirst.androidclone.ui.components.PerforatedDivider
+import com.habitsfirst.androidclone.ui.components.StampBadge
+import com.habitsfirst.androidclone.ui.components.TicketNotches
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
 import com.habitsfirst.androidclone.util.DateProvider
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -543,9 +552,10 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
 }
 
 /**
- * The hero of Home: today's status at a glance -- a big monospace streak readout (this
- * app's numbers are always stamped-label-style, never friendly UI type), how many
- * gating habits are left, and how many apps are still locked. The single strongest
+ * The hero of Home, styled as today's issued "daily slip" -- ticket-notched edges, a
+ * dashed tear line, a rubber-stamped "ALL CLEAR" the moment there's nothing left owed.
+ * This is Locke's whole pitch made literal: you're not just checking a to-do list,
+ * you're clearing an itemized bill before your apps unlock. The single strongest
  * "modern and intuitive" lever on this screen, since it's the first thing seen on
  * every open and the thing every other card on the page supports.
  */
@@ -558,101 +568,136 @@ private fun SummaryCard(
     allDone: Boolean,
 ) {
     val fraction = if (total > 0) completed.toFloat() / total else 1f
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (allDone) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            },
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
+    val pageBackground = MaterialTheme.colorScheme.background
+    val onCard = if (allDone) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val onCardMuted = if (allDone) {
+        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (allDone) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = if (allDone) {
-                            stringResource(R.string.home_all_done_title)
-                        } else {
-                            stringResource(R.string.home_remaining_habits, total - completed, total)
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = if (allDone) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
+                        text = "DAILY SLIP · ${todaySlipDateLabel()}",
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
+                        color = onCardMuted,
                     )
-                    if (allDone) {
-                        Text(
-                            text = stringResource(R.string.home_all_done_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    LockStatusChip(allDone = allDone, lockedAppCount = lockedAppCount)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = if (allDone) {
+                        stringResource(R.string.home_all_done_title)
+                    } else {
+                        stringResource(R.string.home_remaining_habits, total - completed, total)
+                    },
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = onCard,
+                )
+                if (allDone) {
+                    Text(
+                        text = stringResource(R.string.home_all_done_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onCardMuted,
+                    )
+                }
+
+                if (!allDone && total > 0) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(MaterialTheme.shapes.extraSmall),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        strokeCap = StrokeCap.Butt,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                PerforatedDivider(
+                    color = if (allDone) onCardMuted.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (allDone) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                } else {
+                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LocalFireDepartment,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.secondary,
                         )
                     }
-                }
-                LockStatusChip(allDone = allDone, lockedAppCount = lockedAppCount)
-            }
-
-            if (!allDone && total > 0) {
-                Spacer(modifier = Modifier.height(14.dp))
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(MaterialTheme.shapes.extraSmall),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (allDone) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                            } else {
-                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)
-                            },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.LocalFireDepartment,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.secondary,
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "$streakDays",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = onCard,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(if (streakDays == 1) R.string.home_streak_day_singular else R.string.home_streak_day_plural),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = onCardMuted,
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "$streakDays",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace),
-                    color = if (allDone) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(if (streakDays == 1) R.string.home_streak_day_singular else R.string.home_streak_day_plural),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (allDone) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
             }
         }
+
+        if (allDone) {
+            StampBadge(
+                text = stringResource(R.string.home_all_clear_stamp),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 2.dp, end = 24.dp),
+                color = MaterialTheme.colorScheme.primary,
+                rotationDegrees = 9f,
+            )
+        }
+
+        // The "bitten" notches read as a ticket stub torn from a longer roll -- the
+        // punchline of "do your habits, then use your apps" made literal furniture.
+        TicketNotches(behindColor = pageBackground, modifier = Modifier.matchParentSize())
     }
 }
+
+/** "SEP 3" -- the daily slip's dateline, called at composition time like [greetingRes] below. */
+@Composable
+private fun todaySlipDateLabel(): String =
+    LocalDate.now().format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())).uppercase()
 
 /** The small pill on [SummaryCard] showing how many apps are locked right now -- open or shut, at a glance. */
 @Composable

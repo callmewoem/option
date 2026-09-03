@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -69,6 +68,7 @@ import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
+import com.habitsfirst.androidclone.ui.components.LedgerLineRow
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.util.PermissionUtils
 
@@ -250,18 +250,21 @@ fun SettingsScreen(
 
             item { SectionHeader("Rewards") }
             item {
-                ListItem(
-                    headlineContent = { Text("Grace tokens") },
-                    supportingContent = { Text("1-minute unblock, redeemed from a lock screen") },
-                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null) },
-                    trailingContent = { Text("${state.graceTokenCount}", style = MaterialTheme.typography.titleMedium) },
-                )
-                ListItem(
-                    headlineContent = { Text("Task-skip tokens") },
-                    supportingContent = { Text("Force-completes one gating habit for today") },
-                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null) },
-                    trailingContent = { Text("${state.taskSkipTokenCount}", style = MaterialTheme.typography.titleMedium) },
-                )
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    LedgerLineRow(label = "Grace tokens", value = "${state.graceTokenCount}")
+                    Text(
+                        "1-minute unblock, redeemed from a lock screen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LedgerLineRow(label = "Task-skip tokens", value = "${state.taskSkipTokenCount}")
+                    Text(
+                        "Force-completes one gating habit for today",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (state.taskSkipTokenCount > 0) {
                     OutlinedButton(
                         onClick = { showSkipHabitDialog = true },

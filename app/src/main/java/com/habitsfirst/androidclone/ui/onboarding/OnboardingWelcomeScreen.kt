@@ -34,10 +34,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.PerforatedDivider
 import com.habitsfirst.androidclone.ui.theme.Concrete10
 
 @Composable
@@ -73,7 +75,9 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            OnboardingKicker("New enrollment")
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.onboarding_welcome_title),
                 style = MaterialTheme.typography.displaySmall,
@@ -86,22 +90,28 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(28.dp))
+            PerforatedDivider()
+            Spacer(modifier = Modifier.height(28.dp))
             // A quick, honest preview of what setup involves and what's waiting on the
-            // other side of it -- so "Get Started" isn't a leap into the unknown.
+            // other side of it -- so "Get Started" isn't a leap into the unknown. Numbered
+            // like docket entries rather than a bare bullet list.
             Column(
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 OnboardingFeatureRow(
+                    index = 1,
                     icon = Icons.Filled.Lock,
                     text = stringResource(R.string.onboarding_welcome_feature_lock),
                 )
                 OnboardingFeatureRow(
+                    index = 2,
                     icon = Icons.Filled.CameraAlt,
                     text = stringResource(R.string.onboarding_welcome_feature_photo),
                 )
                 OnboardingFeatureRow(
+                    index = 3,
                     icon = Icons.Filled.Redeem,
                     text = stringResource(R.string.onboarding_welcome_feature_rewards),
                 )
@@ -136,13 +146,22 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
     }
 }
 
-/** One row in the welcome screen's "what Locke does" preview -- an icon chip plus its explanation. */
+/**
+ * One row in the welcome screen's "what Locke does" preview -- a docket-style index
+ * number, an icon chip, and its explanation.
+ */
 @Composable
-private fun OnboardingFeatureRow(icon: ImageVector, text: String) {
+private fun OnboardingFeatureRow(index: Int, icon: ImageVector, text: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Text(
+            text = index.toString().padStart(2, '0'),
+            style = MaterialTheme.typography.labelLarge.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.width(24.dp),
+        )
         Box(
             modifier = Modifier
                 .size(44.dp)

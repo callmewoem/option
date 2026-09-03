@@ -75,9 +75,13 @@ fun LootboxRewardDialog(reward: LootboxReward, onDismiss: () -> Unit) {
                         modifier = Modifier.size(40.dp),
                     )
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                StampBadge(text = "Redeemed", color = MaterialTheme.colorScheme.primary, rotationDegrees = -5f)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(reward.title(), style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                PerforatedDivider()
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     reward.description(),
                     style = MaterialTheme.typography.bodyMedium,

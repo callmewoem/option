@@ -1,14 +1,11 @@
 package com.habitsfirst.androidclone.ui.block
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,10 +35,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.LedgerLineRow
+import com.habitsfirst.androidclone.ui.components.PerforatedDivider
+import com.habitsfirst.androidclone.ui.components.StampBadge
 
+/**
+ * The lock cover -- Locke's entire reason to exist, and the one screen every user sees
+ * far more often than any other. Styled as a "notice of restriction": a stamped verdict,
+ * a torn tear-line, and an itemized docket of what clears it, rather than a generic
+ * card wall. The goal is a screen that reads as *issued at you*, not just displayed.
+ */
 @Composable
 fun BlockScreen(
     onTakeBreak: () -> Unit,
@@ -58,9 +65,6 @@ fun BlockScreen(
         if (state.allHabitsComplete && !state.isBedtime && !state.isPermanent) onAllHabitsComplete()
     }
 
-    // A locked app's cover is the app's whole reason to exist -- it earns a bolder
-    // treatment than any other screen: a full-bleed accent-tinted field behind the
-    // badge and headline, rather than another neutral card on a plain background.
     val fieldColor = when {
         state.isBedtime -> MaterialTheme.colorScheme.secondaryContainer
         state.isPermanent -> MaterialTheme.colorScheme.errorContainer
@@ -71,9 +75,21 @@ fun BlockScreen(
         state.isPermanent -> MaterialTheme.colorScheme.onErrorContainer
         else -> MaterialTheme.colorScheme.onPrimaryContainer
     }
+    val verdictColor = when {
+        state.isBedtime -> MaterialTheme.colorScheme.secondary
+        state.isPermanent -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val verdictStamp = when {
+        state.isBedtime -> "Curfew"
+        state.isPermanent -> "Locked out"
+        else -> "On hold"
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // A full-bleed accent field, not another neutral card on a plain
+            // background -- this cover earns a bolder treatment than any other screen.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -84,24 +100,28 @@ fun BlockScreen(
                     .systemBarsPadding()
                     .padding(24.dp),
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(onFieldColor.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = when {
-                            state.isBedtime -> Icons.Filled.Bedtime
-                            state.isPermanent -> Icons.Filled.Block
-                            else -> Icons.Filled.Lock
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp),
-                        tint = onFieldColor,
-                    )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(onFieldColor.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = when {
+                                state.isBedtime -> Icons.Filled.Bedtime
+                                state.isPermanent -> Icons.Filled.Block
+                                else -> Icons.Filled.Lock
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(26.dp),
+                            tint = onFieldColor,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    StampBadge(text = verdictStamp, color = verdictColor, rotationDegrees = -6f)
                 }
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(
@@ -127,23 +147,8 @@ fun BlockScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     color = onFieldColor.copy(alpha = 0.85f),
                 )
-                if (!state.isBedtime && !state.isPermanent && state.incompleteHabits.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    val count = state.incompleteHabits.size
-                    Row(
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.extraLarge)
-                            .background(onFieldColor.copy(alpha = 0.14f))
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            text = if (count == 1) "1 habit stands between you and it" else "$count habits stand between you and it",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = onFieldColor,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
+                PerforatedDivider(color = onFieldColor.copy(alpha = 0.3f))
             }
 
             Column(
@@ -151,43 +156,28 @@ fun BlockScreen(
                     .fillMaxSize()
                     .padding(horizontal = 24.dp),
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 if (state.isBedtime || state.isPermanent) {
                     Spacer(modifier = Modifier.weight(1f))
                 } else {
+                    Text(
+                        text = "TODAY'S DOCKET",
+                        style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         items(state.incompleteHabits, key = { it.habit.id }) { progress ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(IntrinsicSize.Min)
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                                    .border(2.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(6.dp)
-                                        .fillMaxHeight()
-                                        .background(MaterialTheme.colorScheme.primary),
-                                )
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = progress.habit.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                    Text(
-                                        text = "${progress.currentValue} / ${progress.habit.targetValue} ${progress.habit.type.unit}"
-                                            .trim(),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                            LedgerLineRow(
+                                label = progress.habit.name,
+                                value = "${progress.currentValue}/${progress.habit.targetValue} ${progress.habit.type.unit}"
+                                    .trim(),
+                                modifier = Modifier.padding(vertical = 10.dp),
+                            )
                         }
                     }
 
