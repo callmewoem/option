@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.habitsfirst.androidclone.domain.model.AppBlockMode
 import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
@@ -47,6 +48,7 @@ class PreferencesRepository @Inject constructor(
         val MORNING_TODO_REMINDER_ENABLED = booleanPreferencesKey("morning_todo_reminder_enabled")
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
+        val APP_BLOCK_MODE = stringPreferencesKey("app_block_mode") // AppBlockMode.name
         val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
         val HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("hard_mode_toggle_locked_until_epoch_millis")
         val EASE_IN_STREAK_LENGTH = intPreferencesKey("ease_in_streak_length")
@@ -260,6 +262,17 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setLastMorningReminderSentDate(date: String) {
         dataStore.edit { it[Keys.LAST_MORNING_REMINDER_SENT_DATE] = date }
+    }
+
+    // -- App block mode -----------------------------------------------------------------
+
+    /** Whether the app picker's selected packages are locked (blacklist, the default) or exempt from locking (whitelist). */
+    val appBlockMode: Flow<AppBlockMode> = dataStore.data.map {
+        it[Keys.APP_BLOCK_MODE]?.let { name -> runCatching { AppBlockMode.valueOf(name) }.getOrNull() } ?: AppBlockMode.BLACKLIST
+    }
+
+    suspend fun setAppBlockMode(mode: AppBlockMode) {
+        dataStore.edit { it[Keys.APP_BLOCK_MODE] = mode.name }
     }
 
     // -- Hard mode --------------------------------------------------------------------
