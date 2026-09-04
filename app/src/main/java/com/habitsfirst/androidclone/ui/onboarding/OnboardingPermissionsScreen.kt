@@ -51,7 +51,7 @@ fun OnboardingPermissionsScreen(
     val hasOverlay = remember(refreshTick) { PermissionUtils.hasOverlayPermission(context) }
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 3, totalSteps = 3, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 4, totalSteps = 4, onBack = onBack) },
         bottomBar = {
             Button(
                 onClick = {

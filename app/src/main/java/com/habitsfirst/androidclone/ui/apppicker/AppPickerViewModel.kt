@@ -35,20 +35,27 @@ data class AppPickerUiState(
     /** Hard mode: restrictions can only tighten, never loosen -- see [isToggleLockedByHardMode]. */
     val isHardModeEnabled: Boolean = false,
 ) {
+    /** Screen-time-first recommendations, falling back to the curated list -- see [RecommendedApps.recommendedPackages]. */
+    private val recommendedPackageNames: Set<String> get() = RecommendedApps.recommendedPackages(usageMinutesByPackage)
+
     val filteredApps: List<InstalledApp>
         get() {
             val base = if (query.isBlank()) apps else apps.filter { it.label.contains(query, ignoreCase = true) }
             return when (sortMode) {
                 AppSortMode.ALPHABETICAL -> base.sortedBy { it.label.lowercase() }
                 AppSortMode.MOST_USED -> base.sortedByDescending { usageMinutesByPackage[it.packageName] ?: 0 }
-                AppSortMode.RECOMMENDED -> base.sortedWith(
-                    compareByDescending<InstalledApp> { RecommendedApps.isRecommended(it.packageName) }
-                        .thenBy { it.label.lowercase() },
-                )
+                AppSortMode.RECOMMENDED -> {
+                    val recommended = recommendedPackageNames
+                    base.sortedWith(
+                        compareByDescending<InstalledApp> { it.packageName in recommended }
+                            .thenByDescending { usageMinutesByPackage[it.packageName] ?: 0 }
+                            .thenBy { it.label.lowercase() },
+                    )
+                }
             }
         }
 
-    fun isRecommended(app: InstalledApp): Boolean = RecommendedApps.isRecommended(app.packageName)
+    fun isRecommended(app: InstalledApp): Boolean = app.packageName in recommendedPackageNames
 
     /**
      * Whether hard mode should keep this app's switch from being toggled, given whether

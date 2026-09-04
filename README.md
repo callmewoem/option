@@ -15,9 +15,12 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 
 ## How it works
 
-1. **Onboarding** -- pick which installed apps to lock, pick a few starter habits
-   (steps, exercise, meditation, or a plain custom check-in), and grant three
-   special permissions. Picking 2+ habits also asks you to rank them easiest-first
+1. **Onboarding** -- a 4-step flow: grant Usage Access up front so the app-picking
+   step can recommend apps by this phone's *actual* screen time instead of a
+   generic guess (skip it and that step falls back to a curated list of
+   commonly-distracting apps); pick which installed apps to lock; pick a few
+   starter habits (steps, exercise, meditation, or a plain custom check-in); then
+   grant the remaining two special permissions. Picking 2+ habits also asks you to rank them easiest-first
    ("ease into it"): only the easiest gates your apps right away, and each one
    after it is promoted from tracked-only to gating automatically once the habit
    before it has been a consistent streak for a configurable number of days
@@ -130,7 +133,7 @@ app/src/main/java/com/habitsfirst/androidclone/
 ├── service/         AccessibilityService, WorkManager workers (usage tracking,
 │                    morning todo reminder), boot receiver
 ├── ui/
-│   ├── onboarding/  4-step first-run flow
+│   ├── onboarding/  5-screen first-run flow (welcome, then 4 numbered steps)
 │   ├── home/        Dashboard + manual progress logging + lootbox reveal
 │   ├── habits/      Gating/tracked/antihabit sections + heatmap
 │   ├── todos/       Daily non-repeating task list
@@ -168,7 +171,7 @@ code entered in Settings → *Theme* (`domain/model/ThemeRedeemCode.kt`).
 
 | Permission | Why |
 |---|---|
-| Usage Access (`PACKAGE_USAGE_STATS`) | Reads today's per-app foreground time for "use an app" habits and the app picker's "Most used" sort. |
+| Usage Access (`PACKAGE_USAGE_STATS`) | Reads today's per-app foreground time for "use an app" habits, the app picker's "Most used" sort, and screen-time-based "Recommended" apps (onboarding asks for this first, so the app-picking step can use it). |
 | Accessibility Service | Detects when you switch into a locked app so the cover can appear immediately. |
 | Display over other apps (`SYSTEM_ALERT_WINDOW`) | Lets the lock screen actually cover the app underneath. |
 | Notifications | Habit reminders, streak nudges, and the morning todo reminder (optional, toggleable in Settings). |

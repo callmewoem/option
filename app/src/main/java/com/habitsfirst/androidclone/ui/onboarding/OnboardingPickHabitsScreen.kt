@@ -41,7 +41,7 @@ fun OnboardingPickHabitsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 2, totalSteps = 3, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 3, totalSteps = 4, onBack = onBack) },
         bottomBar = {
             Button(
                 onClick = onContinue,
