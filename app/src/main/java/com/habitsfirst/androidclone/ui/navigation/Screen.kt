@@ -7,6 +7,7 @@ sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
 
     data object OnboardingWelcome : Screen("onboarding/welcome")
+    data object OnboardingUsageAccess : Screen("onboarding/usage_access")
     data object OnboardingPickApps : Screen("onboarding/pick_apps")
     data object OnboardingPickHabits : Screen("onboarding/pick_habits")
     data object OnboardingPermissions : Screen("onboarding/permissions")

@@ -26,6 +26,7 @@ import com.habitsfirst.androidclone.ui.home.HomeScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPermissionsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickAppsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickHabitsScreen
+import com.habitsfirst.androidclone.ui.onboarding.OnboardingUsageAccessScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
 import com.habitsfirst.androidclone.ui.proofoflife.ProofOfLifeScreen
@@ -50,7 +51,16 @@ fun HabitsFirstNavHost() {
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.OnboardingWelcome.route) {
             OnboardingWelcomeScreen(
-                onGetStarted = { navController.navigate(Screen.OnboardingPickApps.route) },
+                onGetStarted = { navController.navigate(Screen.OnboardingUsageAccess.route) },
+            )
+        }
+        composable(Screen.OnboardingUsageAccess.route) {
+            val onboardingViewModel: OnboardingViewModel =
+                hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
+            OnboardingUsageAccessScreen(
+                onBack = { navController.popBackStack() },
+                onContinue = { navController.navigate(Screen.OnboardingPickApps.route) },
+                viewModel = onboardingViewModel,
             )
         }
         composable(Screen.OnboardingPickApps.route) {

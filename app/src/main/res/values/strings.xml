@@ -4,8 +4,9 @@
     <string name="accessibility_service_description">Locke uses this to notice when you open an app, or browse to a website, you\'ve chosen to block, so it can show your habit checklist until you\'ve completed today\'s habits (or keep it blocked outright, for lists you\'ve set to never unlock).</string>
 
     <!-- Onboarding -->
-    <!-- The three setup screens after this one are framed as one story: lay the locks,
-         cut the keys, then hand them over. See each screen's OnboardingKicker line. -->
+    <!-- The four setup screens after this one are framed as one story: see your screen
+         time, lay the locks, cut the keys, then hand them over. See each screen's
+         OnboardingKicker line. -->
     <string name="onboarding_welcome_title">Do your habits.\nThen use your apps.</string>
     <string name="onboarding_welcome_subtitle">Right now, the apps that pull at your attention are one tap away, any time, for no reason at all. Locke changes the terms: it locks them down, and hands the key back only once you\'ve done what you actually meant to do today.</string>
     <string name="onboarding_welcome_feature_lock">Set the locks and cut the keys yourself -- about a minute, start to finish</string>
@@ -13,19 +14,28 @@
     <string name="onboarding_welcome_feature_rewards">Streaks, a daily lootbox, and a bedtime curfew carry the discipline past today</string>
     <string name="onboarding_get_started">Get Started</string>
     <string name="onboarding_step_of">Step %1$d of %2$d</string>
-    <string name="onboarding_kicker_apps">Part one -- the locks</string>
+    <string name="onboarding_kicker_usage_access">Part one -- your screen time</string>
+    <string name="onboarding_usage_access_title">See where your time actually goes</string>
+    <string name="onboarding_usage_access_subtitle">Grant Usage Access and the next step can tell you which apps are eating your day, instead of guessing -- so the ones you pick to lock are the ones your own phone says are the problem.</string>
+    <string name="onboarding_usage_access_grant">Grant Usage Access</string>
+    <string name="onboarding_usage_access_skip">Skip for now</string>
+    <string name="onboarding_usage_access_note">Optional -- skip it and the next step falls back to a curated list of commonly-distracting apps instead. You can grant this anytime later from Settings.</string>
+    <string name="onboarding_kicker_apps">Part two -- the locks</string>
     <string name="onboarding_pick_apps_title">What steals your time?</string>
     <string name="onboarding_pick_apps_subtitle">Name the apps you lose hours to, and they\'ll stay locked until today\'s habits are done. Nothing locks until setup is finished, and this list is never final -- add or remove apps anytime from Settings.</string>
     <string name="onboarding_pick_apps_selected_count">%1$d app selected</string>
     <string name="onboarding_pick_apps_selected_count_plural">%1$d apps selected</string>
     <string name="onboarding_pick_apps_none_selected">No apps selected yet -- that\'s fine, you can lock some later from Settings.</string>
-    <string name="onboarding_kicker_habits">Part two -- the keys</string>
+    <string name="onboarding_pick_apps_recommended">Recommended</string>
+    <string name="onboarding_pick_apps_recommended_with_usage">Recommended -- %1$d min today</string>
+    <string name="onboarding_pick_apps_usage_minutes">%1$d min today</string>
+    <string name="onboarding_kicker_habits">Part three -- the keys</string>
     <string name="onboarding_pick_habits_title">What matters more?</string>
     <string name="onboarding_pick_habits_subtitle">Every habit you pick here is a key to the locks you just set. Check at least one to continue -- you can edit, add, or remove habits anytime later.</string>
     <string name="onboarding_pick_habits_gating_explainer">Miss one of these today, and the apps it guards stay locked -- that\'s the deal. Want a habit that\'s just tracked, or an antihabit, or one a photo has to prove? Add those later from Settings; these five are just a running start.</string>
     <string name="onboarding_pick_habits_ease_in_title">Ease in -- easiest first</string>
     <string name="onboarding_pick_habits_ease_in_body">Only #1 gates your apps right away. Each one after it takes over once the habit before it is a consistent streak, so the full weight of Hard Mode never lands on day one.</string>
-    <string name="onboarding_kicker_permissions">Part three -- the handoff</string>
+    <string name="onboarding_kicker_permissions">Part four -- the handoff</string>
     <string name="onboarding_permissions_title">Make it real</string>
     <string name="onboarding_permissions_subtitle">Everything so far has been on paper. These three permissions are what let Locke actually see a blocked app open and put the lock screen in front of it. All are optional right now -- skip any and finish setup anyway, then grant them later from Settings. Until they\'re granted, nothing you set up above actually locks anything.</string>
     <string name="onboarding_permissions_whats_next_title">Worth exploring once you\'re in</string>

@@ -14,6 +14,7 @@ import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.habit.defaultTarget
 import com.habitsfirst.androidclone.util.DateProvider
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
+import com.habitsfirst.androidclone.util.PermissionUtils
 import com.habitsfirst.androidclone.util.RecommendedApps
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,6 +43,13 @@ data class OnboardingUiState(
     val installedApps: List<InstalledApp> = emptyList(),
     val selectedPackageNames: Set<String> = emptySet(),
     /**
+     * Today's per-app foreground minutes, read once usage access is granted (empty
+     * otherwise). Drives [recommendedPackageNames] and [sortedInstalledApps] so the
+     * app-picking step reflects this phone's actual screen time instead of a guess.
+     */
+    val usageMinutesByPackage: Map<String, Int> = emptyMap(),
+    val hasUsageAccess: Boolean = false,
+    /**
      * Selected habit templates, ordered easiest-first. With 2+ selected, this order
      * becomes the "ease into it" ramp: only the first gates right away, and the rest
      * are promoted one at a time as the current one becomes a consistent streak (see
@@ -54,7 +62,28 @@ data class OnboardingUiState(
     val canContinueFromApps: Boolean get() = true // blocking zero apps is a valid (if pointless) choice
     val canContinueFromHabits: Boolean get() = selectedTemplateOrder.isNotEmpty()
 
-    fun isRecommended(app: InstalledApp): Boolean = RecommendedApps.isRecommended(app.packageName)
+    /** Packages flagged "Recommended" -- screen time first, the curated list as fallback. See [RecommendedApps.recommendedPackages]. */
+    val recommendedPackageNames: Set<String> get() = RecommendedApps.recommendedPackages(usageMinutesByPackage)
+
+    fun isRecommended(app: InstalledApp): Boolean = app.packageName in recommendedPackageNames
+
+    /** Minutes of today's screen time for [app], or null if there's no usage data for it. */
+    fun usageMinutesFor(app: InstalledApp): Int? = usageMinutesByPackage[app.packageName]
+
+    /**
+     * [installedApps] ordered for the picker: recommended apps first (screen-time
+     * heavy hitters, or the curated list once there's no usage data to rank by),
+     * ties broken by today's actual minutes, then alphabetically.
+     */
+    val sortedInstalledApps: List<InstalledApp>
+        get() {
+            val recommended = recommendedPackageNames
+            return installedApps.sortedWith(
+                compareByDescending<InstalledApp> { it.packageName in recommended }
+                    .thenByDescending { usageMinutesByPackage[it.packageName] ?: 0 }
+                    .thenBy { it.label.lowercase() },
+            )
+        }
 }
 
 @HiltViewModel
@@ -71,13 +100,25 @@ class OnboardingViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            // Same ordering as the app picker reached later from Settings -- recommended
-            // (commonly-blocked, attention-grabbing) apps float to the top.
-            val apps = installedAppsProvider.getLaunchableApps().sortedWith(
-                compareByDescending<InstalledApp> { RecommendedApps.isRecommended(it.packageName) }
-                    .thenBy { it.label.lowercase() },
-            )
+            // Raw list only -- OnboardingUiState.sortedInstalledApps applies the
+            // recommended-first ordering, re-sorting live once usage minutes arrive.
+            val apps = installedAppsProvider.getLaunchableApps()
             _uiState.value = _uiState.value.copy(installedApps = apps)
+        }
+        refreshUsageAccessState()
+    }
+
+    /**
+     * Re-checks usage-access and, if granted, re-reads today's per-app minutes.
+     * Called on init and whenever the usage-access step resumes (e.g. back from the
+     * system settings screen the user just granted it in), so a grant made mid-onboarding
+     * shows up as screen-time-based recommendations without needing a restart.
+     */
+    fun refreshUsageAccessState() {
+        viewModelScope.launch {
+            val granted = PermissionUtils.hasUsageAccess(appContext)
+            val minutes = if (granted) installedAppsProvider.getTodayUsageMinutes() else emptyMap()
+            _uiState.value = _uiState.value.copy(hasUsageAccess = granted, usageMinutesByPackage = minutes)
         }
     }
 

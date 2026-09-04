@@ -36,7 +36,7 @@ fun OnboardingPickAppsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 1, totalSteps = 3, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 2, totalSteps = 4, onBack = onBack) },
         bottomBar = {
             Button(
                 onClick = onContinue,
@@ -80,12 +80,27 @@ fun OnboardingPickAppsScreen(
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                    items(state.installedApps, key = { it.packageName }) { app ->
+                    items(state.sortedInstalledApps, key = { it.packageName }) { app ->
                         val checked = app.packageName in state.selectedPackageNames
+                        val usageMinutes = state.usageMinutesFor(app)
                         ListItem(
                             headlineContent = { Text(app.label) },
                             supportingContent = if (state.isRecommended(app)) {
-                                { Text("Recommended", color = MaterialTheme.colorScheme.primary) }
+                                {
+                                    Text(
+                                        // Real screen time backs up the badge whenever it's known
+                                        // (the picker's own recommendation signal), rather than
+                                        // just asserting "Recommended" with nothing to show for it.
+                                        text = if (usageMinutes != null && usageMinutes > 0) {
+                                            stringResource(R.string.onboarding_pick_apps_recommended_with_usage, usageMinutes)
+                                        } else {
+                                            stringResource(R.string.onboarding_pick_apps_recommended)
+                                        },
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            } else if (usageMinutes != null && usageMinutes > 0) {
+                                { Text(stringResource(R.string.onboarding_pick_apps_usage_minutes, usageMinutes)) }
                             } else {
                                 null
                             },
