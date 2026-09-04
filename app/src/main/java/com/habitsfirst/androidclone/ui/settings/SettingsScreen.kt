@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.BuildConfig
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
+import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
@@ -182,6 +183,29 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(onClick = onManageUrls),
+                )
+                HorizontalDivider()
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Limited unblocking") },
+                    supportingContent = {
+                        Text(
+                            if (state.limitedUnblockEnabled) {
+                                "Once today's habits are done, blocked apps and sites stay open for " +
+                                    "${LimitedUnblockRepository.WINDOW_MINUTES} minutes, then lock again."
+                            } else {
+                                "Off -- blocked apps and sites stay open the rest of the day once habits are done."
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                    trailingContent = {
+                        Switch(
+                            checked = state.limitedUnblockEnabled,
+                            onCheckedChange = viewModel::onLimitedUnblockToggled,
+                        )
+                    },
                 )
                 HorizontalDivider()
             }

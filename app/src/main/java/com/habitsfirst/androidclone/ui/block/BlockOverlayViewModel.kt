@@ -24,6 +24,8 @@ data class BlockUiState(
     val incompleteHabits: List<HabitProgress> = emptyList(),
     val allHabitsComplete: Boolean = false,
     val isBedtime: Boolean = false,
+    /** True when this block kicked in despite [allHabitsComplete] -- an active penalty, or limited unblocking's window running out. Set once at launch, same as [isBedtime]/[isPermanent]; see [com.habitsfirst.androidclone.service.AppBlockAccessibilityService.LockState.Locked]. */
+    val habitsCompleteButLocked: Boolean = false,
     val graceTokenCount: Int = 0,
     val graceRedeemed: Boolean = false,
 )
@@ -41,6 +43,8 @@ class BlockOverlayViewModel @Inject constructor(
     private val listName: String? = savedStateHandle[BlockOverlayActivity.EXTRA_LIST_NAME]
     private val isPermanent: Boolean = savedStateHandle[BlockOverlayActivity.EXTRA_IS_PERMANENT] ?: false
     private val isBedtime: Boolean = savedStateHandle[BlockOverlayActivity.EXTRA_IS_BEDTIME] ?: false
+    private val habitsCompleteButLocked: Boolean =
+        savedStateHandle[BlockOverlayActivity.EXTRA_HABITS_COMPLETE_BUT_LOCKED] ?: false
 
     // A URL block's target is already the host to display; an app block's is a
     // package name, which needs resolving to its user-facing label.
@@ -68,6 +72,7 @@ class BlockOverlayViewModel @Inject constructor(
             incompleteHabits = incomplete,
             allHabitsComplete = progress.isNotEmpty() && incomplete.isEmpty(),
             isBedtime = isBedtime,
+            habitsCompleteButLocked = habitsCompleteButLocked,
             graceTokenCount = graceTokens,
             graceRedeemed = redeemed,
         )
@@ -80,6 +85,7 @@ class BlockOverlayViewModel @Inject constructor(
             listName = listName,
             isPermanent = isPermanent,
             isBedtime = isBedtime,
+            habitsCompleteButLocked = habitsCompleteButLocked,
         ),
     )
 

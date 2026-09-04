@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
+import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
@@ -43,6 +44,7 @@ data class SettingsUiState(
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     val hardModeEnabled: Boolean = false,
     val hardModeToggleLockedUntilEpochMillis: Long = 0L,
+    val limitedUnblockEnabled: Boolean = false,
     val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
     /** False on any device without the Health Connect provider installed -- the whole section hides then. */
     val healthConnectAvailable: Boolean = false,
@@ -70,9 +72,15 @@ private data class HardModeState(
     val toggleLockedUntilEpochMillis: Long,
 )
 
-/** Hard mode, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
-private data class ExtraSettings(
+/** Hard mode and limited unblocking -- the two blocking-behavior toggles -- grouped only to keep [extraSettings] within combine()'s 5-flow cap. */
+private data class BlockingSettings(
     val hardMode: HardModeState,
+    val limitedUnblockEnabled: Boolean,
+)
+
+/** Hard mode/limited unblocking, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
+private data class ExtraSettings(
+    val blocking: BlockingSettings,
     val easeInStreakLength: Int,
     val anthropicApiKey: String?,
     val healthConnectSyncEnabled: Boolean,
@@ -86,6 +94,7 @@ class SettingsViewModel @Inject constructor(
     private val bedtimeRepository: BedtimeRepository,
     private val lootboxRepository: LootboxRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
+    private val limitedUnblockRepository: LimitedUnblockRepository,
     private val healthConnectManager: HealthConnectManager,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -126,8 +135,14 @@ class SettingsViewModel @Inject constructor(
         ::HardModeState,
     )
 
-    private val extraSettings = combine(
+    private val blockingSettings = combine(
         hardModeState,
+        limitedUnblockRepository.isEnabled,
+        ::BlockingSettings,
+    )
+
+    private val extraSettings = combine(
+        blockingSettings,
         preferencesRepository.easeInStreakLength,
         preferencesRepository.anthropicApiKey,
         preferencesRepository.isHealthConnectSyncEnabled,
@@ -158,8 +173,9 @@ class SettingsViewModel @Inject constructor(
             proofOfLifeEnabled = rs.proofOfLife.enabled,
             proofOfLifeTime = rs.proofOfLife.time,
             proofOfLifeWindowMinutes = rs.proofOfLife.windowMinutes,
-            hardModeEnabled = extra.hardMode.enabled,
-            hardModeToggleLockedUntilEpochMillis = extra.hardMode.toggleLockedUntilEpochMillis,
+            hardModeEnabled = extra.blocking.hardMode.enabled,
+            hardModeToggleLockedUntilEpochMillis = extra.blocking.hardMode.toggleLockedUntilEpochMillis,
+            limitedUnblockEnabled = extra.blocking.limitedUnblockEnabled,
             easeInStreakLength = extra.easeInStreakLength,
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
@@ -219,6 +235,11 @@ class SettingsViewModel @Inject constructor(
      */
     fun onHardModeToggled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
+    }
+
+    /** Once habits are done, blocked apps and sites re-lock after [LimitedUnblockRepository.WINDOW_MINUTES] instead of staying open the rest of the day. */
+    fun onLimitedUnblockToggled(enabled: Boolean) {
+        viewModelScope.launch { limitedUnblockRepository.setEnabled(enabled) }
     }
 
     fun onEaseInStreakLengthChanged(days: Int) {

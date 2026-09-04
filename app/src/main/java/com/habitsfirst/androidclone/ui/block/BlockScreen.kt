@@ -51,9 +51,14 @@ fun BlockScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Bedtime is a hard curfew and a permanent block never lifts -- neither auto-
-    // dismisses just because today's habits happen to be done.
-    LaunchedEffect(state.allHabitsComplete, state.isBedtime, state.isPermanent) {
-        if (state.allHabitsComplete && !state.isBedtime && !state.isPermanent) onAllHabitsComplete()
+    // dismisses just because today's habits happen to be done. Nor does a block that's
+    // holding despite habits being complete (an active penalty, or limited unblocking's
+    // window running out) -- otherwise this would fire the instant it's shown, since
+    // state.allHabitsComplete is already true in exactly that case.
+    LaunchedEffect(state.allHabitsComplete, state.isBedtime, state.isPermanent, state.habitsCompleteButLocked) {
+        if (state.allHabitsComplete && !state.isBedtime && !state.isPermanent && !state.habitsCompleteButLocked) {
+            onAllHabitsComplete()
+        }
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -106,6 +111,7 @@ fun BlockScreen(
                         R.string.block_permanent_subtitle,
                         state.listName.orEmpty(),
                     )
+                    state.habitsCompleteButLocked -> stringResource(R.string.block_habits_complete_but_locked_subtitle)
                     state.isUrlBlock -> stringResource(R.string.block_url_subtitle)
                     else -> stringResource(R.string.block_subtitle)
                 },
