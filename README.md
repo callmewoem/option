@@ -132,7 +132,7 @@ app/src/main/java/com/habitsfirst/androidclone/
 │   ├── settings/    Habits, apps, theme, rewards, bedtime, reminders, permissions
 │   ├── block/       The full-screen lock cover (habit checklist or bedtime curfew)
 │   ├── navigation/  NavHost, routes, shared bottom nav bar
-│   └── theme/       Eco-brutalist Material 3 theme (6 variants, 2 free/4 lootbox-unlockable)
+│   └── theme/       Warm, friendly Material 3 theme (6 variants, 2 free/4 lootbox-unlockable)
 └── util/            Date handling, installed-app listing + usage stats, permission
                      helpers, curated "recommended apps" list
 ```
@@ -142,12 +142,19 @@ Navigation Compose, single-activity architecture.
 
 ## Design
 
-Eco-brutalist: flat concrete/paper neutrals, sharp 0dp corners everywhere (one shared
-`Shapes` token flattens every card/button/field/dialog app-wide), heavy stamped
-display type, monospace numeric/label readouts, outlined rather than shadowed cards.
-Six accent variants share that same shape/type language and only swap color --
-`Moss` (default), `Modern`, `Rust`, `Concrete`, `Ink`, `Receipt` -- with `Moss` and
-`Modern` free and the rest won from the lootbox, or unlocked instantly with a theme
+Warm and friendly rather than brutalist: flat concrete/paper neutrals, a generous
+rounded corner scale (one shared `Shapes` token updates every card/button/field/dialog
+app-wide), heavy display type, monospace numeric/label readouts, outlined rather than
+shadowed cards. Every Material tonal role -- including the surface-container ladder
+nav bars, sheets, dialogs and snackbars pull from -- is wired to that same
+concrete/paper scale, so the whole app reads as one consistent material rather than a
+themed layer over an unthemed one. `LockeCat` (`ui/components/LockeCat.kt`) is a small
+flat-vector mascot, not an imported image, that shows up at a handful of meaningful
+moments -- content on Home once nothing's owed, curious on first run and on an empty
+habit list, excited on the lootbox, asleep only for the bedtime curfew -- rather than
+as wallpaper. Six accent variants share that same shape/type language and only swap
+color -- `Moss` (default), `Modern`, `Rust`, `Concrete`, `Ink`, `Receipt` -- with `Moss`
+and `Modern` free and the rest won from the lootbox, or unlocked instantly with a theme
 code entered in Settings → *Theme* (`domain/model/ThemeRedeemCode.kt`).
 
 ## Permissions and why

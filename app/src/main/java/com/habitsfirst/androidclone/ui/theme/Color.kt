@@ -3,15 +3,22 @@ package com.habitsfirst.androidclone.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Eco-brutalist palette: raw, flat, low-saturation tones -- poured concrete and paper
- * for structure, a single loud "organic" accent for signal. No gradients, no pastels.
- * Every [ThemeVariant] shares the same concrete/paper neutrals below and only swaps
- * its accent pair, so unlocking a new theme (see the lootbox system) never changes the
- * app's underlying brutalist shape/type language -- just its signal color.
+ * Eco-brutalist palette: raw, low-saturation tones -- poured concrete and paper for
+ * structure, a single loud "organic" accent for signal. No pastels, and still no
+ * decorative gradients -- but every Material tonal role (including the surface
+ * *container* ladder used by nav bars, sheets, dialogs and snackbars) is now wired to
+ * this same concrete/paper scale instead of falling back to Material's stock neutral
+ * grays, so the whole app reads as one consistent material rather than a themed layer
+ * over an unthemed one. Every [ThemeVariant] shares these neutrals and only swaps its
+ * accent pair, so unlocking a new theme (see the lootbox system) never changes the
+ * app's underlying shape/type language -- just its signal color.
  */
 
-// Concrete / paper neutrals -- shared by every variant.
+// Concrete / paper neutrals -- shared by every variant. The 93/97/15 steps exist only
+// to give the surfaceContainer ladder (Theme.kt) fine-enough gradations between the
+// coarser 90/95/99/10/20 stops everything else already used.
 val Concrete10 = Color(0xFF141311)
+val Concrete15 = Color(0xFF1B1916)
 val Concrete20 = Color(0xFF211F1B)
 val Concrete30 = Color(0xFF332F29)
 val Concrete40 = Color(0xFF4A443B)
@@ -20,11 +27,16 @@ val Concrete60 = Color(0xFF7C7364)
 val Concrete70 = Color(0xFF9A8F7D)
 val Concrete80 = Color(0xFFBBAE99)
 val Concrete90 = Color(0xFFDDD2C0)
+val Concrete93 = Color(0xFFE6DCC7)
 val Concrete95 = Color(0xFFEDE6D8)
+val Concrete97 = Color(0xFFF2EEE3)
 val Concrete99 = Color(0xFFF7F3EA) // "paper" background
 
 val Error40 = Color(0xFF8C1D14)
 val Error80 = Color(0xFFFFB4A4)
+val ErrorContainerLight = Color(0xFFF9DEDC)
+val OnErrorContainerLight = Color(0xFF410E0B)
+val OnErrorContainerDark = Color(0xFFFFDAD4)
 
 /** Moss -- default. The "eco" half of eco-brutalist: an overgrown, unapologetic green. */
 val Moss30 = Color(0xFF243D00)

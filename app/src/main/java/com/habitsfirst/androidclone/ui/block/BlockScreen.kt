@@ -1,5 +1,6 @@
 package com.habitsfirst.androidclone.ui.block
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.CatMood
+import com.habitsfirst.androidclone.ui.components.LockeCat
 
 @Composable
 fun BlockScreen(
@@ -64,25 +67,26 @@ fun BlockScreen(
                 .padding(24.dp),
         ) {
             Spacer(modifier = Modifier.height(32.dp))
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(64.dp),
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
+            if (state.isBedtime) {
+                // Cats sleep -- the one lock state a mascot fits without undercutting it.
+                LockeCat(mood = CatMood.Sleepy, size = 72.dp)
+            } else {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(64.dp),
                 ) {
-                    Icon(
-                        imageVector = when {
-                            state.isBedtime -> Icons.Filled.Bedtime
-                            state.isPermanent -> Icons.Filled.Block
-                            else -> Icons.Filled.Lock
-                        },
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = if (state.isPermanent) Icons.Filled.Block else Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))
@@ -120,7 +124,9 @@ fun BlockScreen(
                     items(state.incompleteHabits, key = { it.habit.id }) { progress ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(

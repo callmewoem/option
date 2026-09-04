@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -22,10 +21,10 @@ private val CellSize = 12.dp
 private val CellGap = 3.dp
 
 /**
- * A GitHub-style contribution grid: one column per week, one row per day-of-week
- * (Sunday at top), colored by [colorForDate]. Purely a renderer -- callers decide what
- * a date's color means (continuous completion-fraction shading for the aggregate
- * heatmap, or a flat done/slipped/empty color for a single habit's strip).
+ * A dot-grid contribution grid: one column per week, one row per day-of-week (Sunday
+ * at top), colored by [colorForDate]. Purely a renderer -- callers decide what a date's
+ * color means (continuous completion-fraction shading for the aggregate heatmap, or a
+ * flat done/slipped/empty color for a single habit's strip).
  */
 @Composable
 fun Heatmap(
@@ -50,10 +49,13 @@ fun Heatmap(
                 for (dow in 0 until 7) {
                     val date = gridStart.plusDays((week * 7 + dow).toLong())
                     val color = if (date in startDate..endDate) colorForDate(date) else Color.Transparent
-                    drawRect(
+                    drawCircle(
                         color = color,
-                        topLeft = Offset(week * (cellPx + gapPx), dow * (cellPx + gapPx)),
-                        size = Size(cellPx, cellPx),
+                        radius = cellPx / 2f,
+                        center = Offset(
+                            week * (cellPx + gapPx) + cellPx / 2f,
+                            dow * (cellPx + gapPx) + cellPx / 2f,
+                        ),
                     )
                 }
             }
