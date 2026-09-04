@@ -75,6 +75,7 @@
     <string name="block_permanent_subtitle">Blocked by your \"%1$s\" list -- no habit or grace token unlocks it.</string>
     <string name="block_bedtime_title">It\'s bedtime</string>
     <string name="block_bedtime_subtitle">Locked apps stay locked until your bedtime window ends -- no habit checklist unlocks this one.</string>
+    <string name="block_habits_complete_but_locked_subtitle">Today\'s habits are already done -- this one\'s still locked for now.</string>
     <string name="block_use_grace_token">Use a grace token (%1$d left) -- 1 min unlock</string>
     <string name="block_go_home">Take a break</string>
     <string name="block_open_habits">Open Locke</string>

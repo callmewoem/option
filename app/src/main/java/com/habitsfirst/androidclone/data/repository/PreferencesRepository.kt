@@ -49,6 +49,9 @@ class PreferencesRepository @Inject constructor(
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
         val APP_BLOCK_MODE = stringPreferencesKey("app_block_mode") // AppBlockMode.name
+        val LIMITED_UNBLOCK_ENABLED = booleanPreferencesKey("limited_unblock_enabled")
+        val LIMITED_UNBLOCK_WINDOW_DATE = stringPreferencesKey("limited_unblock_window_date")
+        val LIMITED_UNBLOCK_WINDOW_STARTED_AT_EPOCH_MILLIS = longPreferencesKey("limited_unblock_window_started_at_epoch_millis")
         val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
         val HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("hard_mode_toggle_locked_until_epoch_millis")
         val EASE_IN_STREAK_LENGTH = intPreferencesKey("ease_in_streak_length")
@@ -273,6 +276,29 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setAppBlockMode(mode: AppBlockMode) {
         dataStore.edit { it[Keys.APP_BLOCK_MODE] = mode.name }
+    }
+
+    // -- Limited unblocking -------------------------------------------------------------
+
+    /** See [com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository]. */
+    val isLimitedUnblockEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.LIMITED_UNBLOCK_ENABLED] ?: false }
+
+    suspend fun setLimitedUnblockEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.LIMITED_UNBLOCK_ENABLED] = enabled }
+    }
+
+    /** The date [habitsCompleteUnlockWindowStartedAtEpochMillis] was last stamped for -- lets a stale stamp from an earlier day be told apart from today's. */
+    val habitsCompleteUnlockWindowDate: Flow<String?> = dataStore.data.map { it[Keys.LIMITED_UNBLOCK_WINDOW_DATE] }
+
+    /** The instant [LimitedUnblockRepository] first noticed today's habits complete -- its unlock window runs from here. */
+    val habitsCompleteUnlockWindowStartedAtEpochMillis: Flow<Long> =
+        dataStore.data.map { it[Keys.LIMITED_UNBLOCK_WINDOW_STARTED_AT_EPOCH_MILLIS] ?: 0L }
+
+    suspend fun stampHabitsCompleteUnlockWindowStart(date: String, startedAtEpochMillis: Long) {
+        dataStore.edit {
+            it[Keys.LIMITED_UNBLOCK_WINDOW_DATE] = date
+            it[Keys.LIMITED_UNBLOCK_WINDOW_STARTED_AT_EPOCH_MILLIS] = startedAtEpochMillis
+        }
     }
 
     // -- Hard mode --------------------------------------------------------------------

@@ -78,5 +78,7 @@ class BlockOverlayActivity : ComponentActivity() {
         /** URL block only: true when the matching list is [com.habitsfirst.androidclone.domain.model.BlockMode.PERMANENT]. */
         const val EXTRA_IS_PERMANENT = "extra_is_permanent"
         const val EXTRA_IS_BEDTIME = "extra_is_bedtime"
+        /** True when today's gating habits are already complete but this is locked anyway (an active penalty, or limited unblocking's window running out) -- see [com.habitsfirst.androidclone.service.AppBlockAccessibilityService]. */
+        const val EXTRA_HABITS_COMPLETE_BUT_LOCKED = "extra_habits_complete_but_locked"
     }
 }

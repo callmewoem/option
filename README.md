@@ -30,8 +30,10 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
    it covers the screen with `BlockOverlayActivity`. Android has no public API to
    prevent an app from launching outright, so this "detect, then cover" technique
    is what every Play Store app-blocker uses. An app is allowed to be open once
-   today's gating habits are done, no active penalty lock is running, and (unless
-   it's bedtime, which no token bypasses) you haven't redeemed a grace token.
+   today's gating habits are done, no active penalty lock is running, and (if
+   limited unblocking is on) that post-completion window hasn't run out -- unless
+   it's bedtime, which no token bypasses, you can also redeem a grace token to
+   bypass the rest of that.
 4. **Habit kinds** -- every habit is one of three kinds:
    - *Gating* -- must be done today or your locked apps stay locked (the default).
    - *Tracked* -- logged and shown on the heatmap, never blocks anything.
@@ -70,21 +72,26 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 8. **Bedtime lock** (Settings) -- an optional hard curfew window (wraps midnight,
    e.g. 22:30-06:30). Blocked apps stay locked for its entire duration regardless
    of habit completion, penalties, or a grace token -- there is no bypass.
-9. **Daily lootbox** -- awarded once per day, the moment every gating habit is
-   done. Weighted reward pool: a grace-period token (common, 1-minute unblock,
-   redeemed from a lock screen, never during bedtime), a cosmetic gold star on
-   today's heatmap cell (uncommon), a new theme accent unlock (uncommon), or a
-   task-skip token (rare -- force-completes one gating habit for the day, redeemed
-   from Settings).
-10. **Todos** -- plain non-repeating one-off tasks for today, added and checked off
+9. **Limited unblocking** (Settings, optional) -- by default, finishing today's
+   gating habits unlocks blocked apps/sites for the rest of the day. Turn this on
+   and that unlock only lasts an hour (`LimitedUnblockRepository`) before they
+   re-lock, even though the habits stay complete; a grace token still bypasses it,
+   same as it bypasses habit gating.
+10. **Daily lootbox** -- awarded once per day, the moment every gating habit is
+    done. Weighted reward pool: a grace-period token (common, 1-minute unblock,
+    redeemed from a lock screen, never during bedtime), a cosmetic gold star on
+    today's heatmap cell (uncommon), a new theme accent unlock (uncommon), or a
+    task-skip token (rare -- force-completes one gating habit for the day, redeemed
+    from Settings).
+11. **Todos** -- plain non-repeating one-off tasks for today, added and checked off
     inline on Home (there's no separate Todos tab). A periodic worker posts a
     reminder to fill them in once it's near your configured morning time (a
     ~15-minute-cadence check, not an exact alarm).
-11. **Morning check-in** (Settings, optional) -- a daily proof-of-life photo, due by a
+12. **Morning check-in** (Settings, optional) -- a daily proof-of-life photo, due by a
     configured time plus a grace window. Miss it and `PenaltyRepository` extends the
     block lock, same as an antihabit slip. It's a thin wrapper around the same
     capture/verify flow as photo verification below, not tied to any habit.
-12. Progress resets automatically at midnight because completion is stored keyed by
+13. Progress resets automatically at midnight because completion is stored keyed by
     calendar date, not as a flag that has to be cleared.
 
 ### Photo verification
