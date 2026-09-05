@@ -146,6 +146,11 @@ dependencies {
     implementation(libs.okhttp)
 
     testImplementation(libs.junit)
+    // The Android SDK's org.json classes are unimplemented stubs on the local unit
+    // test classpath (no Robolectric here) -- this real implementation shadows them so
+    // tests exercising org.json parsing (e.g. AccountabilityDtosTest) actually run
+    // instead of throwing "Stub!".
+    testImplementation("org.json:json:20231013")
     // Runs Migrations.kt's raw SQL against a real (JVM-only, no Android framework/
     // emulator needed) SQLite engine in MigrationsSqlTest -- see that test's KDoc.
     testImplementation(libs.sqlite.jdbc)

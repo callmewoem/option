@@ -3,20 +3,24 @@ package com.habitsfirst.androidclone.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.habitsfirst.androidclone.data.local.dao.AccountabilityBuddyDao
 import com.habitsfirst.androidclone.data.local.dao.BlockAttemptDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
 import com.habitsfirst.androidclone.data.local.dao.BlockListDao
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
+import com.habitsfirst.androidclone.data.local.dao.PendingStatsSyncDao
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.dao.TodoDao
+import com.habitsfirst.androidclone.data.local.entity.AccountabilityBuddyEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockAttemptEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockedAppEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockedDomainEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockListEntity
 import com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity
 import com.habitsfirst.androidclone.data.local.entity.HabitEntity
+import com.habitsfirst.androidclone.data.local.entity.PendingStatsSyncEntity
 import com.habitsfirst.androidclone.data.local.entity.StreakScarEntity
 import com.habitsfirst.androidclone.data.local.entity.TodoEntity
 
@@ -30,6 +34,8 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
         BlockListEntity::class,
         BlockedDomainEntity::class,
         BlockAttemptEntity::class,
+        AccountabilityBuddyEntity::class,
+        PendingStatsSyncEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
@@ -54,17 +60,21 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // into two: PHOTO (was the requiresPhotoVerification toggle from v8, now always on
     // for this type -- dropped HabitEntity.requiresPhotoVerification) and TALLY (the
     // toggle-off case, a plain manual check-in).
-    // v10 (2026-09-04): added block_attempts (impulse-control stat: every time the block
-    // screen actually covers a blocked app/URL, not just the block-list config) and
+    // v10: added block_attempts (impulse-control stat: every time the block screen
+    // actually covers a blocked app/URL, not just the block-list config) and
     // TodoEntity.completedAtEpochMillis (time-to-complete stat for todos). See
     // MIGRATION_9_10 in data/local/migrations/Migrations.kt.
+    // v11 (2026-09-05): added accountability_buddies + pending_stats_sync -- the local
+    // cache/outbox for the accountability-buddy backend scaffolding (see
+    // data/repository/AccountabilityRepository.kt). No default backend exists yet. See
+    // MIGRATION_10_11 in data/local/migrations/Migrations.kt.
     //
-    // Every step through 9->10 now has a real Migration in
+    // Every step through 10->11 now has a real Migration in
     // data/local/migrations/Migrations.kt, wired in by di/AppModule.kt's
     // provideDatabase(). exportSchema is on and app/schemas/ is checked in as the
     // ground truth those migrations are written and tested against -- see
     // Migrations.kt's file-level KDoc and MigrationsSqlTest before touching either.
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -77,6 +87,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun blockListDao(): BlockListDao
     abstract fun blockedDomainDao(): BlockedDomainDao
     abstract fun blockAttemptDao(): BlockAttemptDao
+    abstract fun accountabilityBuddyDao(): AccountabilityBuddyDao
+    abstract fun pendingStatsSyncDao(): PendingStatsSyncDao
 
     companion object {
         const val DATABASE_NAME = "habits_first.db"

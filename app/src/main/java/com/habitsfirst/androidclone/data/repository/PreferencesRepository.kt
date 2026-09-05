@@ -67,6 +67,9 @@ class PreferencesRepository @Inject constructor(
         val LAST_USAGE_SYNC_AT_EPOCH_MILLIS = longPreferencesKey("last_usage_sync_at_epoch_millis")
         val LAST_USAGE_SYNC_HABIT_COUNT = intPreferencesKey("last_usage_sync_habit_count")
         val LAST_USAGE_SYNC_ERROR = stringPreferencesKey("last_usage_sync_error")
+        val ACCOUNTABILITY_BASE_URL = stringPreferencesKey("accountability_base_url")
+        val SHARE_DAILY_STATS_ENABLED = booleanPreferencesKey("share_daily_stats_enabled")
+        val MY_PAIRING_CODE = stringPreferencesKey("my_pairing_code")
         val WEEKLY_DIGEST_ENABLED = booleanPreferencesKey("weekly_digest_enabled")
         val WEEKLY_DIGEST_DAY_OF_WEEK = stringPreferencesKey("weekly_digest_day_of_week") // DayOfWeek.name
         val WEEKLY_DIGEST_TIME = stringPreferencesKey("weekly_digest_time") // "HH:mm"
@@ -445,6 +448,41 @@ class PreferencesRepository @Inject constructor(
             it[Keys.LAST_USAGE_SYNC_AT_EPOCH_MILLIS] = System.currentTimeMillis()
             it[Keys.LAST_USAGE_SYNC_HABIT_COUNT] = habitCount
             if (error == null) it.remove(Keys.LAST_USAGE_SYNC_ERROR) else it[Keys.LAST_USAGE_SYNC_ERROR] = error
+        }
+    }
+
+    // -- Accountability buddies (backend scaffolding) -----------------------------------
+
+    /**
+     * Base URL of the user's own accountability-buddy backend, e.g.
+     * "https://example.com/api". No backend ships with the app -- until this is set,
+     * every [com.habitsfirst.androidclone.data.remote.AccountabilityApiClient] call
+     * fails fast with a clear "no backend configured" error instead of hitting a
+     * hardcoded host. Trimmed of a trailing slash isn't done here (see
+     * [com.habitsfirst.androidclone.data.remote.HttpAccountabilityApiClient]); blank
+     * clears the key, same pattern as [anthropicApiKey].
+     */
+    val accountabilityBaseUrl: Flow<String?> = dataStore.data.map { it[Keys.ACCOUNTABILITY_BASE_URL] }
+
+    suspend fun setAccountabilityBaseUrl(url: String?) {
+        dataStore.edit {
+            if (url.isNullOrBlank()) it.remove(Keys.ACCOUNTABILITY_BASE_URL) else it[Keys.ACCOUNTABILITY_BASE_URL] = url.trim()
+        }
+    }
+
+    /** Whether today's summary is pushed to the configured backend for buddies to see. Off by default. */
+    val shareDailyStatsEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.SHARE_DAILY_STATS_ENABLED] ?: false }
+
+    suspend fun setShareDailyStatsEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.SHARE_DAILY_STATS_ENABLED] = enabled }
+    }
+
+    /** This device's own pairing code, last minted by [com.habitsfirst.androidclone.data.repository.AccountabilityRepository.regeneratePairingCode]. Null until generated once. */
+    val myPairingCode: Flow<String?> = dataStore.data.map { it[Keys.MY_PAIRING_CODE] }
+
+    suspend fun setMyPairingCode(code: String?) {
+        dataStore.edit {
+            if (code.isNullOrBlank()) it.remove(Keys.MY_PAIRING_CODE) else it[Keys.MY_PAIRING_CODE] = code.trim()
         }
     }
 

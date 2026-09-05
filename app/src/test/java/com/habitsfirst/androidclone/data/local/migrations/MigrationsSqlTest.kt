@@ -31,10 +31,10 @@ import java.sql.SQLException
  *
  * What this class verifies instead, for real, on this machine: that every migration's SQL
  * is valid against actual SQLite (catches typos, wrong column/table names, bad DDL for
- * SQLite's specific `ALTER TABLE` limitations), that the full 1->10 chain produces the
+ * SQLite's specific `ALTER TABLE` limitations), that the full 1->11 chain produces the
  * table/column set [AppDatabase][com.habitsfirst.androidclone.data.local.AppDatabase]'s
  * current entities expect (cross-checked by hand against
- * `app/schemas/com.habitsfirst.androidclone.data.local.AppDatabase/10.json`, generated
+ * `app/schemas/com.habitsfirst.androidclone.data.local.AppDatabase/11.json`, generated
  * from those entities), and that the data-rewriting step (v8->v9's habit-type remap) does
  * the right thing on seeded rows. It does not check Room's own schema-identity hash or
  * `@ColumnInfo(defaultValue)` bookkeeping -- there's no substitute for `MigrationTestHelper`
@@ -54,7 +54,7 @@ class MigrationsSqlTest {
         "CREATE TABLE `blocked_apps` (`packageName` TEXT NOT NULL, `appLabel` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`packageName`))",
     )
 
-    /** Every migration's SQL, 1->2 through 9->10, in order. */
+    /** Every migration's SQL, 1->2 through 10->11, in order. */
     private val allMigrationSql = listOf(
         MIGRATION_1_2_SQL,
         MIGRATION_2_3_SQL,
@@ -65,6 +65,7 @@ class MigrationsSqlTest {
         MIGRATION_7_8_SQL,
         MIGRATION_8_9_SQL,
         MIGRATION_9_10_SQL,
+        MIGRATION_10_11_SQL,
     )
 
     private fun newV1Database(): Connection {
@@ -120,7 +121,7 @@ class MigrationsSqlTest {
     }
 
     @Test
-    fun `every migration's SQL is valid and the full chain 1 to 10 lands on the current table set`() {
+    fun `every migration's SQL is valid and the full chain 1 to 11 lands on the current table set`() {
         newV1Database().use { db ->
             allMigrationSql.forEach { db.runSql(it) }
 
@@ -128,6 +129,7 @@ class MigrationsSqlTest {
                 setOf(
                     "habits", "habit_completions", "blocked_apps", "streak_scars", "todos",
                     "block_lists", "blocked_domains", "block_attempts",
+                    "accountability_buddies", "pending_stats_sync",
                 ),
                 db.tableNames(),
             )
@@ -165,6 +167,42 @@ class MigrationsSqlTest {
             )
             assertEquals(listOf("listId", "domain"), db.columnNames("blocked_domains"))
             assertEquals(listOf("id", "target", "date", "timestampEpochMillis"), db.columnNames("block_attempts"))
+            assertEquals(
+                listOf(
+                    "id", "displayName", "pairingCode", "status", "statusMessage", "lastSummaryDate",
+                    "lastSummaryHabitsCompleted", "lastSummaryTotalHabits", "lastSummaryCurrentStreak",
+                    "updatedAtEpochMillis",
+                ),
+                db.columnNames("accountability_buddies"),
+            )
+            assertEquals(
+                listOf(
+                    "date", "habitsCompleted", "totalHabits", "currentStreak", "queuedAtEpochMillis",
+                    "lastAttemptAtEpochMillis", "attemptCount",
+                ),
+                db.columnNames("pending_stats_sync"),
+            )
+        }
+    }
+
+    @Test
+    fun `migration 10 to 11 adds accountability_buddies and pending_stats_sync as empty new tables`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(9).forEach { db.runSql(it) } // 1->2 .. 9->10, i.e. up to v10
+
+            assertFalse(db.tableNames().contains("accountability_buddies"))
+            assertFalse(db.tableNames().contains("pending_stats_sync"))
+
+            db.runSql(MIGRATION_10_11_SQL)
+
+            assertTrue(db.tableNames().contains("accountability_buddies"))
+            assertTrue(db.tableNames().contains("pending_stats_sync"))
+            db.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) AS c FROM `accountability_buddies`").use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals(0, rs.getInt("c"))
+                }
+            }
         }
     }
 

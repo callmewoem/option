@@ -6,7 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Real, hand-written [Migration]s covering every version transition
  * [AppDatabase][com.habitsfirst.androidclone.data.local.AppDatabase] has ever been through,
- * 1 through 10 -- see the version-history comment above `@Database` there for the
+ * 1 through 11 -- see the version-history comment above `@Database` there for the
  * user-facing story of each step; this file is the literal DDL/DML for it.
  *
  * Each `MIGRATION_x_y` is backed by a `MIGRATION_x_y_SQL` statement list so the exact same
@@ -206,6 +206,24 @@ internal val MIGRATION_9_10_SQL: List<String> = listOf(
 val MIGRATION_9_10: Migration = sqlMigration(9, 10, MIGRATION_9_10_SQL)
 
 /**
+ * SQL for [MIGRATION_10_11]: added `accountability_buddies` (a cached buddy list --
+ * connection status, pairing code, and their last-synced daily summary) and
+ * `pending_stats_sync` (an offline outbox of this device's own daily summaries that
+ * failed to push) -- the local storage for the accountability-buddy backend
+ * scaffolding, see `data/repository/AccountabilityRepository.kt`. Both are brand-new,
+ * standalone tables with no relationship to anything that existed before v11, so this
+ * is two plain `CREATE TABLE` statements, no data migration or column changes needed.
+ * Checked against the build-generated `app/schemas/.../11.json`.
+ */
+internal val MIGRATION_10_11_SQL: List<String> = listOf(
+    "CREATE TABLE IF NOT EXISTS `accountability_buddies` (`id` TEXT NOT NULL, `displayName` TEXT NOT NULL, `pairingCode` TEXT NOT NULL, `status` TEXT NOT NULL, `statusMessage` TEXT, `lastSummaryDate` TEXT, `lastSummaryHabitsCompleted` INTEGER, `lastSummaryTotalHabits` INTEGER, `lastSummaryCurrentStreak` INTEGER, `updatedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+    "CREATE TABLE IF NOT EXISTS `pending_stats_sync` (`date` TEXT NOT NULL, `habitsCompleted` INTEGER NOT NULL, `totalHabits` INTEGER NOT NULL, `currentStreak` INTEGER NOT NULL, `queuedAtEpochMillis` INTEGER NOT NULL, `lastAttemptAtEpochMillis` INTEGER, `attemptCount` INTEGER NOT NULL, PRIMARY KEY(`date`))",
+)
+
+/** v10 -> v11, see [MIGRATION_10_11_SQL]. */
+val MIGRATION_10_11: Migration = sqlMigration(10, 11, MIGRATION_10_11_SQL)
+
+/**
  * Every real migration this database has, in order, for
  * [com.habitsfirst.androidclone.di.AppModule.provideDatabase] to install via
  * `addMigrations(*ALL_MIGRATIONS)`.
@@ -220,6 +238,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_7_8,
     MIGRATION_8_9,
     MIGRATION_9_10,
+    MIGRATION_10_11,
 )
 
 /** Builds a [Migration] that just runs [statements] in order via [SupportSQLiteDatabase.execSQL]. */
