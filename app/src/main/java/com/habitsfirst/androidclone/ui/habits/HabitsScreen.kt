@@ -1,5 +1,7 @@
 package com.habitsfirst.androidclone.ui.habits
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,10 +35,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,11 +56,16 @@ import com.habitsfirst.androidclone.ui.components.Heatmap
 import com.habitsfirst.androidclone.ui.components.accentColor
 import com.habitsfirst.androidclone.ui.components.heatmapFractionColor
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
+import com.habitsfirst.androidclone.util.ComposeCaptureUtil
+import com.habitsfirst.androidclone.util.captureGraphicsLayer
+import com.habitsfirst.androidclone.util.rememberCaptureGraphicsLayer
+import java.io.File
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /**
  * Pure stats: a selectable-range streak summary, the heatmap, completion rate by
@@ -65,12 +80,45 @@ fun HabitsScreen(
     viewModel: HabitsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val shareCardLayer = rememberCaptureGraphicsLayer()
+    var shareCardStats by remember { mutableStateOf<ShareCardStats?>(null) }
+    // Guards against a double-tap launching two overlapping captures against the same
+    // shareCardLayer/shareCardStats -- without this, the second tap's state write could
+    // land mid-capture and the first share would go out carrying the second tap's numbers.
+    var isSharingStats by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             LargeTopAppBar(
                 title = { Text("Stats") },
                 actions = {
+                    IconButton(
+                        enabled = !isSharingStats,
+                        onClick = {
+                            isSharingStats = true
+                            coroutineScope.launch {
+                                try {
+                                    // Push fresh numbers into the off-screen card below, then give
+                                    // Compose two frames to recompose/layout/draw it before reading
+                                    // the graphics layer back -- toImageBitmap() only sees whatever
+                                    // was last actually drawn.
+                                    shareCardStats = viewModel.loadShareCardStats()
+                                    withFrameNanos {}
+                                    withFrameNanos {}
+                                    val file = ComposeCaptureUtil.captureToPng(context, shareCardLayer)
+                                    if (file != null) {
+                                        shareStatsCard(context, file)
+                                    }
+                                } finally {
+                                    isSharingStats = false
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Filled.Share, contentDescription = "Share today's stats")
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
@@ -80,104 +128,138 @@ fun HabitsScreen(
         },
         bottomBar = { LockeBottomBar(navController) },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = padding.calculateTopPadding() + 8.dp,
-                bottom = padding.calculateBottomPadding() + 24.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.availableRanges.forEach { range ->
-                        FilterChip(
-                            selected = state.range == range,
-                            onClick = { viewModel.onRangeSelected(range) },
-                            label = { Text(range.label) },
-                        )
-                    }
-                }
-            }
-
-            item {
-                StreakSummaryRow(
-                    currentStreak = state.currentStreak,
-                    longestStreakInRange = state.longestStreakInRange,
-                    perfectDaysInRange = state.perfectDaysInRange,
-                    brokenStreaksInRange = state.scarredDates.size,
-                )
-            }
-
-            item {
-                val today = LocalDate.now()
-                // Canvas draws in a DrawScope, not a composable context, so these have
-                // to be resolved here and captured by value, not read inside colorForDate.
-                val primary = MaterialTheme.colorScheme.primary
-                val secondary = MaterialTheme.colorScheme.secondary
-                val error = MaterialTheme.colorScheme.error
-                val emptyColor = MaterialTheme.colorScheme.surfaceVariant
-                Heatmap(
-                    startDate = today.minusWeeks(state.range.weeks),
-                    endDate = today,
-                    colorForDate = { date ->
-                        val score = state.dayScores[date]
-                        when {
-                            date in state.goldStarDates -> secondary
-                            date in state.scarredDates -> error
-                            score == null -> emptyColor
-                            else -> heatmapFractionColor(score, primary)
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = padding.calculateTopPadding() + 8.dp,
+                    bottom = padding.calculateBottomPadding() + 24.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.availableRanges.forEach { range ->
+                            FilterChip(
+                                selected = state.range == range,
+                                onClick = { viewModel.onRangeSelected(range) },
+                                label = { Text(range.label) },
+                            )
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+                    }
+                }
 
-            item {
-                Column {
-                    Text("Completion by habit", style = MaterialTheme.typography.titleLarge)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    KindLegend()
-                    Spacer(modifier = Modifier.height(12.dp))
-                    if (state.completionStats.isEmpty()) {
-                        Text(
-                            "No data yet.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        state.completionStats
-                            .sortedWith(compareBy({ it.habit.kind.ordinal }, { -it.rate }))
-                            .forEach { stat ->
-                                // For an ANTIHABIT, completedCount is the raw slip count -- invert it to
-                                // the clean-day count so the fraction shown matches the (already-inverted) bar.
-                                val doneCount = if (stat.habit.kind == HabitKind.ANTIHABIT) {
-                                    stat.totalDays - stat.completedCount
-                                } else {
-                                    stat.completedCount
-                                }
-                                HabitRateRow(
-                                    name = stat.habit.name,
-                                    rate = stat.rate,
-                                    accent = stat.habit.kind.accentColor(),
-                                    countLabel = "$doneCount/${stat.totalDays}",
-                                )
+                item {
+                    StreakSummaryRow(
+                        currentStreak = state.currentStreak,
+                        longestStreakInRange = state.longestStreakInRange,
+                        perfectDaysInRange = state.perfectDaysInRange,
+                        brokenStreaksInRange = state.scarredDates.size,
+                    )
+                }
+
+                item {
+                    val today = LocalDate.now()
+                    // Canvas draws in a DrawScope, not a composable context, so these have
+                    // to be resolved here and captured by value, not read inside colorForDate.
+                    val primary = MaterialTheme.colorScheme.primary
+                    val secondary = MaterialTheme.colorScheme.secondary
+                    val error = MaterialTheme.colorScheme.error
+                    val emptyColor = MaterialTheme.colorScheme.surfaceVariant
+                    Heatmap(
+                        startDate = today.minusWeeks(state.range.weeks),
+                        endDate = today,
+                        colorForDate = { date ->
+                            val score = state.dayScores[date]
+                            when {
+                                date in state.goldStarDates -> secondary
+                                date in state.scarredDates -> error
+                                score == null -> emptyColor
+                                else -> heatmapFractionColor(score, primary)
                             }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                item {
+                    Column {
+                        Text("Completion by habit", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        KindLegend()
+                        Spacer(modifier = Modifier.height(12.dp))
+                        if (state.completionStats.isEmpty()) {
+                            Text(
+                                "No data yet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            state.completionStats
+                                .sortedWith(compareBy({ it.habit.kind.ordinal }, { -it.rate }))
+                                .forEach { stat ->
+                                    // For an ANTIHABIT, completedCount is the raw slip count -- invert it to
+                                    // the clean-day count so the fraction shown matches the (already-inverted) bar.
+                                    val doneCount = if (stat.habit.kind == HabitKind.ANTIHABIT) {
+                                        stat.totalDays - stat.completedCount
+                                    } else {
+                                        stat.completedCount
+                                    }
+                                    HabitRateRow(
+                                        name = stat.habit.name,
+                                        rate = stat.rate,
+                                        accent = stat.habit.kind.accentColor(),
+                                        countLabel = "$doneCount/${stat.totalDays}",
+                                    )
+                                }
+                        }
+                    }
+                }
+
+                item {
+                    Column {
+                        Text("By day of week", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        DayOfWeekChart(stats = state.dayOfWeekStats, accent = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
 
-            item {
-                Column {
-                    Text("By day of week", style = MaterialTheme.typography.titleLarge)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    DayOfWeekChart(stats = state.dayOfWeekStats, accent = MaterialTheme.colorScheme.primary)
-                }
+            // Off-screen host for the shareable stats card -- always composed (so the
+            // graphics layer below has *something* drawn to read back the very first
+            // time Share is tapped), positioned far outside the viewport so it's never
+            // actually visible. Compose doesn't clip a child to its parent's bounds by
+            // default, so this still measures/lays out/draws normally; it just never
+            // lands inside the screen's visible area.
+            Box(modifier = Modifier.offset(x = 4000.dp)) {
+                ShareableStatsCard(
+                    stats = shareCardStats ?: ShareCardStats(
+                        date = LocalDate.now(),
+                        currentStreak = 0,
+                        todayCompletionFraction = 0f,
+                        weeklyPerfectDays = 0,
+                        weeklyLongestStreak = 0,
+                    ),
+                    modifier = Modifier
+                        .width(360.dp)
+                        .captureGraphicsLayer(shareCardLayer),
+                )
             }
         }
     }
+}
+
+/** Hands [file] (an already-saved PNG) to the system share sheet as an `image/png` stream. */
+private fun shareStatsCard(context: Context, file: File) {
+    val uri = ComposeCaptureUtil.uriFor(context, file)
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(sendIntent, "Share today's stats"))
 }
 
 /** Four at-a-glance streak figures for the selected range -- current streak isn't windowed, the other three are. */
