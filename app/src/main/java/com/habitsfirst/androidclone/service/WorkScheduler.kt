@@ -80,6 +80,24 @@ object WorkScheduler {
         )
     }
 
+    /**
+     * Enqueues the periodic check that posts the opt-in "N/7 days complete" weekly recap.
+     * Only called once the user turns the digest on in Settings -- see [cancelWeeklyDigest].
+     */
+    fun scheduleWeeklyDigest(context: Context) {
+        val request = PeriodicWorkRequestBuilder<WeeklyDigestWorker>(15, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WeeklyDigestWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    /** Stops the weekly digest worker -- called when the user turns the recap back off in Settings. */
+    fun cancelWeeklyDigest(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(WeeklyDigestWorker.UNIQUE_PERIODIC_NAME)
+    }
+
     /** Enqueues the periodic re-sync of the premade URL blocklists from their upstream source. */
     fun scheduleBlocklistRefresh(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()

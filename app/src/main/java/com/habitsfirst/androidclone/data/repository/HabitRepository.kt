@@ -35,6 +35,9 @@ import kotlin.math.sqrt
  */
 data class HabitCompletionStat(val habit: Habit, val rate: Float, val completedCount: Int, val totalDays: Int)
 
+/** A broken-streak date paired with why it broke -- see [com.habitsfirst.androidclone.data.local.entity.StreakScarEntity]. */
+data class StreakScarInfo(val date: String, val reason: String)
+
 /** Where an onboarding "ease into it" ramp currently stands -- see [Habit.easeInOrder]. */
 data class EaseInStatus(
     val activeHabitName: String,
@@ -334,6 +337,10 @@ class HabitRepository @Inject constructor(
         }
         return consistencyStatsOf(fractions)
     }
+
+    /** Same dates as [getScarredDatesInRange], paired with why each streak broke -- for [com.habitsfirst.androidclone.util.StatsExportUtil]'s data export. */
+    suspend fun getStreakScarsInRange(startDate: String, endDate: String): List<StreakScarInfo> =
+        streakScarDao.getScarsInRange(startDate, endDate).map { StreakScarInfo(it.date, it.reason) }
 
     // -- Onboarding "ease into it" ramp (see Habit.easeInOrder / EaseInRepository) -------
 

@@ -45,4 +45,14 @@ interface TodoDao {
         """,
     )
     suspend fun getCompletionTimingsInRange(startDate: String, endDate: String): List<TodoCompletionTiming>
+
+    /** Every todo due within [startDate]..[endDate] inclusive -- for [com.habitsfirst.androidclone.util.StatsExportUtil]'s data export, unlike [observeForDates]'s today/tomorrow-only window. */
+    @Query(
+        """
+        SELECT * FROM todos
+        WHERE date BETWEEN :startDate AND :endDate
+        ORDER BY date ASC, createdAtEpochMillis ASC
+        """,
+    )
+    suspend fun getForDateRange(startDate: String, endDate: String): List<TodoEntity>
 }

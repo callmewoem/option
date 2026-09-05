@@ -58,6 +58,10 @@ class TodoRepository @Inject constructor(
     suspend fun getAverageCompletionMinutes(startDate: String, endDate: String): Float? =
         averageCompletionMinutes(todoDao.getCompletionTimingsInRange(startDate, endDate))
 
+    /** Every todo due in [startDate]..[endDate] inclusive, oldest first -- the data export's source for todos. */
+    suspend fun getTodosInRange(startDate: String, endDate: String): List<Todo> =
+        todoDao.getForDateRange(startDate, endDate).map { it.toDomain() }
+
     companion object {
         /** Pure so it's unit-testable without a DB -- see [getAverageCompletionMinutes]. */
         fun averageCompletionMinutes(timings: List<TodoCompletionTiming>): Float? {

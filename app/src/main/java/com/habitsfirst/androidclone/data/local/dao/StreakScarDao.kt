@@ -34,4 +34,8 @@ interface StreakScarDao {
         """,
     )
     suspend fun getReasonCountsInRange(startDate: String, endDate: String): List<ScarReasonCount>
+
+    /** Full scar rows (date + why) in range -- [getScarredDatesInRange] only has the dates, which is all the heatmap/streak calc need, but [com.habitsfirst.androidclone.util.StatsExportUtil]'s export wants the reason too. */
+    @Query("SELECT * FROM streak_scars WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
+    suspend fun getScarsInRange(startDate: String, endDate: String): List<StreakScarEntity>
 }
