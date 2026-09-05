@@ -4,18 +4,21 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
+import com.habitsfirst.androidclone.data.repository.AccountabilityRepository
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
+import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.service.WorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +53,18 @@ data class SettingsUiState(
     val healthConnectAvailable: Boolean = false,
     val healthConnectPermissionsGranted: Boolean = false,
     val healthConnectSyncEnabled: Boolean = false,
+    val accountabilityBaseUrl: String? = null,
+    val myPairingCode: String? = null,
+    val shareDailyStatsEnabled: Boolean = false,
+    val buddies: List<AccountabilityBuddy> = emptyList(),
+)
+
+/** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
+private data class AccountabilitySettings(
+    val baseUrl: String?,
+    val pairingCode: String?,
+    val shareEnabled: Boolean,
+    val buddies: List<AccountabilityBuddy>,
 )
 
 private data class ThemeAndTokens(
@@ -96,6 +111,7 @@ class SettingsViewModel @Inject constructor(
     private val proofOfLifeRepository: ProofOfLifeRepository,
     private val limitedUnblockRepository: LimitedUnblockRepository,
     private val healthConnectManager: HealthConnectManager,
+    private val accountabilityRepository: AccountabilityRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -106,8 +122,13 @@ class SettingsViewModel @Inject constructor(
     private val _themeCodeMessage = MutableStateFlow<String?>(null)
     val themeCodeMessage: StateFlow<String?> = _themeCodeMessage.asStateFlow()
 
+    /** One-shot feedback for the last pairing-code/add-buddy attempt; cleared by [onAccountabilityMessageShown] once shown. */
+    private val _accountabilityMessage = MutableStateFlow<String?>(null)
+    val accountabilityMessage: StateFlow<String?> = _accountabilityMessage.asStateFlow()
+
     init {
         refreshHealthConnectPermissions()
+        refreshAccountabilityData()
     }
 
     // kotlinx.coroutines.flow.combine's typed overloads top out at 5 flows, so the
@@ -150,7 +171,18 @@ class SettingsViewModel @Inject constructor(
         ::ExtraSettings,
     )
 
-    val uiState: StateFlow<SettingsUiState> = combine(
+    private val accountabilitySettings = combine(
+        preferencesRepository.accountabilityBaseUrl,
+        accountabilityRepository.myPairingCode,
+        accountabilityRepository.shareStatsEnabled,
+        accountabilityRepository.buddies,
+        ::AccountabilitySettings,
+    )
+
+    // combine()'s typed overloads top out at 5 flows (see the note above), so the
+    // accountability group is folded in with a second combine() rather than growing
+    // this one past its cap.
+    private val baseUiState: Flow<SettingsUiState> = combine(
         habitRepository.observeHabits(),
         preferencesRepository.areNotificationsEnabled,
         themeAndTokens,
@@ -180,6 +212,15 @@ class SettingsViewModel @Inject constructor(
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
             healthConnectSyncEnabled = extra.healthConnectSyncEnabled,
+        )
+    }
+
+    val uiState: StateFlow<SettingsUiState> = combine(baseUiState, accountabilitySettings) { base, accountability ->
+        base.copy(
+            accountabilityBaseUrl = accountability.baseUrl,
+            myPairingCode = accountability.pairingCode,
+            shareDailyStatsEnabled = accountability.shareEnabled,
+            buddies = accountability.buddies,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -275,5 +316,57 @@ class SettingsViewModel @Inject constructor(
                 WorkScheduler.cancelHealthConnectSync(appContext)
             }
         }
+    }
+
+    // -- Accountability buddies (backend scaffolding) ------------------------------------
+
+    fun onAccountabilityBaseUrlChanged(url: String) {
+        viewModelScope.launch { preferencesRepository.setAccountabilityBaseUrl(url) }
+    }
+
+    /** Mints a new pairing code from the configured backend; feedback surfaces via [accountabilityMessage]. */
+    fun onRegeneratePairingCode() {
+        viewModelScope.launch {
+            val code = accountabilityRepository.regeneratePairingCode()
+            _accountabilityMessage.value = if (code != null) {
+                "New pairing code ready."
+            } else {
+                "Couldn't reach the backend -- check the base URL in Settings."
+            }
+        }
+    }
+
+    /** Redeems a buddy's pairing code with the configured backend; feedback surfaces via [accountabilityMessage]. */
+    fun onAddBuddy(code: String) {
+        if (code.isBlank()) return
+        viewModelScope.launch {
+            val added = accountabilityRepository.addBuddy(code)
+            _accountabilityMessage.value = if (added) {
+                "Buddy added."
+            } else {
+                "Couldn't add that buddy -- check the backend and code."
+            }
+        }
+    }
+
+    /** Turning sharing on immediately tries to push today's summary; turning it off is purely local, nothing is retracted from the backend. */
+    fun onShareDailyStatsToggled(enabled: Boolean) {
+        viewModelScope.launch {
+            accountabilityRepository.setShareStatsEnabled(enabled)
+            if (enabled) accountabilityRepository.shareTodayStatsIfEnabled()
+        }
+    }
+
+    fun onAccountabilityMessageShown() {
+        _accountabilityMessage.value = null
+    }
+
+    /**
+     * Opportunistic refresh of the buddy list and the pending-sync outbox -- there's no
+     * periodic worker for this pass, so it's triggered from here (init) and from
+     * [SettingsScreen]'s resume, mirroring [refreshHealthConnectPermissions]'s pattern.
+     */
+    fun refreshAccountabilityData() {
+        viewModelScope.launch { accountabilityRepository.syncNow() }
     }
 }

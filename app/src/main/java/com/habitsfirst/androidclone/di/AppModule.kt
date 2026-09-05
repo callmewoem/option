@@ -6,11 +6,13 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.habitsfirst.androidclone.data.local.AppDatabase
+import com.habitsfirst.androidclone.data.local.dao.AccountabilityBuddyDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
 import com.habitsfirst.androidclone.data.local.dao.BlockListDao
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
+import com.habitsfirst.androidclone.data.local.dao.PendingStatsSyncDao
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.dao.TodoDao
 import dagger.Module
@@ -53,6 +55,12 @@ object AppModule {
 
     @Provides
     fun provideBlockedDomainDao(db: AppDatabase): BlockedDomainDao = db.blockedDomainDao()
+
+    @Provides
+    fun provideAccountabilityBuddyDao(db: AppDatabase): AccountabilityBuddyDao = db.accountabilityBuddyDao()
+
+    @Provides
+    fun providePendingStatsSyncDao(db: AppDatabase): PendingStatsSyncDao = db.pendingStatsSyncDao()
 
     @Provides
     @Singleton

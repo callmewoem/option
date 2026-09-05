@@ -137,6 +137,11 @@ dependencies {
     implementation(libs.okhttp)
 
     testImplementation(libs.junit)
+    // The Android SDK's org.json classes are unimplemented stubs on the local unit
+    // test classpath (no Robolectric here) -- this real implementation shadows them so
+    // tests exercising org.json parsing (e.g. AccountabilityDtosTest) actually run
+    // instead of throwing "Stub!".
+    testImplementation("org.json:json:20231013")
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

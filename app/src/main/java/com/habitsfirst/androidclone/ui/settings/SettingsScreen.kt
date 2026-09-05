@@ -68,6 +68,8 @@ import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
 import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
+import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
+import com.habitsfirst.androidclone.domain.model.BuddyConnectionStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.ui.components.icon
@@ -97,6 +99,13 @@ fun SettingsScreen(
             viewModel.onThemeCodeMessageShown()
         }
     }
+    val accountabilityMessage by viewModel.accountabilityMessage.collectAsStateWithLifecycle()
+    LaunchedEffect(accountabilityMessage) {
+        accountabilityMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onAccountabilityMessageShown()
+        }
+    }
 
     // Permission grants happen in system Settings, outside this screen -- re-read them
     // whenever the user comes back so the rows reflect reality.
@@ -106,6 +115,7 @@ fun SettingsScreen(
     val hasAccessibility = remember(permissionRefreshTick) { PermissionUtils.isAccessibilityServiceEnabled(context) }
     val hasOverlay = remember(permissionRefreshTick) { PermissionUtils.hasOverlayPermission(context) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshHealthConnectPermissions() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshAccountabilityData() }
 
     val healthConnectPermissionLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract(),
@@ -432,6 +442,20 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionHeader("Accountability") }
+            item {
+                AccountabilitySection(
+                    baseUrl = state.accountabilityBaseUrl,
+                    onBaseUrlChanged = viewModel::onAccountabilityBaseUrlChanged,
+                    pairingCode = state.myPairingCode,
+                    onRegenerateCode = viewModel::onRegeneratePairingCode,
+                    onAddBuddy = viewModel::onAddBuddy,
+                    buddies = state.buddies,
+                    shareStatsEnabled = state.shareDailyStatsEnabled,
+                    onShareStatsToggled = viewModel::onShareDailyStatsToggled,
+                )
+            }
+
             item { SectionHeader(stringResource(R.string.settings_about)) }
             item {
                 ListItem(
@@ -662,6 +686,105 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+/**
+ * Client-side scaffolding for a future accountability-buddy backend -- see
+ * `data/repository/AccountabilityRepository.kt`. There is no default backend today, so
+ * every action here is a no-op (with a snackbar explaining why) until a base URL is set
+ * below and something is actually listening there.
+ */
+@Composable
+private fun AccountabilitySection(
+    baseUrl: String?,
+    onBaseUrlChanged: (String) -> Unit,
+    pairingCode: String?,
+    onRegenerateCode: () -> Unit,
+    onAddBuddy: (String) -> Unit,
+    buddies: List<AccountabilityBuddy>,
+    shareStatsEnabled: Boolean,
+    onShareStatsToggled: (Boolean) -> Unit,
+) {
+    var urlText by remember(baseUrl) { mutableStateOf(baseUrl.orEmpty()) }
+    var addBuddyCode by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            text = "Pair with a friend to share your daily progress and see theirs. Requires your own " +
+                "backend server -- nothing is hosted by default.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = urlText,
+            onValueChange = { urlText = it; onBaseUrlChanged(it) },
+            label = { Text("Backend base URL") },
+            placeholder = { Text("https://example.com/api") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    ListItem(
+        headlineContent = { Text("Your pairing code") },
+        supportingContent = { Text(pairingCode ?: "Not generated yet") },
+        trailingContent = {
+            OutlinedButton(onClick = onRegenerateCode) { Text("Regenerate") }
+        },
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = addBuddyCode,
+            onValueChange = { addBuddyCode = it },
+            label = { Text("Add a buddy") },
+            placeholder = { Text("Their pairing code") },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        Button(onClick = { onAddBuddy(addBuddyCode); addBuddyCode = "" }) {
+            Text("Add")
+        }
+    }
+
+    if (buddies.isNotEmpty()) {
+        buddies.forEach { buddy ->
+            ListItem(
+                headlineContent = { Text(buddy.displayName) },
+                supportingContent = { Text(buddySyncStatusLabel(buddy.status)) },
+                trailingContent = {
+                    buddy.lastSummary?.let { summary ->
+                        Text(
+                            "${summary.habitsCompleted}/${summary.totalHabits} today -- ${summary.currentStreak}d streak",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    ListItem(
+        headlineContent = { Text("Share my daily stats") },
+        supportingContent = { Text("Lets your buddies see today's progress and streak") },
+        trailingContent = {
+            Switch(checked = shareStatsEnabled, onCheckedChange = onShareStatsToggled)
+        },
+    )
+}
+
+private fun buddySyncStatusLabel(status: BuddyConnectionStatus): String = when (status) {
+    BuddyConnectionStatus.Pending -> "Pending -- no sync yet"
+    BuddyConnectionStatus.Connected -> "Connected"
+    is BuddyConnectionStatus.Error -> "Sync failed: ${status.message}"
 }
 
 /**
