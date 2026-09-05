@@ -152,6 +152,28 @@ class HabitsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * One-shot snapshot for the shareable stats card (see [ShareableStatsCard]) --
+     * always windowed to the last 7 days regardless of whichever [StatsRange] chip is
+     * selected on screen, so a shared card reads the same "this week" no matter when
+     * it's tapped. Fetched fresh on demand rather than folded into [uiState], since
+     * nothing on screen needs it until Share is actually tapped.
+     */
+    suspend fun loadShareCardStats(): ShareCardStats {
+        val today = DateProvider.fromDateString(DateProvider.todayString())
+        val weekStart = today.minusDays(6)
+        val scores = habitRepository
+            .getDayScoresInRange(DateProvider.toDateString(weekStart), DateProvider.todayString())
+            .mapKeys { DateProvider.fromDateString(it.key) }
+        return ShareCardStats(
+            date = today,
+            currentStreak = habitRepository.computeCurrentStreak(),
+            todayCompletionFraction = scores[today] ?: 0f,
+            weeklyPerfectDays = scores.values.count { it >= 1f },
+            weeklyLongestStreak = longestRun(scores, weekStart, today),
+        )
+    }
+
     /** Longest run of consecutive 100%-scored days between [start] and [end] inclusive. A date missing from [scores] (no activity logged) counts as incomplete, same as the heatmap's empty cell. */
     private fun longestRun(scores: Map<LocalDate, Float>, start: LocalDate, end: LocalDate): Int {
         var longest = 0
