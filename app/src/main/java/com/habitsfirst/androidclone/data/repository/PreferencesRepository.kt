@@ -13,6 +13,7 @@ import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.DayOfWeek
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -66,6 +67,10 @@ class PreferencesRepository @Inject constructor(
         val LAST_USAGE_SYNC_AT_EPOCH_MILLIS = longPreferencesKey("last_usage_sync_at_epoch_millis")
         val LAST_USAGE_SYNC_HABIT_COUNT = intPreferencesKey("last_usage_sync_habit_count")
         val LAST_USAGE_SYNC_ERROR = stringPreferencesKey("last_usage_sync_error")
+        val WEEKLY_DIGEST_ENABLED = booleanPreferencesKey("weekly_digest_enabled")
+        val WEEKLY_DIGEST_DAY_OF_WEEK = stringPreferencesKey("weekly_digest_day_of_week") // DayOfWeek.name
+        val WEEKLY_DIGEST_TIME = stringPreferencesKey("weekly_digest_time") // "HH:mm"
+        val LAST_WEEKLY_DIGEST_SENT_DATE = stringPreferencesKey("last_weekly_digest_sent_date")
         val LIMITED_UNBLOCK_WINDOW_MINUTES = intPreferencesKey("limited_unblock_window_minutes")
         val LIMITED_UNBLOCK_STREAK_BONUS_ENABLED = booleanPreferencesKey("limited_unblock_streak_bonus_enabled")
         val LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = intPreferencesKey("limited_unblock_streak_bonus_minutes_per_day")
@@ -441,6 +446,40 @@ class PreferencesRepository @Inject constructor(
             it[Keys.LAST_USAGE_SYNC_HABIT_COUNT] = habitCount
             if (error == null) it.remove(Keys.LAST_USAGE_SYNC_ERROR) else it[Keys.LAST_USAGE_SYNC_ERROR] = error
         }
+    }
+
+    // -- Weekly digest --------------------------------------------------------------
+
+    /**
+     * A once-a-week "5/7 days complete, best streak 4 days" recap notification --
+     * opt-in and off by default, unlike the daily morning reminder, since it's an
+     * extra nudge on top of that one rather than something every install needs.
+     */
+    data class WeeklyDigestSettings(val enabled: Boolean, val dayOfWeek: DayOfWeek, val time: String)
+
+    val weeklyDigestSettings: Flow<WeeklyDigestSettings> = dataStore.data.map {
+        WeeklyDigestSettings(
+            enabled = it[Keys.WEEKLY_DIGEST_ENABLED] ?: false,
+            dayOfWeek = it[Keys.WEEKLY_DIGEST_DAY_OF_WEEK]
+                ?.let { name -> runCatching { DayOfWeek.valueOf(name) }.getOrNull() }
+                ?: DayOfWeek.SUNDAY,
+            time = it[Keys.WEEKLY_DIGEST_TIME] ?: "18:00",
+        )
+    }
+
+    suspend fun setWeeklyDigestSettings(enabled: Boolean, dayOfWeek: DayOfWeek, time: String) {
+        dataStore.edit {
+            it[Keys.WEEKLY_DIGEST_ENABLED] = enabled
+            it[Keys.WEEKLY_DIGEST_DAY_OF_WEEK] = dayOfWeek.name
+            it[Keys.WEEKLY_DIGEST_TIME] = time
+        }
+    }
+
+    /** Guards [com.habitsfirst.androidclone.service.WeeklyDigestWorker] against posting the same week's recap twice. */
+    val lastWeeklyDigestSentDate: Flow<String?> = dataStore.data.map { it[Keys.LAST_WEEKLY_DIGEST_SENT_DATE] }
+
+    suspend fun setLastWeeklyDigestSentDate(date: String) {
+        dataStore.edit { it[Keys.LAST_WEEKLY_DIGEST_SENT_DATE] = date }
     }
 
     // -- Limited-unblock window customization ------------------------------------------

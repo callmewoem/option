@@ -126,6 +126,8 @@
     <string name="todos_delete">Delete task</string>
     <string name="morning_reminder_title">Plan your day</string>
     <string name="morning_reminder_body">Add today\'s one-off tasks before you get going.</string>
+    <string name="weekly_digest_title">Your week in review</string>
+    <string name="weekly_digest_body">%1$d/7 days complete this week, best streak %2$d days.</string>
 
     <!-- Generic -->
     <string name="cancel">Cancel</string>

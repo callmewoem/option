@@ -21,9 +21,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -42,6 +44,9 @@ data class SettingsUiState(
     val proofOfLifeEnabled: Boolean = false,
     val proofOfLifeTime: String = "08:00",
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
+    val weeklyDigestEnabled: Boolean = false,
+    val weeklyDigestDayOfWeek: DayOfWeek = DayOfWeek.SUNDAY,
+    val weeklyDigestTime: String = "18:00",
     val hardModeEnabled: Boolean = false,
     val hardModeToggleLockedUntilEpochMillis: Long = 0L,
     val limitedUnblockEnabled: Boolean = false,
@@ -62,11 +67,12 @@ private data class ThemeAndTokens(
     val taskSkipTokens: Int,
 )
 
-/** Bedtime, the morning todo reminder, and the morning proof-of-life check-in -- everything keyed off "today's morning". */
+/** Bedtime, the morning todo reminder, the morning proof-of-life check-in, and the weekly digest -- the settings screen's notification-scheduling rows. */
 private data class ReminderSettings(
     val bedtime: PreferencesRepository.BedtimeSettings,
     val morning: PreferencesRepository.MorningReminderSettings,
     val proofOfLife: PreferencesRepository.ProofOfLifeSettings,
+    val weeklyDigest: PreferencesRepository.WeeklyDigestSettings,
 )
 
 /** Hard mode's on/off state paired with its toggle-cooldown expiry -- split out only to keep [extraSettings] within combine()'s 5-flow cap. */
@@ -130,6 +136,7 @@ class SettingsViewModel @Inject constructor(
         bedtimeRepository.settings,
         preferencesRepository.morningTodoReminderSettings,
         proofOfLifeRepository.settings,
+        preferencesRepository.weeklyDigestSettings,
         ::ReminderSettings,
     )
 
@@ -178,6 +185,9 @@ class SettingsViewModel @Inject constructor(
             proofOfLifeEnabled = rs.proofOfLife.enabled,
             proofOfLifeTime = rs.proofOfLife.time,
             proofOfLifeWindowMinutes = rs.proofOfLife.windowMinutes,
+            weeklyDigestEnabled = rs.weeklyDigest.enabled,
+            weeklyDigestDayOfWeek = rs.weeklyDigest.dayOfWeek,
+            weeklyDigestTime = rs.weeklyDigest.time,
             hardModeEnabled = extra.blocking.hardMode.enabled,
             hardModeToggleLockedUntilEpochMillis = extra.blocking.hardMode.toggleLockedUntilEpochMillis,
             limitedUnblockEnabled = extra.blocking.limitedUnblockEnabled,
@@ -234,6 +244,27 @@ class SettingsViewModel @Inject constructor(
 
     fun onProofOfLifeChanged(enabled: Boolean, time: String, windowMinutes: Int) {
         viewModelScope.launch { proofOfLifeRepository.setProofOfLife(enabled, time, windowMinutes) }
+    }
+
+    /**
+     * Opt-in "N/7 days complete, best streak M days" recap -- schedules/cancels
+     * [com.habitsfirst.androidclone.service.WeeklyDigestWorker] to match, same as
+     * [onHealthConnectSyncToggled]. [SettingsScreen] calls this on every day-of-week chip
+     * tap and every keystroke of the time field (not just the enable switch), so the
+     * WorkManager call is only made when [enabled] actually flips -- otherwise typing a
+     * time would touch WorkManager's work database on every keystroke for no reason.
+     */
+    fun onWeeklyDigestChanged(enabled: Boolean, dayOfWeek: DayOfWeek, time: String) {
+        viewModelScope.launch {
+            val wasEnabled = preferencesRepository.weeklyDigestSettings.first().enabled
+            preferencesRepository.setWeeklyDigestSettings(enabled, dayOfWeek, time)
+            if (enabled == wasEnabled) return@launch
+            if (enabled) {
+                WorkScheduler.scheduleWeeklyDigest(appContext)
+            } else {
+                WorkScheduler.cancelWeeklyDigest(appContext)
+            }
+        }
     }
 
     /**

@@ -73,6 +73,9 @@ import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.util.PermissionUtils
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -348,6 +351,10 @@ fun SettingsScreen(
                     proofOfLifeTime = state.proofOfLifeTime,
                     proofOfLifeWindowMinutes = state.proofOfLifeWindowMinutes,
                     onProofOfLifeChanged = viewModel::onProofOfLifeChanged,
+                    weeklyDigestEnabled = state.weeklyDigestEnabled,
+                    weeklyDigestDayOfWeek = state.weeklyDigestDayOfWeek,
+                    weeklyDigestTime = state.weeklyDigestTime,
+                    onWeeklyDigestChanged = viewModel::onWeeklyDigestChanged,
                 )
             }
 
@@ -528,11 +535,16 @@ private fun BedtimeAndReminderSection(
     proofOfLifeTime: String,
     proofOfLifeWindowMinutes: Int,
     onProofOfLifeChanged: (Boolean, String, Int) -> Unit,
+    weeklyDigestEnabled: Boolean,
+    weeklyDigestDayOfWeek: DayOfWeek,
+    weeklyDigestTime: String,
+    onWeeklyDigestChanged: (Boolean, DayOfWeek, String) -> Unit,
 ) {
     var start by remember(bedtimeStart) { mutableStateOf(bedtimeStart) }
     var end by remember(bedtimeEnd) { mutableStateOf(bedtimeEnd) }
     var reminderTime by remember(morningReminderTime) { mutableStateOf(morningReminderTime) }
     var checkInTime by remember(proofOfLifeTime) { mutableStateOf(proofOfLifeTime) }
+    var digestTime by remember(weeklyDigestTime) { mutableStateOf(weeklyDigestTime) }
 
     ListItem(
         headlineContent = { Text("Enable bedtime lock") },
@@ -588,6 +600,45 @@ private fun BedtimeAndReminderSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
+            singleLine = true,
+        )
+    }
+    HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+
+    SectionHeader("Weekly digest")
+    ListItem(
+        headlineContent = { Text("Weekly recap") },
+        supportingContent = { Text("A once-a-week nudge, e.g. \"5/7 days complete, best streak 4 days\"") },
+        trailingContent = {
+            Switch(
+                checked = weeklyDigestEnabled,
+                onCheckedChange = { onWeeklyDigestChanged(it, weeklyDigestDayOfWeek, digestTime) },
+            )
+        },
+    )
+    if (weeklyDigestEnabled) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            DayOfWeek.values().forEach { day ->
+                FilterChip(
+                    selected = day == weeklyDigestDayOfWeek,
+                    onClick = { onWeeklyDigestChanged(weeklyDigestEnabled, day, digestTime) },
+                    label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) },
+                )
+            }
+        }
+        OutlinedTextField(
+            value = digestTime,
+            onValueChange = { digestTime = it; onWeeklyDigestChanged(weeklyDigestEnabled, weeklyDigestDayOfWeek, it) },
+            label = { Text("Time (HH:mm)") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             singleLine = true,
         )
     }
