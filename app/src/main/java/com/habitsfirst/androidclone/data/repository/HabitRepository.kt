@@ -2,6 +2,7 @@ package com.habitsfirst.androidclone.data.repository
 
 import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
+import com.habitsfirst.androidclone.data.local.dao.ScarReasonCount
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.entity.HabitCompletionEntity
 import com.habitsfirst.androidclone.data.local.entity.toDomain
@@ -18,10 +19,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.sqrt
 
 /**
  * A habit's completion rate over a stats window. For an ANTIHABIT, [rate] is the
@@ -38,6 +41,41 @@ data class EaseInStatus(
     val activeHabitStreak: Int,
     val requiredStreak: Int,
     val nextHabitName: String,
+)
+
+/** A coarse bucket of the day, for [HabitRepository.getCompletionTimeDistribution]. */
+enum class TimeOfDayBucket(val label: String) {
+    MORNING("Morning"),
+    AFTERNOON("Afternoon"),
+    EVENING("Evening"),
+    NIGHT("Night"),
+}
+
+/**
+ * When completions actually happen during the day, across every habit in range --
+ * flags an "always finishing at the last minute" pattern (a [NIGHT]-heavy
+ * distribution, or a high [averageMinutesSinceMidnight]) that a bare completion rate
+ * can't show.
+ */
+data class CompletionTimeDistribution(
+    val bucketCounts: Map<TimeOfDayBucket, Int>,
+    /** Null with no timestamped completions in range. */
+    val averageMinutesSinceMidnight: Float?,
+) {
+    val totalCount: Int get() = bucketCounts.values.sum()
+}
+
+/**
+ * Day-to-day variance of [HabitRepository.getDayScoresInRange]'s completion fraction,
+ * over the same window -- a low [standardDeviation] alongside a middling
+ * [meanFraction] reads as "steady, room to grow"; a high one reads as "on-again,
+ * off-again", which a bare average can't distinguish and is the more useful signal
+ * for ADHD self-review.
+ */
+data class ConsistencyStats(
+    val meanFraction: Float,
+    val standardDeviation: Float,
+    val daysCounted: Int,
 )
 
 @Singleton
@@ -266,6 +304,37 @@ class HabitRepository @Inject constructor(
     suspend fun getScarredDatesInRange(startDate: String, endDate: String): Set<String> =
         streakScarDao.getScarredDatesInRange(startDate, endDate).toSet()
 
+    /** How often each [com.habitsfirst.androidclone.data.local.entity.StreakScarEntity.reason] shows up in range, most frequent first -- a "why did streaks break" summary. */
+    suspend fun getStreakBreakReasonBreakdown(startDate: String, endDate: String): List<ScarReasonCount> =
+        streakScarDao.getReasonCountsInRange(startDate, endDate)
+
+    /** See [CompletionTimeDistribution]. Buckets every habit-completion timestamp in range by time of day. */
+    suspend fun getCompletionTimeDistribution(startDate: String, endDate: String): CompletionTimeDistribution =
+        completionTimeDistributionOf(completionDao.getCompletionTimestampsInRange(startDate, endDate))
+
+    /** See [ConsistencyStats]. Fetches [getDayScoresInRange] itself -- if a caller already has that map (e.g. [HabitsViewModel][com.habitsfirst.androidclone.ui.habits.HabitsViewModel] building the same window's heatmap), call [consistencyStatsForDayScores] directly instead to avoid querying it twice. */
+    suspend fun getConsistencyStats(startDate: String, endDate: String): ConsistencyStats =
+        consistencyStatsForDayScores(getDayScoresInRange(startDate, endDate), startDate, endDate)
+
+    /**
+     * See [ConsistencyStats]. Re-walks every calendar day in the range (not just the
+     * ones [dayScores] happens to have a row for) so a day with zero logged activity
+     * counts as a 0f, not a gap -- otherwise a habit tracked only sporadically would
+     * understate its own variance. Takes an already-fetched [getDayScoresInRange] map
+     * rather than fetching it again -- see [getConsistencyStats].
+     */
+    fun consistencyStatsForDayScores(dayScores: Map<String, Float>, startDate: String, endDate: String): ConsistencyStats {
+        val start = DateProvider.fromDateString(startDate)
+        val end = DateProvider.fromDateString(endDate)
+        val fractions = mutableListOf<Float>()
+        var cursor = start
+        while (!cursor.isAfter(end)) {
+            fractions += dayScores[DateProvider.toDateString(cursor)] ?: 0f
+            cursor = cursor.plusDays(1)
+        }
+        return consistencyStatsOf(fractions)
+    }
+
     // -- Onboarding "ease into it" ramp (see Habit.easeInOrder / EaseInRepository) -------
 
     /** Active habits chosen together at onboarding to ease in, easiest (order 0) first. */
@@ -362,5 +431,43 @@ class HabitRepository @Inject constructor(
     companion object {
         /** Habit types that [com.habitsfirst.androidclone.service.HealthConnectSyncWorker] can sync. */
         private val HEALTH_CONNECT_HABIT_TYPES = setOf(HabitType.STEPS, HabitType.WORKOUT_MINUTES, HabitType.SLEEP_HOURS)
+
+        /** Pure so it's unit-testable without a DB -- see [getCompletionTimeDistribution]. */
+        fun completionTimeDistributionOf(timestamps: List<Long>): CompletionTimeDistribution {
+            if (timestamps.isEmpty()) return CompletionTimeDistribution(bucketCounts = emptyMap(), averageMinutesSinceMidnight = null)
+            val zone = ZoneId.systemDefault()
+            var totalMinutes = 0L
+            val counts = mutableMapOf<TimeOfDayBucket, Int>()
+            for (millis in timestamps) {
+                val time = Instant.ofEpochMilli(millis).atZone(zone).toLocalTime()
+                totalMinutes += time.toSecondOfDay() / 60L
+                val bucket = bucketFor(time)
+                counts[bucket] = (counts[bucket] ?: 0) + 1
+            }
+            return CompletionTimeDistribution(
+                bucketCounts = counts,
+                averageMinutesSinceMidnight = (totalMinutes.toFloat() / timestamps.size),
+            )
+        }
+
+        private fun bucketFor(time: LocalTime): TimeOfDayBucket = when {
+            time.isBefore(LocalTime.of(5, 0)) -> TimeOfDayBucket.NIGHT
+            time.isBefore(LocalTime.of(12, 0)) -> TimeOfDayBucket.MORNING
+            time.isBefore(LocalTime.of(17, 0)) -> TimeOfDayBucket.AFTERNOON
+            time.isBefore(LocalTime.of(21, 0)) -> TimeOfDayBucket.EVENING
+            else -> TimeOfDayBucket.NIGHT
+        }
+
+        /** Pure so it's unit-testable without a DB -- see [getConsistencyStats]. Population (not sample) standard deviation, since [dailyFractions] is the whole window, not a sample of it. */
+        fun consistencyStatsOf(dailyFractions: List<Float>): ConsistencyStats {
+            if (dailyFractions.isEmpty()) return ConsistencyStats(meanFraction = 0f, standardDeviation = 0f, daysCounted = 0)
+            val mean = dailyFractions.map { it.toDouble() }.average()
+            val variance = dailyFractions.sumOf { val diff = it - mean; diff * diff } / dailyFractions.size
+            return ConsistencyStats(
+                meanFraction = mean.toFloat(),
+                standardDeviation = sqrt(variance).toFloat(),
+                daysCounted = dailyFractions.size,
+            )
+        }
     }
 }

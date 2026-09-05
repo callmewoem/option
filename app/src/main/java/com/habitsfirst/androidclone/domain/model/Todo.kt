@@ -11,4 +11,6 @@ data class Todo(
     val date: String,
     val isDone: Boolean = false,
     val createdAtEpochMillis: Long = System.currentTimeMillis(),
+    /** When [isDone] was last set true -- null while pending, cleared back to null if un-done. Powers the time-to-complete stat. */
+    val completedAtEpochMillis: Long? = null,
 )

@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.habitsfirst.androidclone.data.local.dao.BlockAttemptDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
 import com.habitsfirst.androidclone.data.local.dao.BlockListDao
@@ -10,6 +11,7 @@ import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.dao.TodoDao
+import com.habitsfirst.androidclone.data.local.entity.BlockAttemptEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockedAppEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockedDomainEntity
 import com.habitsfirst.androidclone.data.local.entity.BlockListEntity
@@ -27,6 +29,7 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
         TodoEntity::class,
         BlockListEntity::class,
         BlockedDomainEntity::class,
+        BlockAttemptEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
@@ -54,7 +57,10 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // into two: PHOTO (was the requiresPhotoVerification toggle from v8, now always on
     // for this type -- dropped HabitEntity.requiresPhotoVerification) and TALLY (the
     // toggle-off case, a plain manual check-in).
-    version = 9,
+    // v10 (2026-09-04): added block_attempts (impulse-control stat: every time the block
+    // screen actually covers a blocked app/URL, not just the block-list config) and
+    // TodoEntity.completedAtEpochMillis (time-to-complete stat for todos).
+    version = 10,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -66,6 +72,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun todoDao(): TodoDao
     abstract fun blockListDao(): BlockListDao
     abstract fun blockedDomainDao(): BlockedDomainDao
+    abstract fun blockAttemptDao(): BlockAttemptDao
 
     companion object {
         const val DATABASE_NAME = "habits_first.db"

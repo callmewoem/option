@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.habitsfirst.androidclone.data.local.AppDatabase
+import com.habitsfirst.androidclone.data.local.dao.BlockAttemptDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
 import com.habitsfirst.androidclone.data.local.dao.BlockListDao
@@ -53,6 +54,9 @@ object AppModule {
 
     @Provides
     fun provideBlockedDomainDao(db: AppDatabase): BlockedDomainDao = db.blockedDomainDao()
+
+    @Provides
+    fun provideBlockAttemptDao(db: AppDatabase): BlockAttemptDao = db.blockAttemptDao()
 
     @Provides
     @Singleton
