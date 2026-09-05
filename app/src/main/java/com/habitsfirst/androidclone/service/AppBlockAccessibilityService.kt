@@ -10,6 +10,7 @@ import android.telecom.TelecomManager
 import android.view.accessibility.AccessibilityEvent
 import com.habitsfirst.androidclone.data.repository.ActiveDomainBlock
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
+import com.habitsfirst.androidclone.data.repository.BlockAttemptRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
@@ -80,6 +81,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
     @Inject lateinit var urlBlockRepository: UrlBlockRepository
 
     @Inject lateinit var preferencesRepository: PreferencesRepository
+
+    @Inject lateinit var blockAttemptRepository: BlockAttemptRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -160,8 +163,10 @@ class AppBlockAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             when (val lockState = evaluateLockState()) {
                 LockState.Unlocked -> Unit
-                is LockState.Locked ->
+                is LockState.Locked -> {
+                    blockAttemptRepository.logAttempt(packageName)
                     showAppBlockScreen(packageName, lockState.isBedtime, lockState.habitsCompleteButLocked)
+                }
             }
         }
     }
@@ -198,6 +203,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
                 // A back action only affects the current tab's history, so other tabs are
                 // untouched.
                 performGlobalAction(GLOBAL_ACTION_BACK)
+                blockAttemptRepository.logAttempt(host)
                 showUrlBlockScreen(
                     host,
                     block.listName,

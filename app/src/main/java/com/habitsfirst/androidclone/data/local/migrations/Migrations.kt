@@ -6,7 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Real, hand-written [Migration]s covering every version transition
  * [AppDatabase][com.habitsfirst.androidclone.data.local.AppDatabase] has ever been through,
- * 1 through 9 -- see the version-history comment above `@Database` there for the
+ * 1 through 10 -- see the version-history comment above `@Database` there for the
  * user-facing story of each step; this file is the literal DDL/DML for it.
  *
  * Each `MIGRATION_x_y` is backed by a `MIGRATION_x_y_SQL` statement list so the exact same
@@ -185,6 +185,27 @@ internal val MIGRATION_8_9_SQL: List<String> = listOf(
 val MIGRATION_8_9: Migration = sqlMigration(8, 9, MIGRATION_8_9_SQL)
 
 /**
+ * SQL for [MIGRATION_9_10]: added `block_attempts` (impulse-control stat -- one row per
+ * instant the block screen actually covered a blocked app/URL, see
+ * [com.habitsfirst.androidclone.data.local.entity.BlockAttemptEntity]) and
+ * [com.habitsfirst.androidclone.data.local.entity.TodoEntity.completedAtEpochMillis]
+ * (nullable, no backfill -- there's no way to know when an already-done todo was
+ * actually completed, so existing done todos simply read as "no timing data" rather
+ * than being guessed at). Both are purely additive -- no existing column changes type,
+ * gets dropped, or needs a table recreate -- checked against the build-generated
+ * `app/schemas/.../10.json` (verified byte-identical against a rebuild), same as every
+ * migration above.
+ */
+internal val MIGRATION_9_10_SQL: List<String> = listOf(
+    "ALTER TABLE `todos` ADD COLUMN `completedAtEpochMillis` INTEGER",
+    "CREATE TABLE IF NOT EXISTS `block_attempts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `target` TEXT NOT NULL, `date` TEXT NOT NULL, `timestampEpochMillis` INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS `index_block_attempts_date` ON `block_attempts` (`date`)",
+)
+
+/** v9 -> v10, see [MIGRATION_9_10_SQL]. */
+val MIGRATION_9_10: Migration = sqlMigration(9, 10, MIGRATION_9_10_SQL)
+
+/**
  * Every real migration this database has, in order, for
  * [com.habitsfirst.androidclone.di.AppModule.provideDatabase] to install via
  * `addMigrations(*ALL_MIGRATIONS)`.
@@ -198,6 +219,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_6_7,
     MIGRATION_7_8,
     MIGRATION_8_9,
+    MIGRATION_9_10,
 )
 
 /** Builds a [Migration] that just runs [statements] in order via [SupportSQLiteDatabase.execSQL]. */

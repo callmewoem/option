@@ -51,6 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.habitsfirst.androidclone.data.local.dao.ScarReasonCount
+import com.habitsfirst.androidclone.data.repository.CompletionTimeDistribution
+import com.habitsfirst.androidclone.data.repository.ConsistencyStats
+import com.habitsfirst.androidclone.data.repository.TimeOfDayBucket
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.ui.components.Heatmap
 import com.habitsfirst.androidclone.ui.components.accentColor
@@ -225,6 +229,76 @@ fun HabitsScreen(
                         DayOfWeekChart(stats = state.dayOfWeekStats, accent = MaterialTheme.colorScheme.primary)
                     }
                 }
+
+                item {
+                    Column {
+                        Text("For your review", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "A few extra signals worth mentioning to a doctor or therapist.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            StatCard(
+                                label = "Blocked opens",
+                                value = "${state.blockedOpenAttemptsInRange}",
+                                modifier = Modifier.weight(1f),
+                            )
+                            StatCard(
+                                label = "Avg. todo time",
+                                value = formatMinutes(state.averageTodoCompletionMinutes),
+                                modifier = Modifier.weight(1f),
+                            )
+                            StatCard(
+                                label = "Consistency",
+                                value = formatConsistency(state.consistencyStats),
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Column {
+                        Text("When habits get done", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "A last-minute-heavy pattern is worth flagging even if the completion rate looks fine.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        if (state.completionTimeDistribution.totalCount == 0) {
+                            Text(
+                                "No data yet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            TimeOfDayChart(
+                                distribution = state.completionTimeDistribution,
+                                accent = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+
+                if (state.streakBreakReasons.isNotEmpty()) {
+                    item {
+                        Column {
+                            Text("Why streaks broke", style = MaterialTheme.typography.titleLarge)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            state.streakBreakReasons.forEach { reasonCount ->
+                                ReasonCountRow(reasonCount)
+                            }
+                        }
+                    }
+                }
             }
 
             // Off-screen host for the shareable stats card -- always composed (so the
@@ -248,6 +322,25 @@ fun HabitsScreen(
                 )
             }
         }
+    }
+}
+
+/** "1h 20m" / "45m" / "No data yet" -- keeps the number readable without a decimal once it's over an hour. */
+private fun formatMinutes(minutes: Float?): String {
+    if (minutes == null) return "–"
+    val total = minutes.roundToInt().coerceAtLeast(0)
+    val hours = total / 60
+    val mins = total % 60
+    return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+}
+
+/** A plain-language read on [ConsistencyStats.standardDeviation] -- lower is steadier day to day, which matters more for ADHD self-review than the bare average alone. */
+private fun formatConsistency(stats: ConsistencyStats): String {
+    if (stats.daysCounted == 0) return "–"
+    return when {
+        stats.standardDeviation < 0.15f -> "Steady"
+        stats.standardDeviation < 0.3f -> "Mixed"
+        else -> "Uneven"
     }
 }
 
@@ -367,6 +460,63 @@ private fun HabitRateRow(name: String, rate: Float, accent: Color, countLabel: S
             text = "${(rate * 100).roundToInt()}%",
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.width(40.dp),
+        )
+    }
+}
+
+/** Bucketed bar chart of [CompletionTimeDistribution.bucketCounts], same visual language as [DayOfWeekChart] -- proportion of the range's completions in each bucket, not a raw count, so it reads the same at any window size. */
+@Composable
+private fun TimeOfDayChart(distribution: CompletionTimeDistribution, accent: Color) {
+    val total = distribution.totalCount
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        TimeOfDayBucket.entries.forEach { bucket ->
+            val count = distribution.bucketCounts[bucket] ?: 0
+            val fraction = if (total == 0) 0f else count.toFloat() / total
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp)
+                            .height((4 + 60 * fraction.coerceIn(0f, 1f)).dp)
+                            .clip(MaterialTheme.shapes.extraSmall)
+                            .background(accent),
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = bucket.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** One row of the "why streaks broke" breakdown -- a raw reason string paired with how often it showed up. */
+@Composable
+private fun ReasonCountRow(reasonCount: ScarReasonCount) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = reasonCount.reason,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "${reasonCount.count}×",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

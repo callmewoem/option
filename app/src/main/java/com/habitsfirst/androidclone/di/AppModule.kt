@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.habitsfirst.androidclone.data.local.AppDatabase
+import com.habitsfirst.androidclone.data.local.dao.BlockAttemptDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedAppDao
 import com.habitsfirst.androidclone.data.local.dao.BlockedDomainDao
 import com.habitsfirst.androidclone.data.local.dao.BlockListDao
@@ -28,7 +29,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 object AppModule {
 
     /**
-     * Every version this database has ever shipped (1 through 9, current) has a real
+     * Every version this database has ever shipped (1 through 10, current) has a real
      * [androidx.room.migration.Migration] in `data/local/migrations/Migrations.kt`,
      * wired in below via `ALL_MIGRATIONS` instead of `fallbackToDestructiveMigration()`.
      * Deliberately no destructive fallback beyond that: if a future version bump lands
@@ -37,10 +38,10 @@ object AppModule {
      * dropping and recreating every table (wiping the user's habit/todo/streak history
      * with no warning) -- that crash-loudly behavior is the entire point of this setup.
      *
-     * So: bumping `AppDatabase.version` past 9 without adding a matching
-     * `MIGRATION_9_10` (etc.) here is a bug, not a style choice -- add the migration
+     * So: bumping `AppDatabase.version` past 10 without adding a matching
+     * `MIGRATION_10_11` (etc.) here is a bug, not a style choice -- add the migration
      * (mirroring the pattern in Migrations.kt) in the same change that bumps the
-     * version, the same way every step 1->9 was done.
+     * version, the same way every step 1->10 was done.
      */
     @Provides
     @Singleton
@@ -69,6 +70,9 @@ object AppModule {
 
     @Provides
     fun provideBlockedDomainDao(db: AppDatabase): BlockedDomainDao = db.blockedDomainDao()
+
+    @Provides
+    fun provideBlockAttemptDao(db: AppDatabase): BlockAttemptDao = db.blockAttemptDao()
 
     @Provides
     @Singleton

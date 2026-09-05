@@ -12,6 +12,8 @@ data class TodoEntity(
     val date: String,
     val isDone: Boolean = false,
     val createdAtEpochMillis: Long = System.currentTimeMillis(),
+    /** When [isDone] was last set true -- null while pending, cleared back to null if un-done. */
+    val completedAtEpochMillis: Long? = null,
 )
 
 fun TodoEntity.toDomain(): Todo = Todo(
@@ -20,6 +22,7 @@ fun TodoEntity.toDomain(): Todo = Todo(
     date = date,
     isDone = isDone,
     createdAtEpochMillis = createdAtEpochMillis,
+    completedAtEpochMillis = completedAtEpochMillis,
 )
 
 fun Todo.toEntity(): TodoEntity = TodoEntity(
@@ -28,4 +31,5 @@ fun Todo.toEntity(): TodoEntity = TodoEntity(
     date = date,
     isDone = isDone,
     createdAtEpochMillis = createdAtEpochMillis,
+    completedAtEpochMillis = completedAtEpochMillis,
 )

@@ -68,4 +68,13 @@ interface HabitCompletionDao {
         """,
     )
     suspend fun getCompletedCountsByHabitInRange(startDate: String, endDate: String): List<HabitCompletedCount>
+
+    /** Every completion timestamp in range, for the time-of-day-of-completion distribution ("always finishing at the last minute?"). */
+    @Query(
+        """
+        SELECT completedAtEpochMillis FROM habit_completions
+        WHERE date BETWEEN :startDate AND :endDate AND isCompleted = 1 AND completedAtEpochMillis IS NOT NULL
+        """,
+    )
+    suspend fun getCompletionTimestampsInRange(startDate: String, endDate: String): List<Long>
 }

@@ -31,10 +31,10 @@ import java.sql.SQLException
  *
  * What this class verifies instead, for real, on this machine: that every migration's SQL
  * is valid against actual SQLite (catches typos, wrong column/table names, bad DDL for
- * SQLite's specific `ALTER TABLE` limitations), that the full 1->9 chain produces the
+ * SQLite's specific `ALTER TABLE` limitations), that the full 1->10 chain produces the
  * table/column set [AppDatabase][com.habitsfirst.androidclone.data.local.AppDatabase]'s
  * current entities expect (cross-checked by hand against
- * `app/schemas/com.habitsfirst.androidclone.data.local.AppDatabase/9.json`, generated
+ * `app/schemas/com.habitsfirst.androidclone.data.local.AppDatabase/10.json`, generated
  * from those entities), and that the data-rewriting step (v8->v9's habit-type remap) does
  * the right thing on seeded rows. It does not check Room's own schema-identity hash or
  * `@ColumnInfo(defaultValue)` bookkeeping -- there's no substitute for `MigrationTestHelper`
@@ -54,7 +54,7 @@ class MigrationsSqlTest {
         "CREATE TABLE `blocked_apps` (`packageName` TEXT NOT NULL, `appLabel` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`packageName`))",
     )
 
-    /** All eight migrations' SQL, 1->2 through 8->9, in order. */
+    /** Every migration's SQL, 1->2 through 9->10, in order. */
     private val allMigrationSql = listOf(
         MIGRATION_1_2_SQL,
         MIGRATION_2_3_SQL,
@@ -64,6 +64,7 @@ class MigrationsSqlTest {
         MIGRATION_6_7_SQL,
         MIGRATION_7_8_SQL,
         MIGRATION_8_9_SQL,
+        MIGRATION_9_10_SQL,
     )
 
     private fun newV1Database(): Connection {
@@ -119,12 +120,15 @@ class MigrationsSqlTest {
     }
 
     @Test
-    fun `every migration's SQL is valid and the full chain 1 to 9 lands on the current table set`() {
+    fun `every migration's SQL is valid and the full chain 1 to 10 lands on the current table set`() {
         newV1Database().use { db ->
             allMigrationSql.forEach { db.runSql(it) }
 
             assertEquals(
-                setOf("habits", "habit_completions", "blocked_apps", "streak_scars", "todos", "block_lists", "blocked_domains"),
+                setOf(
+                    "habits", "habit_completions", "blocked_apps", "streak_scars", "todos",
+                    "block_lists", "blocked_domains", "block_attempts",
+                ),
                 db.tableNames(),
             )
             // No leftover recreation-scratch tables from MIGRATION_5_6/MIGRATION_8_9.
@@ -150,7 +154,7 @@ class MigrationsSqlTest {
                 db.columnNames("habit_completions"),
             )
             assertEquals(
-                listOf("id", "title", "date", "isDone", "createdAtEpochMillis"),
+                listOf("id", "title", "date", "isDone", "createdAtEpochMillis", "completedAtEpochMillis"),
                 db.columnNames("todos"),
             )
             assertFalse("repeatDaysMask must not survive past v6", db.columnNames("todos").contains("repeatDaysMask"))
@@ -160,6 +164,36 @@ class MigrationsSqlTest {
                 db.columnNames("block_lists"),
             )
             assertEquals(listOf("listId", "domain"), db.columnNames("blocked_domains"))
+            assertEquals(listOf("id", "target", "date", "timestampEpochMillis"), db.columnNames("block_attempts"))
+        }
+    }
+
+    @Test
+    fun `migration 9 to 10 adds todos completedAtEpochMillis without disturbing existing rows`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(8).forEach { db.runSql(it) } // 1->2 .. 8->9, i.e. up to v9
+
+            db.runSql(
+                listOf(
+                    "INSERT INTO `todos` (`title`, `date`, `isDone`, `createdAtEpochMillis`) VALUES ('Water plants', '2026-09-05', 1, 1000)",
+                ),
+            )
+
+            db.runSql(MIGRATION_9_10_SQL)
+
+            assertEquals(
+                listOf("id", "title", "date", "isDone", "createdAtEpochMillis", "completedAtEpochMillis"),
+                db.columnNames("todos"),
+            )
+            db.createStatement().use { statement ->
+                statement.executeQuery("SELECT `title`, `completedAtEpochMillis` FROM `todos`").use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals("Water plants", rs.getString("title"))
+                    assertEquals(null, rs.getObject("completedAtEpochMillis"))
+                    assertFalse(rs.next())
+                }
+            }
+            assertTrue(db.tableNames().contains("block_attempts"))
         }
     }
 

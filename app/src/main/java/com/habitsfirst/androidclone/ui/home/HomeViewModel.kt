@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.habitsfirst.androidclone.data.repository.BlockAttemptRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.EaseInStatus
 import com.habitsfirst.androidclone.data.repository.HabitRepository
@@ -25,11 +26,13 @@ import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.util.DateProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -57,6 +60,8 @@ data class HomeUiState(
     val showPhotoVerificationPrompt: Boolean = false,
     /** True while the app-usage/Health-Connect one-off refresh kicked off on app open (or the manual refresh button) is still running. */
     val isRefreshingDataDrivenHabits: Boolean = false,
+    /** How many times a blocked app/URL was actually covered by the block screen today -- an impulse-control signal (see [BlockAttemptRepository]), shown as a small chip only when non-zero. */
+    val blockedOpenAttemptsToday: Int = 0,
 ) {
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
@@ -77,6 +82,7 @@ private data class HomeMiscState(
 class HomeViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val blockedAppRepository: BlockedAppRepository,
+    private val blockAttemptRepository: BlockAttemptRepository,
     private val lootboxRepository: LootboxRepository,
     private val penaltyRepository: PenaltyRepository,
     private val todoRepository: TodoRepository,
@@ -118,6 +124,11 @@ class HomeViewModel @Inject constructor(
         preferencesRepository.hasDismissedPhotoVerificationPrompt,
     ) { completedDate, dismissed -> !dismissed && completedDate == DateProvider.todayString() }
 
+    /** Re-derives "today" reactively (see [DateProvider.currentDateFlow]) and updates the instant [BlockAttemptRepository] logs a new attempt, rather than waiting for an unrelated flow to re-emit -- see [uiState]. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val blockedOpenAttemptsTodayFlow = DateProvider.currentDateFlow()
+        .flatMapLatest { date -> blockAttemptRepository.observeAttemptCountForDate(date) }
+
     private val miscFlow = combine(
         preferencesRepository.easeInStreakLength,
         proofOfLifeRepository.isDueFlow,
@@ -134,7 +145,11 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    // blockedOpenAttemptsTodayFlow is combined separately (rather than as a 6th flow
+    // here, past kotlinx.coroutines.flow.combine's 5-flow cap) and filled in below --
+    // see that flow's doc for why it needs its own live subscription instead of being
+    // just another one-shot suspend read alongside the rest of this lambda.
+    private val baseUiState = combine(
         kindsFlow,
         blockedAppRepository.observeBlockedApps(),
         streakRefreshTrigger,
@@ -157,11 +172,17 @@ class HomeViewModel @Inject constructor(
             showPhotoVerificationPrompt = misc.photoVerificationPromptEligible && !hasImageVerificationHabit,
             isRefreshingDataDrivenHabits = misc.isRefreshingDataDrivenHabits,
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = HomeUiState(),
-    )
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        baseUiState,
+        blockedOpenAttemptsTodayFlow,
+    ) { base, attemptsToday -> base.copy(blockedOpenAttemptsToday = attemptsToday) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = HomeUiState(),
+        )
 
     init {
         // Data-driven progress (app usage, Health Connect) otherwise only updates on the
