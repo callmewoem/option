@@ -13,6 +13,7 @@ import com.habitsfirst.androidclone.data.local.dao.HabitCompletionDao
 import com.habitsfirst.androidclone.data.local.dao.HabitDao
 import com.habitsfirst.androidclone.data.local.dao.StreakScarDao
 import com.habitsfirst.androidclone.data.local.dao.TodoDao
+import com.habitsfirst.androidclone.data.local.migrations.ALL_MIGRATIONS
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,11 +27,26 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    /**
+     * Every version this database has ever shipped (1 through 9, current) has a real
+     * [androidx.room.migration.Migration] in `data/local/migrations/Migrations.kt`,
+     * wired in below via `ALL_MIGRATIONS` instead of `fallbackToDestructiveMigration()`.
+     * Deliberately no destructive fallback beyond that: if a future version bump lands
+     * without its own `Migration`, Room throws `IllegalStateException` the first time
+     * that build tries to open an older on-device database, rather than silently
+     * dropping and recreating every table (wiping the user's habit/todo/streak history
+     * with no warning) -- that crash-loudly behavior is the entire point of this setup.
+     *
+     * So: bumping `AppDatabase.version` past 9 without adding a matching
+     * `MIGRATION_9_10` (etc.) here is a bug, not a style choice -- add the migration
+     * (mirroring the pattern in Migrations.kt) in the same change that bumps the
+     * version, the same way every step 1->9 was done.
+     */
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
-            .fallbackToDestructiveMigration()
+            .addMigrations(*ALL_MIGRATIONS)
             .build()
 
     @Provides
