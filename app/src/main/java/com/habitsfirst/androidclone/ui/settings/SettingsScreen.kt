@@ -72,7 +72,9 @@ import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.ui.components.icon
+import com.habitsfirst.androidclone.ui.habits.StatsRange
 import com.habitsfirst.androidclone.util.PermissionUtils
+import com.habitsfirst.androidclone.util.exportShareIntent
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -99,6 +101,23 @@ fun SettingsScreen(
         themeCodeMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.onThemeCodeMessageShown()
+        }
+    }
+
+    // A finished export launches the share sheet as a side effect, then clears itself
+    // so rotating the screen (or coming back to it) doesn't relaunch the chooser.
+    val exportRequest by viewModel.exportRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(exportRequest) {
+        exportRequest?.let {
+            context.startActivity(exportShareIntent(it))
+            viewModel.onExportRequestHandled()
+        }
+    }
+    val exportError by viewModel.exportError.collectAsStateWithLifecycle()
+    LaunchedEffect(exportError) {
+        exportError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.onExportErrorShown()
         }
     }
 
@@ -474,6 +493,17 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionHeader("Export my data") }
+            item {
+                DataExportSection(
+                    selectedRange = state.exportRange,
+                    isExporting = state.isExporting,
+                    onRangeSelected = viewModel::onExportRangeSelected,
+                    onExportCsv = viewModel::onExportCsvClicked,
+                    onExportJson = viewModel::onExportJsonClicked,
+                )
+            }
+
             item { SectionHeader(stringResource(R.string.settings_about)) }
             item {
                 ListItem(
@@ -831,6 +861,63 @@ private fun HealthConnectSection(
             Switch(checked = syncEnabled, onCheckedChange = onSyncToggled, enabled = permissionsGranted)
         },
     )
+    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+}
+
+/**
+ * Exports habit/todo/streak history over [selectedRange] as CSV or JSON, for
+ * self-review or sharing with e.g. a psychiatrist -- see [com.habitsfirst.androidclone.util.StatsExportUtil].
+ */
+@Composable
+private fun DataExportSection(
+    selectedRange: StatsRange,
+    isExporting: Boolean,
+    onRangeSelected: (StatsRange) -> Unit,
+    onExportCsv: () -> Unit,
+    onExportJson: () -> Unit,
+) {
+    Text(
+        "Export your habit, todo, and streak history to review yourself or share elsewhere.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StatsRange.entries.forEach { range ->
+            FilterChip(
+                selected = selectedRange == range,
+                onClick = { onRangeSelected(range) },
+                label = { Text(range.label) },
+            )
+        }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = onExportCsv,
+            enabled = !isExporting,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("Export as CSV")
+        }
+        OutlinedButton(
+            onClick = onExportJson,
+            enabled = !isExporting,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("Export as JSON")
+        }
+    }
     HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 }
 

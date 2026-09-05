@@ -2,4 +2,7 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Where the camera app writes a freshly captured verification photo. -->
     <cache-path name="verification_captures" path="verification_captures/" />
+
+    <!-- Where StatsExportUtil writes CSV/JSON data exports before sharing them. -->
+    <cache-path name="stats_export" path="stats_export/" />
 </paths>

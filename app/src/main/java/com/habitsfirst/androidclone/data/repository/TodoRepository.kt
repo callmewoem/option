@@ -47,4 +47,8 @@ class TodoRepository @Inject constructor(
 
     suspend fun hasTodosForDate(date: String = DateProvider.todayString()): Boolean =
         todoDao.getCountForDate(date) > 0
+
+    /** Every todo due in [startDate]..[endDate] inclusive, oldest first -- the data export's source for todos. */
+    suspend fun getTodosInRange(startDate: String, endDate: String): List<Todo> =
+        todoDao.getForDateRange(startDate, endDate).map { it.toDomain() }
 }
