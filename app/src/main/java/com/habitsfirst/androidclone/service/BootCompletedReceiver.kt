@@ -26,13 +26,17 @@ class BootCompletedReceiver : BroadcastReceiver() {
         WorkScheduler.scheduleProofOfLifeCheck(appContext)
         WorkScheduler.scheduleBlocklistRefresh(appContext)
 
-        // Health Connect sync is opt-in (unlike the three above), so only re-assert it
-        // if the user had actually turned it on before the reboot -- goAsync() keeps the
-        // receiver alive long enough for this one-shot DataStore read to finish.
+        // Health Connect sync and the weekly digest are both opt-in (unlike the four
+        // above), so only re-assert them if the user had actually turned them on before
+        // the reboot -- goAsync() keeps the receiver alive long enough for these
+        // one-shot DataStore reads to finish.
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             if (preferencesRepository.isHealthConnectSyncEnabled.first()) {
                 WorkScheduler.scheduleHealthConnectSync(appContext)
+            }
+            if (preferencesRepository.weeklyDigestSettings.first().enabled) {
+                WorkScheduler.scheduleWeeklyDigest(appContext)
             }
             pendingResult.finish()
         }
