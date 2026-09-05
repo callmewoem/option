@@ -50,6 +50,9 @@ data class SettingsUiState(
     val hardModeEnabled: Boolean = false,
     val hardModeToggleLockedUntilEpochMillis: Long = 0L,
     val limitedUnblockEnabled: Boolean = false,
+    val limitedUnblockWindowMinutes: Int = PreferencesRepository.DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES,
+    val limitedUnblockStreakBonusEnabled: Boolean = false,
+    val limitedUnblockStreakBonusMinutesPerDay: Int = PreferencesRepository.DEFAULT_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
     val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
     /** False on any device without the Health Connect provider installed -- the whole section hides then. */
     val healthConnectAvailable: Boolean = false,
@@ -78,10 +81,11 @@ private data class HardModeState(
     val toggleLockedUntilEpochMillis: Long,
 )
 
-/** Hard mode and limited unblocking -- the two blocking-behavior toggles -- grouped only to keep [extraSettings] within combine()'s 5-flow cap. */
+/** Hard mode and limited unblocking (including its window customization) -- the blocking-behavior toggles -- grouped only to keep [extraSettings] within combine()'s 5-flow cap. */
 private data class BlockingSettings(
     val hardMode: HardModeState,
     val limitedUnblockEnabled: Boolean,
+    val limitedUnblockWindow: PreferencesRepository.LimitedUnblockWindowSettings,
 )
 
 /** Hard mode/limited unblocking, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
@@ -145,6 +149,7 @@ class SettingsViewModel @Inject constructor(
     private val blockingSettings = combine(
         hardModeState,
         limitedUnblockRepository.isEnabled,
+        preferencesRepository.limitedUnblockWindowSettings,
         ::BlockingSettings,
     )
 
@@ -186,6 +191,9 @@ class SettingsViewModel @Inject constructor(
             hardModeEnabled = extra.blocking.hardMode.enabled,
             hardModeToggleLockedUntilEpochMillis = extra.blocking.hardMode.toggleLockedUntilEpochMillis,
             limitedUnblockEnabled = extra.blocking.limitedUnblockEnabled,
+            limitedUnblockWindowMinutes = extra.blocking.limitedUnblockWindow.windowMinutes,
+            limitedUnblockStreakBonusEnabled = extra.blocking.limitedUnblockWindow.streakBonusEnabled,
+            limitedUnblockStreakBonusMinutesPerDay = extra.blocking.limitedUnblockWindow.streakBonusMinutesPerDay,
             easeInStreakLength = extra.easeInStreakLength,
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
@@ -268,9 +276,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
     }
 
-    /** Once habits are done, blocked apps and sites re-lock after [LimitedUnblockRepository.WINDOW_MINUTES] instead of staying open the rest of the day. */
+    /** Once habits are done, blocked apps and sites re-lock after the configured window instead of staying open the rest of the day. */
     fun onLimitedUnblockToggled(enabled: Boolean) {
         viewModelScope.launch { limitedUnblockRepository.setEnabled(enabled) }
+    }
+
+    fun onLimitedUnblockWindowMinutesChanged(minutes: Int) {
+        viewModelScope.launch { preferencesRepository.setLimitedUnblockWindowMinutes(minutes) }
+    }
+
+    /** [enabled] adds [minutesPerDay] extra minutes to the window for every day of the user's current streak. */
+    fun onLimitedUnblockStreakBonusChanged(enabled: Boolean, minutesPerDay: Int) {
+        viewModelScope.launch { preferencesRepository.setLimitedUnblockStreakBonus(enabled, minutesPerDay) }
     }
 
     fun onEaseInStreakLengthChanged(days: Int) {

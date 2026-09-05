@@ -71,6 +71,9 @@ class PreferencesRepository @Inject constructor(
         val WEEKLY_DIGEST_DAY_OF_WEEK = stringPreferencesKey("weekly_digest_day_of_week") // DayOfWeek.name
         val WEEKLY_DIGEST_TIME = stringPreferencesKey("weekly_digest_time") // "HH:mm"
         val LAST_WEEKLY_DIGEST_SENT_DATE = stringPreferencesKey("last_weekly_digest_sent_date")
+        val LIMITED_UNBLOCK_WINDOW_MINUTES = intPreferencesKey("limited_unblock_window_minutes")
+        val LIMITED_UNBLOCK_STREAK_BONUS_ENABLED = booleanPreferencesKey("limited_unblock_streak_bonus_enabled")
+        val LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = intPreferencesKey("limited_unblock_streak_bonus_minutes_per_day")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -479,10 +482,65 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[Keys.LAST_WEEKLY_DIGEST_SENT_DATE] = date }
     }
 
+    // -- Limited-unblock window customization ------------------------------------------
+
+    /**
+     * How long [LimitedUnblockRepository]'s post-completion window lasts. [windowMinutes]
+     * replaces what used to be a hardcoded 60. [streakBonusEnabled] adds
+     * [streakBonusMinutesPerDay] extra minutes for every day of the user's current streak
+     * (see [HabitRepository.computeCurrentStreak]) on top of [windowMinutes] -- a small
+     * reward for consistency, capped by [LimitedUnblockRepository] so an especially long
+     * streak can't stretch the window out indefinitely.
+     */
+    data class LimitedUnblockWindowSettings(
+        val windowMinutes: Int,
+        val streakBonusEnabled: Boolean,
+        val streakBonusMinutesPerDay: Int,
+    )
+
+    val limitedUnblockWindowSettings: Flow<LimitedUnblockWindowSettings> = dataStore.data.map {
+        LimitedUnblockWindowSettings(
+            windowMinutes = it[Keys.LIMITED_UNBLOCK_WINDOW_MINUTES] ?: DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES,
+            streakBonusEnabled = it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_ENABLED] ?: false,
+            streakBonusMinutesPerDay = it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY]
+                ?: DEFAULT_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+        )
+    }
+
+    suspend fun setLimitedUnblockWindowMinutes(minutes: Int) {
+        dataStore.edit {
+            it[Keys.LIMITED_UNBLOCK_WINDOW_MINUTES] =
+                minutes.coerceIn(MIN_LIMITED_UNBLOCK_WINDOW_MINUTES, MAX_LIMITED_UNBLOCK_WINDOW_MINUTES)
+        }
+    }
+
+    suspend fun setLimitedUnblockStreakBonus(enabled: Boolean, minutesPerDay: Int) {
+        dataStore.edit {
+            it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_ENABLED] = enabled
+            it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY] = minutesPerDay.coerceIn(
+                MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+                MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+            )
+        }
+    }
+
     companion object {
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
         const val HARD_MODE_TOGGLE_COOLDOWN_DAYS = 7
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5
         const val DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES = 30
+        const val DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES = 60
+        const val DEFAULT_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = 5
+
+        /**
+         * Shared with [LimitedUnblockRepository.computeEffectiveWindowMinutes] (the ceiling
+         * on the streak-bonus-boosted window, so it can never exceed what a user could
+         * already configure directly) and with the settings-screen stepper's range -- one
+         * constant so the three can't drift apart.
+         */
+        const val MIN_LIMITED_UNBLOCK_WINDOW_MINUTES = 5
+        const val MAX_LIMITED_UNBLOCK_WINDOW_MINUTES = 480
+        const val MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = 0
+        const val MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = 30
     }
 }
