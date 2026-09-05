@@ -16,17 +16,24 @@ import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.service.WorkScheduler
+import com.habitsfirst.androidclone.ui.habits.StatsRange
+import com.habitsfirst.androidclone.util.DateProvider
+import com.habitsfirst.androidclone.util.ExportedFile
+import com.habitsfirst.androidclone.util.StatsExportUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -45,9 +52,15 @@ data class SettingsUiState(
     val proofOfLifeEnabled: Boolean = false,
     val proofOfLifeTime: String = "08:00",
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
+    val weeklyDigestEnabled: Boolean = false,
+    val weeklyDigestDayOfWeek: DayOfWeek = DayOfWeek.SUNDAY,
+    val weeklyDigestTime: String = "18:00",
     val hardModeEnabled: Boolean = false,
     val hardModeToggleLockedUntilEpochMillis: Long = 0L,
     val limitedUnblockEnabled: Boolean = false,
+    val limitedUnblockWindowMinutes: Int = PreferencesRepository.DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES,
+    val limitedUnblockStreakBonusEnabled: Boolean = false,
+    val limitedUnblockStreakBonusMinutesPerDay: Int = PreferencesRepository.DEFAULT_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
     val easeInStreakLength: Int = PreferencesRepository.DEFAULT_EASE_IN_STREAK_LENGTH,
     /** False on any device without the Health Connect provider installed -- the whole section hides then. */
     val healthConnectAvailable: Boolean = false,
@@ -57,6 +70,8 @@ data class SettingsUiState(
     val myPairingCode: String? = null,
     val shareDailyStatsEnabled: Boolean = false,
     val buddies: List<AccountabilityBuddy> = emptyList(),
+    val exportRange: StatsRange = StatsRange.TWELVE_WEEKS,
+    val isExporting: Boolean = false,
 )
 
 /** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
@@ -74,11 +89,12 @@ private data class ThemeAndTokens(
     val taskSkipTokens: Int,
 )
 
-/** Bedtime, the morning todo reminder, and the morning proof-of-life check-in -- everything keyed off "today's morning". */
+/** Bedtime, the morning todo reminder, the morning proof-of-life check-in, and the weekly digest -- the settings screen's notification-scheduling rows. */
 private data class ReminderSettings(
     val bedtime: PreferencesRepository.BedtimeSettings,
     val morning: PreferencesRepository.MorningReminderSettings,
     val proofOfLife: PreferencesRepository.ProofOfLifeSettings,
+    val weeklyDigest: PreferencesRepository.WeeklyDigestSettings,
 )
 
 /** Hard mode's on/off state paired with its toggle-cooldown expiry -- split out only to keep [extraSettings] within combine()'s 5-flow cap. */
@@ -87,10 +103,11 @@ private data class HardModeState(
     val toggleLockedUntilEpochMillis: Long,
 )
 
-/** Hard mode and limited unblocking -- the two blocking-behavior toggles -- grouped only to keep [extraSettings] within combine()'s 5-flow cap. */
+/** Hard mode and limited unblocking (including its window customization) -- the blocking-behavior toggles -- grouped only to keep [extraSettings] within combine()'s 5-flow cap. */
 private data class BlockingSettings(
     val hardMode: HardModeState,
     val limitedUnblockEnabled: Boolean,
+    val limitedUnblockWindow: PreferencesRepository.LimitedUnblockWindowSettings,
 )
 
 /** Hard mode/limited unblocking, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
@@ -102,6 +119,12 @@ private data class ExtraSettings(
     val healthConnectPermissionsGranted: Boolean,
 )
 
+/** The data-export section's selected range and in-flight state. */
+private data class ExportSettings(val range: StatsRange, val isExporting: Boolean)
+
+/** [ExtraSettings] paired with [ExportSettings] -- grouped only to fit combine()'s 5-flow cap at the top level. */
+private data class ExtraAndExport(val extra: ExtraSettings, val export: ExportSettings)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
@@ -112,6 +135,7 @@ class SettingsViewModel @Inject constructor(
     private val limitedUnblockRepository: LimitedUnblockRepository,
     private val healthConnectManager: HealthConnectManager,
     private val accountabilityRepository: AccountabilityRepository,
+    private val statsExportUtil: StatsExportUtil,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -125,6 +149,17 @@ class SettingsViewModel @Inject constructor(
     /** One-shot feedback for the last pairing-code/add-buddy attempt; cleared by [onAccountabilityMessageShown] once shown. */
     private val _accountabilityMessage = MutableStateFlow<String?>(null)
     val accountabilityMessage: StateFlow<String?> = _accountabilityMessage.asStateFlow()
+
+    private val _exportRange = MutableStateFlow(StatsRange.TWELVE_WEEKS)
+    private val _isExporting = MutableStateFlow(false)
+
+    /** One-shot: a just-written export ready to share; cleared by [onExportRequestHandled] once the share sheet's been launched. */
+    private val _exportRequest = MutableStateFlow<ExportedFile?>(null)
+    val exportRequest: StateFlow<ExportedFile?> = _exportRequest.asStateFlow()
+
+    /** One-shot: feedback for a failed export; cleared by [onExportErrorShown] once shown. */
+    private val _exportError = MutableStateFlow<String?>(null)
+    val exportError: StateFlow<String?> = _exportError.asStateFlow()
 
     init {
         refreshHealthConnectPermissions()
@@ -147,6 +182,7 @@ class SettingsViewModel @Inject constructor(
         bedtimeRepository.settings,
         preferencesRepository.morningTodoReminderSettings,
         proofOfLifeRepository.settings,
+        preferencesRepository.weeklyDigestSettings,
         ::ReminderSettings,
     )
 
@@ -159,6 +195,7 @@ class SettingsViewModel @Inject constructor(
     private val blockingSettings = combine(
         hardModeState,
         limitedUnblockRepository.isEnabled,
+        preferencesRepository.limitedUnblockWindowSettings,
         ::BlockingSettings,
     )
 
@@ -179,6 +216,10 @@ class SettingsViewModel @Inject constructor(
         ::AccountabilitySettings,
     )
 
+    private val exportSettings = combine(_exportRange, _isExporting, ::ExportSettings)
+
+    private val extraAndExport = combine(extraSettings, exportSettings, ::ExtraAndExport)
+
     // combine()'s typed overloads top out at 5 flows (see the note above), so the
     // accountability group is folded in with a second combine() rather than growing
     // this one past its cap.
@@ -187,8 +228,9 @@ class SettingsViewModel @Inject constructor(
         preferencesRepository.areNotificationsEnabled,
         themeAndTokens,
         reminderSettings,
-        extraSettings,
-    ) { habits, notificationsEnabled, tt, rs, extra ->
+        extraAndExport,
+    ) { habits, notificationsEnabled, tt, rs, extraExport ->
+        val extra = extraExport.extra
         SettingsUiState(
             habits = habits,
             notificationsEnabled = notificationsEnabled,
@@ -205,13 +247,21 @@ class SettingsViewModel @Inject constructor(
             proofOfLifeEnabled = rs.proofOfLife.enabled,
             proofOfLifeTime = rs.proofOfLife.time,
             proofOfLifeWindowMinutes = rs.proofOfLife.windowMinutes,
+            weeklyDigestEnabled = rs.weeklyDigest.enabled,
+            weeklyDigestDayOfWeek = rs.weeklyDigest.dayOfWeek,
+            weeklyDigestTime = rs.weeklyDigest.time,
             hardModeEnabled = extra.blocking.hardMode.enabled,
             hardModeToggleLockedUntilEpochMillis = extra.blocking.hardMode.toggleLockedUntilEpochMillis,
             limitedUnblockEnabled = extra.blocking.limitedUnblockEnabled,
+            limitedUnblockWindowMinutes = extra.blocking.limitedUnblockWindow.windowMinutes,
+            limitedUnblockStreakBonusEnabled = extra.blocking.limitedUnblockWindow.streakBonusEnabled,
+            limitedUnblockStreakBonusMinutesPerDay = extra.blocking.limitedUnblockWindow.streakBonusMinutesPerDay,
             easeInStreakLength = extra.easeInStreakLength,
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
             healthConnectSyncEnabled = extra.healthConnectSyncEnabled,
+            exportRange = extraExport.export.range,
+            isExporting = extraExport.export.isExporting,
         )
     }
 
@@ -270,6 +320,27 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
+     * Opt-in "N/7 days complete, best streak M days" recap -- schedules/cancels
+     * [com.habitsfirst.androidclone.service.WeeklyDigestWorker] to match, same as
+     * [onHealthConnectSyncToggled]. [SettingsScreen] calls this on every day-of-week chip
+     * tap and every keystroke of the time field (not just the enable switch), so the
+     * WorkManager call is only made when [enabled] actually flips -- otherwise typing a
+     * time would touch WorkManager's work database on every keystroke for no reason.
+     */
+    fun onWeeklyDigestChanged(enabled: Boolean, dayOfWeek: DayOfWeek, time: String) {
+        viewModelScope.launch {
+            val wasEnabled = preferencesRepository.weeklyDigestSettings.first().enabled
+            preferencesRepository.setWeeklyDigestSettings(enabled, dayOfWeek, time)
+            if (enabled == wasEnabled) return@launch
+            if (enabled) {
+                WorkScheduler.scheduleWeeklyDigest(appContext)
+            } else {
+                WorkScheduler.cancelWeeklyDigest(appContext)
+            }
+        }
+    }
+
+    /**
      * Enabling grants a batch of grace tokens to ease into it; either direction is a no-op while the previous
      * toggle's cooldown is still active (see [PreferencesRepository.setHardModeEnabled]). The switch itself is
      * disabled in [SettingsScreen] during the cooldown, so this is normally unreachable then anyway.
@@ -278,9 +349,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
     }
 
-    /** Once habits are done, blocked apps and sites re-lock after [LimitedUnblockRepository.WINDOW_MINUTES] instead of staying open the rest of the day. */
+    /** Once habits are done, blocked apps and sites re-lock after the configured window instead of staying open the rest of the day. */
     fun onLimitedUnblockToggled(enabled: Boolean) {
         viewModelScope.launch { limitedUnblockRepository.setEnabled(enabled) }
+    }
+
+    fun onLimitedUnblockWindowMinutesChanged(minutes: Int) {
+        viewModelScope.launch { preferencesRepository.setLimitedUnblockWindowMinutes(minutes) }
+    }
+
+    /** [enabled] adds [minutesPerDay] extra minutes to the window for every day of the user's current streak. */
+    fun onLimitedUnblockStreakBonusChanged(enabled: Boolean, minutesPerDay: Int) {
+        viewModelScope.launch { preferencesRepository.setLimitedUnblockStreakBonus(enabled, minutesPerDay) }
     }
 
     fun onEaseInStreakLengthChanged(days: Int) {
@@ -336,6 +416,41 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // -- Data export ----------------------------------------------------------------
+
+    fun onExportRangeSelected(range: StatsRange) {
+        _exportRange.value = range
+    }
+
+    /** Writes today-minus-[exportRange] as a CSV and surfaces it via [exportRequest] for [SettingsScreen] to share. */
+    fun onExportCsvClicked() = runExport(statsExportUtil::exportCsv)
+
+    /** Same as [onExportCsvClicked], but the fuller JSON export. */
+    fun onExportJsonClicked() = runExport(statsExportUtil::exportJson)
+
+    private fun runExport(export: suspend (startDate: String, endDate: String) -> ExportedFile) {
+        if (_isExporting.value) return
+        viewModelScope.launch {
+            _isExporting.value = true
+            try {
+                val end = DateProvider.todayString()
+                val start = DateProvider.toDateString(DateProvider.fromDateString(end).minusWeeks(_exportRange.value.weeks))
+                _exportRequest.value = export(start, end)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Broad on purpose: writing the file (IOException), resolving its
+                // content:// Uri (IllegalArgumentException if file_paths.xml and this
+                // file's actual location ever drift), and the repository reads
+                // (SQLiteException) all need to land on the same "export failed"
+                // message instead of crashing the app.
+                _exportError.value = "Couldn't export your data -- try again."
+            } finally {
+                _isExporting.value = false
+            }
+        }
+    }
+
     /** Redeems a buddy's pairing code with the configured backend; feedback surfaces via [accountabilityMessage]. */
     fun onAddBuddy(code: String) {
         if (code.isBlank()) return
@@ -368,5 +483,14 @@ class SettingsViewModel @Inject constructor(
      */
     fun refreshAccountabilityData() {
         viewModelScope.launch { accountabilityRepository.syncNow() }
+    }
+
+    /** Called once [SettingsScreen] has launched the share sheet for the pending [exportRequest]. */
+    fun onExportRequestHandled() {
+        _exportRequest.value = null
+    }
+
+    fun onExportErrorShown() {
+        _exportError.value = null
     }
 }

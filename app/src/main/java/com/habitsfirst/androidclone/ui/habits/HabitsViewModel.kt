@@ -2,9 +2,14 @@ package com.habitsfirst.androidclone.ui.habits
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.local.dao.ScarReasonCount
+import com.habitsfirst.androidclone.data.repository.BlockAttemptRepository
+import com.habitsfirst.androidclone.data.repository.CompletionTimeDistribution
+import com.habitsfirst.androidclone.data.repository.ConsistencyStats
 import com.habitsfirst.androidclone.data.repository.HabitCompletionStat
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
+import com.habitsfirst.androidclone.data.repository.TodoRepository
 import com.habitsfirst.androidclone.util.DateProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +47,16 @@ data class HabitsUiState(
     val longestStreakInRange: Int = 0,
     /** Count of 100%-complete days within [range]. */
     val perfectDaysInRange: Int = 0,
+    /** How many times the block screen actually covered a blocked app/URL within [range] -- an impulsivity signal. See [BlockAttemptRepository]. */
+    val blockedOpenAttemptsInRange: Int = 0,
+    /** Average minutes from creating a todo to completing it, within [range]. Null with no completed todos in range. */
+    val averageTodoCompletionMinutes: Float? = null,
+    /** When habit completions actually happen during the day, within [range] -- flags an "always at the last minute" pattern. */
+    val completionTimeDistribution: CompletionTimeDistribution = CompletionTimeDistribution(emptyMap(), null),
+    /** Day-to-day variance of the completion fraction, within [range] -- a variance-aware companion to the plain average. */
+    val consistencyStats: ConsistencyStats = ConsistencyStats(0f, 0f, 0),
+    /** How often each broken-streak reason shows up within [range], most frequent first. */
+    val streakBreakReasons: List<ScarReasonCount> = emptyList(),
 ) {
     val availableRanges: List<StatsRange> get() = StatsRange.entries
 }
@@ -63,6 +78,15 @@ private data class MetaData(
     val longestStreakInRange: Int,
 )
 
+/** The newer ADHD-focused stats -- impulse control, completion timing, and consistency -- split out only to keep [HabitsViewModel.uiState]'s combine() within its arity cap. */
+private data class InsightsData(
+    val blockedOpenAttemptsInRange: Int,
+    val averageTodoCompletionMinutes: Float?,
+    val completionTimeDistribution: CompletionTimeDistribution,
+    val consistencyStats: ConsistencyStats,
+    val streakBreakReasons: List<ScarReasonCount>,
+)
+
 /**
  * Pure stats: the heatmap, streak summary, completion rate by habit, and completion
  * rate by day of week, over a selectable window. Managing the habit list (add/edit/
@@ -73,6 +97,8 @@ private data class MetaData(
 class HabitsViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val blockAttemptRepository: BlockAttemptRepository,
+    private val todoRepository: TodoRepository,
 ) : ViewModel() {
 
     private val dayScores = MutableStateFlow<Map<LocalDate, Float>>(emptyMap())
@@ -83,6 +109,11 @@ class HabitsViewModel @Inject constructor(
     private val scarredDates = MutableStateFlow<Set<LocalDate>>(emptySet())
     private val longestStreakInRange = MutableStateFlow(0)
     private val perfectDaysInRange = MutableStateFlow(0)
+    private val blockedOpenAttemptsInRange = MutableStateFlow(0)
+    private val averageTodoCompletionMinutes = MutableStateFlow<Float?>(null)
+    private val completionTimeDistribution = MutableStateFlow(CompletionTimeDistribution(emptyMap(), null))
+    private val consistencyStats = MutableStateFlow(ConsistencyStats(0f, 0f, 0))
+    private val streakBreakReasons = MutableStateFlow<List<ScarReasonCount>>(emptyList())
 
     private val scoreData = combine(dayScores, completionStats, isLoading, perfectDaysInRange, ::ScoreData)
 
@@ -102,7 +133,16 @@ class HabitsViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<HabitsUiState> = combine(scoreData, metaData) { sd, md ->
+    private val insightsData = combine(
+        blockedOpenAttemptsInRange,
+        averageTodoCompletionMinutes,
+        completionTimeDistribution,
+        consistencyStats,
+        streakBreakReasons,
+        ::InsightsData,
+    )
+
+    val uiState: StateFlow<HabitsUiState> = combine(scoreData, metaData, insightsData) { sd, md, id ->
         HabitsUiState(
             isLoading = sd.isLoading,
             range = md.range,
@@ -117,6 +157,11 @@ class HabitsViewModel @Inject constructor(
             currentStreak = md.currentStreak,
             longestStreakInRange = md.longestStreakInRange,
             perfectDaysInRange = sd.perfectDaysInRange,
+            blockedOpenAttemptsInRange = id.blockedOpenAttemptsInRange,
+            averageTodoCompletionMinutes = id.averageTodoCompletionMinutes,
+            completionTimeDistribution = id.completionTimeDistribution,
+            consistencyStats = id.consistencyStats,
+            streakBreakReasons = id.streakBreakReasons,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HabitsUiState())
 
@@ -140,7 +185,8 @@ class HabitsViewModel @Inject constructor(
             val range = selectedRange.value
             val end = DateProvider.todayString()
             val start = DateProvider.toDateString(DateProvider.fromDateString(end).minusWeeks(range.weeks))
-            val scores = habitRepository.getDayScoresInRange(start, end).mapKeys { DateProvider.fromDateString(it.key) }
+            val rawScores = habitRepository.getDayScoresInRange(start, end)
+            val scores = rawScores.mapKeys { DateProvider.fromDateString(it.key) }
             dayScores.value = scores
             completionStats.value = habitRepository.getHabitCompletionStats(start, end)
             scarredDates.value = habitRepository.getScarredDatesInRange(start, end)
@@ -148,8 +194,35 @@ class HabitsViewModel @Inject constructor(
             currentStreak.value = habitRepository.computeCurrentStreak()
             longestStreakInRange.value = longestRun(scores, DateProvider.fromDateString(start), DateProvider.fromDateString(end))
             perfectDaysInRange.value = scores.values.count { it >= 1f }
+            blockedOpenAttemptsInRange.value = blockAttemptRepository.getAttemptCountInRange(start, end)
+            averageTodoCompletionMinutes.value = todoRepository.getAverageCompletionMinutes(start, end)
+            completionTimeDistribution.value = habitRepository.getCompletionTimeDistribution(start, end)
+            consistencyStats.value = habitRepository.consistencyStatsForDayScores(rawScores, start, end)
+            streakBreakReasons.value = habitRepository.getStreakBreakReasonBreakdown(start, end)
             isLoading.value = false
         }
+    }
+
+    /**
+     * One-shot snapshot for the shareable stats card (see [ShareableStatsCard]) --
+     * always windowed to the last 7 days regardless of whichever [StatsRange] chip is
+     * selected on screen, so a shared card reads the same "this week" no matter when
+     * it's tapped. Fetched fresh on demand rather than folded into [uiState], since
+     * nothing on screen needs it until Share is actually tapped.
+     */
+    suspend fun loadShareCardStats(): ShareCardStats {
+        val today = DateProvider.fromDateString(DateProvider.todayString())
+        val weekStart = today.minusDays(6)
+        val scores = habitRepository
+            .getDayScoresInRange(DateProvider.toDateString(weekStart), DateProvider.todayString())
+            .mapKeys { DateProvider.fromDateString(it.key) }
+        return ShareCardStats(
+            date = today,
+            currentStreak = habitRepository.computeCurrentStreak(),
+            todayCompletionFraction = scores[today] ?: 0f,
+            weeklyPerfectDays = scores.values.count { it >= 1f },
+            weeklyLongestStreak = longestRun(scores, weekStart, today),
+        )
     }
 
     /** Longest run of consecutive 100%-scored days between [start] and [end] inclusive. A date missing from [scores] (no activity logged) counts as incomplete, same as the heatmap's empty cell. */

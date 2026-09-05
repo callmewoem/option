@@ -235,10 +235,13 @@ update to the same Play Store listing again, and it must never be committed
   (`applicationId`, class names, DB/DataStore file names), but worth a deliberate
   rename pass before a Play Store listing, since `applicationId` becomes
   effectively permanent once published.
-- Room's schema bump to v4 relies on `fallbackToDestructiveMigration()` (see
-  `di/AppModule.kt`) rather than a real `Migration` -- fine pre-release, but must
-  be replaced before this ships with real user data on device, or an update will
-  silently wipe local habit/todo history.
+- Room's `AppDatabase` now has a real `Migration` for every version step 1 through
+  9 (see `data/local/migrations/Migrations.kt`), wired in by `di/AppModule.kt`
+  instead of `fallbackToDestructiveMigration()`, so an update no longer risks
+  silently wiping local habit/todo history. There's deliberately no destructive
+  fallback beyond v9 -- adding a new version without its own `Migration` now
+  crashes loudly in development instead of silently dropping data, so bump the
+  version and add its migration together the same way each existing step was.
 - Uninstall/bypass friction was deliberately left out of this pass -- a natural
   next addition alongside the penalty engine and bedtime lock already in place.
 - Home-screen habit reminder notifications beyond the morning todo reminder (the

@@ -26,9 +26,17 @@ object ImageStore {
     fun createCaptureUri(context: Context): Pair<Uri, File> {
         val dir = File(context.cacheDir, CAPTURE_DIR).apply { mkdirs() }
         val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        return uri to file
+        return uriForFile(context, file) to file
     }
+
+    /**
+     * A `content://` [Uri] for a file this app already owns, via the app's [FileProvider]
+     * (authority `${applicationId}.fileprovider`, paths declared in `res/xml/file_paths.xml`).
+     * Shared by every call site that hands one of this app's own files to another app
+     * (the camera, or the system share sheet) so the authority string lives in one place.
+     */
+    fun uriForFile(context: Context, file: File): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
     /** Saves a habit's example photo, overwriting any previous one for [habitId]. */
     fun saveExampleImage(context: Context, source: Uri, habitId: Long): String? =

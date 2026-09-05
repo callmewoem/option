@@ -185,6 +185,10 @@ fun HomeScreen(
                 )
             }
 
+            if (state.blockedOpenAttemptsToday > 0) {
+                item { BlockedAttemptsChip(count = state.blockedOpenAttemptsToday) }
+            }
+
             state.easeInStatus?.let { status ->
                 item { EaseInBanner(status) }
             }
@@ -693,6 +697,32 @@ private fun LockStatusChip(allDone: Boolean, lockedAppCount: Int) {
             text = "$lockedAppCount",
             style = MaterialTheme.typography.labelLarge,
             color = if (allDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/** "N attempts blocked today" -- a small, non-blocking nudge that impulsivity is showing up today, not just in the weekly stats. Only shown once there's actually something to report. */
+@Composable
+private fun BlockedAttemptsChip(count: Int) {
+    Row(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        val timesWord = if (count == 1) "time" else "times"
+        Text(
+            text = "Tried to open a locked app/site $count $timesWord today",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

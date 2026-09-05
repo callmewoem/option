@@ -13,6 +13,7 @@ import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.DayOfWeek
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -69,6 +70,13 @@ class PreferencesRepository @Inject constructor(
         val ACCOUNTABILITY_BASE_URL = stringPreferencesKey("accountability_base_url")
         val SHARE_DAILY_STATS_ENABLED = booleanPreferencesKey("share_daily_stats_enabled")
         val MY_PAIRING_CODE = stringPreferencesKey("my_pairing_code")
+        val WEEKLY_DIGEST_ENABLED = booleanPreferencesKey("weekly_digest_enabled")
+        val WEEKLY_DIGEST_DAY_OF_WEEK = stringPreferencesKey("weekly_digest_day_of_week") // DayOfWeek.name
+        val WEEKLY_DIGEST_TIME = stringPreferencesKey("weekly_digest_time") // "HH:mm"
+        val LAST_WEEKLY_DIGEST_SENT_DATE = stringPreferencesKey("last_weekly_digest_sent_date")
+        val LIMITED_UNBLOCK_WINDOW_MINUTES = intPreferencesKey("limited_unblock_window_minutes")
+        val LIMITED_UNBLOCK_STREAK_BONUS_ENABLED = booleanPreferencesKey("limited_unblock_streak_bonus_enabled")
+        val LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = intPreferencesKey("limited_unblock_streak_bonus_minutes_per_day")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -478,10 +486,99 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
+    // -- Weekly digest --------------------------------------------------------------
+
+    /**
+     * A once-a-week "5/7 days complete, best streak 4 days" recap notification --
+     * opt-in and off by default, unlike the daily morning reminder, since it's an
+     * extra nudge on top of that one rather than something every install needs.
+     */
+    data class WeeklyDigestSettings(val enabled: Boolean, val dayOfWeek: DayOfWeek, val time: String)
+
+    val weeklyDigestSettings: Flow<WeeklyDigestSettings> = dataStore.data.map {
+        WeeklyDigestSettings(
+            enabled = it[Keys.WEEKLY_DIGEST_ENABLED] ?: false,
+            dayOfWeek = it[Keys.WEEKLY_DIGEST_DAY_OF_WEEK]
+                ?.let { name -> runCatching { DayOfWeek.valueOf(name) }.getOrNull() }
+                ?: DayOfWeek.SUNDAY,
+            time = it[Keys.WEEKLY_DIGEST_TIME] ?: "18:00",
+        )
+    }
+
+    suspend fun setWeeklyDigestSettings(enabled: Boolean, dayOfWeek: DayOfWeek, time: String) {
+        dataStore.edit {
+            it[Keys.WEEKLY_DIGEST_ENABLED] = enabled
+            it[Keys.WEEKLY_DIGEST_DAY_OF_WEEK] = dayOfWeek.name
+            it[Keys.WEEKLY_DIGEST_TIME] = time
+        }
+    }
+
+    /** Guards [com.habitsfirst.androidclone.service.WeeklyDigestWorker] against posting the same week's recap twice. */
+    val lastWeeklyDigestSentDate: Flow<String?> = dataStore.data.map { it[Keys.LAST_WEEKLY_DIGEST_SENT_DATE] }
+
+    suspend fun setLastWeeklyDigestSentDate(date: String) {
+        dataStore.edit { it[Keys.LAST_WEEKLY_DIGEST_SENT_DATE] = date }
+    }
+
+    // -- Limited-unblock window customization ------------------------------------------
+
+    /**
+     * How long [LimitedUnblockRepository]'s post-completion window lasts. [windowMinutes]
+     * replaces what used to be a hardcoded 60. [streakBonusEnabled] adds
+     * [streakBonusMinutesPerDay] extra minutes for every day of the user's current streak
+     * (see [HabitRepository.computeCurrentStreak]) on top of [windowMinutes] -- a small
+     * reward for consistency, capped by [LimitedUnblockRepository] so an especially long
+     * streak can't stretch the window out indefinitely.
+     */
+    data class LimitedUnblockWindowSettings(
+        val windowMinutes: Int,
+        val streakBonusEnabled: Boolean,
+        val streakBonusMinutesPerDay: Int,
+    )
+
+    val limitedUnblockWindowSettings: Flow<LimitedUnblockWindowSettings> = dataStore.data.map {
+        LimitedUnblockWindowSettings(
+            windowMinutes = it[Keys.LIMITED_UNBLOCK_WINDOW_MINUTES] ?: DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES,
+            streakBonusEnabled = it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_ENABLED] ?: false,
+            streakBonusMinutesPerDay = it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY]
+                ?: DEFAULT_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+        )
+    }
+
+    suspend fun setLimitedUnblockWindowMinutes(minutes: Int) {
+        dataStore.edit {
+            it[Keys.LIMITED_UNBLOCK_WINDOW_MINUTES] =
+                minutes.coerceIn(MIN_LIMITED_UNBLOCK_WINDOW_MINUTES, MAX_LIMITED_UNBLOCK_WINDOW_MINUTES)
+        }
+    }
+
+    suspend fun setLimitedUnblockStreakBonus(enabled: Boolean, minutesPerDay: Int) {
+        dataStore.edit {
+            it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_ENABLED] = enabled
+            it[Keys.LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY] = minutesPerDay.coerceIn(
+                MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+                MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+            )
+        }
+    }
+
     companion object {
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
         const val HARD_MODE_TOGGLE_COOLDOWN_DAYS = 7
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5
         const val DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES = 30
+        const val DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES = 60
+        const val DEFAULT_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = 5
+
+        /**
+         * Shared with [LimitedUnblockRepository.computeEffectiveWindowMinutes] (the ceiling
+         * on the streak-bonus-boosted window, so it can never exceed what a user could
+         * already configure directly) and with the settings-screen stepper's range -- one
+         * constant so the three can't drift apart.
+         */
+        const val MIN_LIMITED_UNBLOCK_WINDOW_MINUTES = 5
+        const val MAX_LIMITED_UNBLOCK_WINDOW_MINUTES = 480
+        const val MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = 0
+        const val MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = 30
     }
 }

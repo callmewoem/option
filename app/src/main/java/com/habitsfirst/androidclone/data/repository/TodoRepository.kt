@@ -1,5 +1,6 @@
 package com.habitsfirst.androidclone.data.repository
 
+import com.habitsfirst.androidclone.data.local.dao.TodoCompletionTiming
 import com.habitsfirst.androidclone.data.local.dao.TodoDao
 import com.habitsfirst.androidclone.data.local.entity.TodoEntity
 import com.habitsfirst.androidclone.data.local.entity.toDomain
@@ -38,7 +39,7 @@ class TodoRepository @Inject constructor(
     }
 
     suspend fun setDone(todo: Todo, done: Boolean) {
-        todoDao.setDone(todo.id, done)
+        todoDao.setDone(todo.id, done, if (done) System.currentTimeMillis() else null)
     }
 
     suspend fun delete(todo: Todo) {
@@ -47,4 +48,26 @@ class TodoRepository @Inject constructor(
 
     suspend fun hasTodosForDate(date: String = DateProvider.todayString()): Boolean =
         todoDao.getCountForDate(date) > 0
+
+    /**
+     * Average time from creation to completion, in minutes, for todos due in
+     * [startDate]..[endDate] that were actually completed -- null with no completed
+     * todos in range. A large value (or one that keeps climbing) suggests todos are
+     * sitting untouched rather than being acted on promptly.
+     */
+    suspend fun getAverageCompletionMinutes(startDate: String, endDate: String): Float? =
+        averageCompletionMinutes(todoDao.getCompletionTimingsInRange(startDate, endDate))
+
+    /** Every todo due in [startDate]..[endDate] inclusive, oldest first -- the data export's source for todos. */
+    suspend fun getTodosInRange(startDate: String, endDate: String): List<Todo> =
+        todoDao.getForDateRange(startDate, endDate).map { it.toDomain() }
+
+    companion object {
+        /** Pure so it's unit-testable without a DB -- see [getAverageCompletionMinutes]. */
+        fun averageCompletionMinutes(timings: List<TodoCompletionTiming>): Float? {
+            if (timings.isEmpty()) return null
+            val totalMinutes = timings.sumOf { (it.completedAtEpochMillis - it.createdAtEpochMillis).coerceAtLeast(0) / 60_000.0 }
+            return (totalMinutes / timings.size).toFloat()
+        }
+    }
 }
