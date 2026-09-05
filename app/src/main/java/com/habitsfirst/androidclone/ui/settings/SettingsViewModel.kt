@@ -14,8 +14,13 @@ import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.service.WorkScheduler
+import com.habitsfirst.androidclone.ui.habits.StatsRange
+import com.habitsfirst.androidclone.util.DateProvider
+import com.habitsfirst.androidclone.util.ExportedFile
+import com.habitsfirst.androidclone.util.StatsExportUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +55,8 @@ data class SettingsUiState(
     val healthConnectAvailable: Boolean = false,
     val healthConnectPermissionsGranted: Boolean = false,
     val healthConnectSyncEnabled: Boolean = false,
+    val exportRange: StatsRange = StatsRange.TWELVE_WEEKS,
+    val isExporting: Boolean = false,
 )
 
 private data class ThemeAndTokens(
@@ -87,6 +94,12 @@ private data class ExtraSettings(
     val healthConnectPermissionsGranted: Boolean,
 )
 
+/** The data-export section's selected range and in-flight state. */
+private data class ExportSettings(val range: StatsRange, val isExporting: Boolean)
+
+/** [ExtraSettings] paired with [ExportSettings] -- grouped only to fit combine()'s 5-flow cap at the top level. */
+private data class ExtraAndExport(val extra: ExtraSettings, val export: ExportSettings)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
@@ -96,6 +109,7 @@ class SettingsViewModel @Inject constructor(
     private val proofOfLifeRepository: ProofOfLifeRepository,
     private val limitedUnblockRepository: LimitedUnblockRepository,
     private val healthConnectManager: HealthConnectManager,
+    private val statsExportUtil: StatsExportUtil,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -105,6 +119,17 @@ class SettingsViewModel @Inject constructor(
     /** One-shot feedback for the last theme-code redemption attempt; cleared by [onThemeCodeMessageShown] once shown. */
     private val _themeCodeMessage = MutableStateFlow<String?>(null)
     val themeCodeMessage: StateFlow<String?> = _themeCodeMessage.asStateFlow()
+
+    private val _exportRange = MutableStateFlow(StatsRange.TWELVE_WEEKS)
+    private val _isExporting = MutableStateFlow(false)
+
+    /** One-shot: a just-written export ready to share; cleared by [onExportRequestHandled] once the share sheet's been launched. */
+    private val _exportRequest = MutableStateFlow<ExportedFile?>(null)
+    val exportRequest: StateFlow<ExportedFile?> = _exportRequest.asStateFlow()
+
+    /** One-shot: feedback for a failed export; cleared by [onExportErrorShown] once shown. */
+    private val _exportError = MutableStateFlow<String?>(null)
+    val exportError: StateFlow<String?> = _exportError.asStateFlow()
 
     init {
         refreshHealthConnectPermissions()
@@ -150,13 +175,18 @@ class SettingsViewModel @Inject constructor(
         ::ExtraSettings,
     )
 
+    private val exportSettings = combine(_exportRange, _isExporting, ::ExportSettings)
+
+    private val extraAndExport = combine(extraSettings, exportSettings, ::ExtraAndExport)
+
     val uiState: StateFlow<SettingsUiState> = combine(
         habitRepository.observeHabits(),
         preferencesRepository.areNotificationsEnabled,
         themeAndTokens,
         reminderSettings,
-        extraSettings,
-    ) { habits, notificationsEnabled, tt, rs, extra ->
+        extraAndExport,
+    ) { habits, notificationsEnabled, tt, rs, extraExport ->
+        val extra = extraExport.extra
         SettingsUiState(
             habits = habits,
             notificationsEnabled = notificationsEnabled,
@@ -180,6 +210,8 @@ class SettingsViewModel @Inject constructor(
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
             healthConnectSyncEnabled = extra.healthConnectSyncEnabled,
+            exportRange = extraExport.export.range,
+            isExporting = extraExport.export.isExporting,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -275,5 +307,47 @@ class SettingsViewModel @Inject constructor(
                 WorkScheduler.cancelHealthConnectSync(appContext)
             }
         }
+    }
+
+    fun onExportRangeSelected(range: StatsRange) {
+        _exportRange.value = range
+    }
+
+    /** Writes today-minus-[exportRange] as a CSV and surfaces it via [exportRequest] for [SettingsScreen] to share. */
+    fun onExportCsvClicked() = runExport(statsExportUtil::exportCsv)
+
+    /** Same as [onExportCsvClicked], but the fuller JSON export. */
+    fun onExportJsonClicked() = runExport(statsExportUtil::exportJson)
+
+    private fun runExport(export: suspend (startDate: String, endDate: String) -> ExportedFile) {
+        if (_isExporting.value) return
+        viewModelScope.launch {
+            _isExporting.value = true
+            try {
+                val end = DateProvider.todayString()
+                val start = DateProvider.toDateString(DateProvider.fromDateString(end).minusWeeks(_exportRange.value.weeks))
+                _exportRequest.value = export(start, end)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Broad on purpose: writing the file (IOException), resolving its
+                // content:// Uri (IllegalArgumentException if file_paths.xml and this
+                // file's actual location ever drift), and the repository reads
+                // (SQLiteException) all need to land on the same "export failed"
+                // message instead of crashing the app.
+                _exportError.value = "Couldn't export your data -- try again."
+            } finally {
+                _isExporting.value = false
+            }
+        }
+    }
+
+    /** Called once [SettingsScreen] has launched the share sheet for the pending [exportRequest]. */
+    fun onExportRequestHandled() {
+        _exportRequest.value = null
+    }
+
+    fun onExportErrorShown() {
+        _exportError.value = null
     }
 }
