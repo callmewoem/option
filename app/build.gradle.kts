@@ -100,6 +100,15 @@ android {
     }
 }
 
+ksp {
+    // Room schema export (AppDatabase's exportSchema = true): writes
+    // app/schemas/com.habitsfirst.androidclone.data.local.AppDatabase/<version>.json on
+    // every build. That's the ground truth Migrations.kt's raw SQL is checked against --
+    // regenerate it (just build) whenever an entity changes, and commit the new file
+    // alongside the version bump and its Migration.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -137,9 +146,13 @@ dependencies {
     implementation(libs.okhttp)
 
     testImplementation(libs.junit)
+    // Runs Migrations.kt's raw SQL against a real (JVM-only, no Android framework/
+    // emulator needed) SQLite engine in MigrationsSqlTest -- see that test's KDoc.
+    testImplementation(libs.sqlite.jdbc)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -66,7 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.BuildConfig
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
-import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
@@ -74,6 +75,9 @@ import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.habits.StatsRange
 import com.habitsfirst.androidclone.util.PermissionUtils
 import com.habitsfirst.androidclone.util.exportShareIntent
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,7 +216,7 @@ fun SettingsScreen(
                         Text(
                             if (state.limitedUnblockEnabled) {
                                 "Once today's habits are done, blocked apps and sites stay open for " +
-                                    "${LimitedUnblockRepository.WINDOW_MINUTES} minutes, then lock again."
+                                    "${state.limitedUnblockWindowMinutes} minutes, then lock again."
                             } else {
                                 "Off -- blocked apps and sites stay open the rest of the day once habits are done."
                             },
@@ -226,6 +230,40 @@ fun SettingsScreen(
                         )
                     },
                 )
+                if (state.limitedUnblockEnabled) {
+                    MinutesStepperRow(
+                        label = "Window length",
+                        value = state.limitedUnblockWindowMinutes,
+                        step = 5,
+                        range = PreferencesRepository.MIN_LIMITED_UNBLOCK_WINDOW_MINUTES..
+                            PreferencesRepository.MAX_LIMITED_UNBLOCK_WINDOW_MINUTES,
+                        onValueChange = viewModel::onLimitedUnblockWindowMinutesChanged,
+                    )
+                    ListItem(
+                        headlineContent = { Text("Streak bonus") },
+                        supportingContent = { Text("Adds extra minutes to the window for every day of your current streak") },
+                        trailingContent = {
+                            Switch(
+                                checked = state.limitedUnblockStreakBonusEnabled,
+                                onCheckedChange = {
+                                    viewModel.onLimitedUnblockStreakBonusChanged(it, state.limitedUnblockStreakBonusMinutesPerDay)
+                                },
+                            )
+                        },
+                    )
+                    if (state.limitedUnblockStreakBonusEnabled) {
+                        MinutesStepperRow(
+                            label = "Bonus minutes per streak day",
+                            value = state.limitedUnblockStreakBonusMinutesPerDay,
+                            step = 1,
+                            range = PreferencesRepository.MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY..
+                                PreferencesRepository.MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+                            onValueChange = {
+                                viewModel.onLimitedUnblockStreakBonusChanged(state.limitedUnblockStreakBonusEnabled, it)
+                            },
+                        )
+                    }
+                }
                 HorizontalDivider()
             }
 
@@ -332,6 +370,10 @@ fun SettingsScreen(
                     proofOfLifeTime = state.proofOfLifeTime,
                     proofOfLifeWindowMinutes = state.proofOfLifeWindowMinutes,
                     onProofOfLifeChanged = viewModel::onProofOfLifeChanged,
+                    weeklyDigestEnabled = state.weeklyDigestEnabled,
+                    weeklyDigestDayOfWeek = state.weeklyDigestDayOfWeek,
+                    weeklyDigestTime = state.weeklyDigestTime,
+                    onWeeklyDigestChanged = viewModel::onWeeklyDigestChanged,
                 )
             }
 
@@ -523,11 +565,16 @@ private fun BedtimeAndReminderSection(
     proofOfLifeTime: String,
     proofOfLifeWindowMinutes: Int,
     onProofOfLifeChanged: (Boolean, String, Int) -> Unit,
+    weeklyDigestEnabled: Boolean,
+    weeklyDigestDayOfWeek: DayOfWeek,
+    weeklyDigestTime: String,
+    onWeeklyDigestChanged: (Boolean, DayOfWeek, String) -> Unit,
 ) {
     var start by remember(bedtimeStart) { mutableStateOf(bedtimeStart) }
     var end by remember(bedtimeEnd) { mutableStateOf(bedtimeEnd) }
     var reminderTime by remember(morningReminderTime) { mutableStateOf(morningReminderTime) }
     var checkInTime by remember(proofOfLifeTime) { mutableStateOf(proofOfLifeTime) }
+    var digestTime by remember(weeklyDigestTime) { mutableStateOf(weeklyDigestTime) }
 
     ListItem(
         headlineContent = { Text("Enable bedtime lock") },
@@ -583,6 +630,45 @@ private fun BedtimeAndReminderSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
+            singleLine = true,
+        )
+    }
+    HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+
+    SectionHeader("Weekly digest")
+    ListItem(
+        headlineContent = { Text("Weekly recap") },
+        supportingContent = { Text("A once-a-week nudge, e.g. \"5/7 days complete, best streak 4 days\"") },
+        trailingContent = {
+            Switch(
+                checked = weeklyDigestEnabled,
+                onCheckedChange = { onWeeklyDigestChanged(it, weeklyDigestDayOfWeek, digestTime) },
+            )
+        },
+    )
+    if (weeklyDigestEnabled) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            DayOfWeek.values().forEach { day ->
+                FilterChip(
+                    selected = day == weeklyDigestDayOfWeek,
+                    onClick = { onWeeklyDigestChanged(weeklyDigestEnabled, day, digestTime) },
+                    label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) },
+                )
+            }
+        }
+        OutlinedTextField(
+            value = digestTime,
+            onValueChange = { digestTime = it; onWeeklyDigestChanged(weeklyDigestEnabled, weeklyDigestDayOfWeek, it) },
+            label = { Text("Time (HH:mm)") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             singleLine = true,
         )
     }
@@ -647,6 +733,36 @@ private fun daysUntil(untilEpochMillis: Long): Int {
 }
 
 private const val MILLIS_PER_DAY = 24 * 60 * 60 * 1000L
+
+/** A "Label  [-] N min [+]" row for a minutes value stepped by [step] and clamped to [range]. */
+@Composable
+private fun MinutesStepperRow(label: String, value: Int, step: Int, range: IntRange, onValueChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        IconButton(
+            onClick = { onValueChange((value - step).coerceIn(range)) },
+            enabled = value > range.first,
+        ) {
+            Icon(Icons.Filled.Remove, contentDescription = "Decrease $label")
+        }
+        Text(
+            "$value min",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        IconButton(
+            onClick = { onValueChange((value + step).coerceIn(range)) },
+            enabled = value < range.last,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Increase $label")
+        }
+    }
+}
 
 @Composable
 private fun SectionHeader(text: String) {

@@ -1,5 +1,6 @@
 package com.habitsfirst.androidclone.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.habitsfirst.androidclone.domain.model.Habit
@@ -23,10 +24,23 @@ data class HabitEntity(
     val verificationPrompt: String? = null,
     /** [HabitType.PHOTO] only: path to a saved example photo, if any. */
     val verificationExampleImagePath: String? = null,
+    /**
+     * Stored as [HabitKind.name]. `@ColumnInfo(defaultValue)` here isn't just documentation --
+     * MIGRATION_2_3 (see `data/local/migrations`) adds this column with
+     * `DEFAULT 'GATING'` for existing rows, and Room's schema validator compares that
+     * literal default against this annotation on every app start; letting them drift
+     * would make Room reject the migrated database as a schema mismatch.
+     */
+    @ColumnInfo(defaultValue = "'GATING'")
     val kind: String = HabitKind.GATING.name,
     val expiresAfterDate: String? = null,
     val easeInOrder: Int? = null,
-    /** Bitmask over [DayOfWeek.value] (bit `value - 1`), see [toDayOfWeekSet]. 0 means every day. */
+    /**
+     * Bitmask over [DayOfWeek.value] (bit `value - 1`), see [toDayOfWeekSet]. 0 means
+     * every day. `@ColumnInfo(defaultValue)` must track MIGRATION_5_6's
+     * `DEFAULT 0` -- see the note on [kind].
+     */
+    @ColumnInfo(defaultValue = "0")
     val scheduledDaysMask: Int = 0,
 )
 
