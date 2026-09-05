@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -66,7 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.BuildConfig
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
-import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
@@ -193,7 +194,7 @@ fun SettingsScreen(
                         Text(
                             if (state.limitedUnblockEnabled) {
                                 "Once today's habits are done, blocked apps and sites stay open for " +
-                                    "${LimitedUnblockRepository.WINDOW_MINUTES} minutes, then lock again."
+                                    "${state.limitedUnblockWindowMinutes} minutes, then lock again."
                             } else {
                                 "Off -- blocked apps and sites stay open the rest of the day once habits are done."
                             },
@@ -207,6 +208,40 @@ fun SettingsScreen(
                         )
                     },
                 )
+                if (state.limitedUnblockEnabled) {
+                    MinutesStepperRow(
+                        label = "Window length",
+                        value = state.limitedUnblockWindowMinutes,
+                        step = 5,
+                        range = PreferencesRepository.MIN_LIMITED_UNBLOCK_WINDOW_MINUTES..
+                            PreferencesRepository.MAX_LIMITED_UNBLOCK_WINDOW_MINUTES,
+                        onValueChange = viewModel::onLimitedUnblockWindowMinutesChanged,
+                    )
+                    ListItem(
+                        headlineContent = { Text("Streak bonus") },
+                        supportingContent = { Text("Adds extra minutes to the window for every day of your current streak") },
+                        trailingContent = {
+                            Switch(
+                                checked = state.limitedUnblockStreakBonusEnabled,
+                                onCheckedChange = {
+                                    viewModel.onLimitedUnblockStreakBonusChanged(it, state.limitedUnblockStreakBonusMinutesPerDay)
+                                },
+                            )
+                        },
+                    )
+                    if (state.limitedUnblockStreakBonusEnabled) {
+                        MinutesStepperRow(
+                            label = "Bonus minutes per streak day",
+                            value = state.limitedUnblockStreakBonusMinutesPerDay,
+                            step = 1,
+                            range = PreferencesRepository.MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY..
+                                PreferencesRepository.MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+                            onValueChange = {
+                                viewModel.onLimitedUnblockStreakBonusChanged(state.limitedUnblockStreakBonusEnabled, it)
+                            },
+                        )
+                    }
+                }
                 HorizontalDivider()
             }
 
@@ -617,6 +652,36 @@ private fun daysUntil(untilEpochMillis: Long): Int {
 }
 
 private const val MILLIS_PER_DAY = 24 * 60 * 60 * 1000L
+
+/** A "Label  [-] N min [+]" row for a minutes value stepped by [step] and clamped to [range]. */
+@Composable
+private fun MinutesStepperRow(label: String, value: Int, step: Int, range: IntRange, onValueChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        IconButton(
+            onClick = { onValueChange((value - step).coerceIn(range)) },
+            enabled = value > range.first,
+        ) {
+            Icon(Icons.Filled.Remove, contentDescription = "Decrease $label")
+        }
+        Text(
+            "$value min",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        IconButton(
+            onClick = { onValueChange((value + step).coerceIn(range)) },
+            enabled = value < range.last,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Increase $label")
+        }
+    }
+}
 
 @Composable
 private fun SectionHeader(text: String) {
