@@ -3,9 +3,11 @@ package com.habitsfirst.androidclone.ui.onboarding
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
+import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
@@ -56,6 +58,15 @@ data class OnboardingUiState(
      * [com.habitsfirst.androidclone.data.repository.EaseInRepository]).
      */
     val selectedTemplateOrder: List<HabitTemplate> = listOf(onboardingHabitTemplates[0], onboardingHabitTemplates[2]),
+    /** Curfew + check-in setup (design spec's onboarding screen 7) -- disclosed here, not sprung later. */
+    val bedtimeEnabled: Boolean = false,
+    val bedtimeStart: String = "22:30",
+    val bedtimeEnd: String = "06:30",
+    val proofOfLifeEnabled: Boolean = false,
+    val proofOfLifeTime: String = "08:00",
+    val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
+    /** Needed for photo verification and the check-in's photo check alike -- asked for here so the dependency is disclosed up front, not sprung later. */
+    val anthropicApiKey: String = "",
     val isFinishing: Boolean = false,
     val finished: Boolean = false,
 ) {
@@ -92,6 +103,8 @@ class OnboardingViewModel @Inject constructor(
     private val blockedAppRepository: BlockedAppRepository,
     private val habitRepository: HabitRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val bedtimeRepository: BedtimeRepository,
+    private val proofOfLifeRepository: ProofOfLifeRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -151,6 +164,22 @@ class OnboardingViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedTemplateOrder = current)
     }
 
+    fun onBedtimeChanged(enabled: Boolean, start: String, end: String) {
+        _uiState.value = _uiState.value.copy(bedtimeEnabled = enabled, bedtimeStart = start, bedtimeEnd = end)
+    }
+
+    fun onProofOfLifeChanged(enabled: Boolean, time: String, windowMinutes: Int) {
+        _uiState.value = _uiState.value.copy(
+            proofOfLifeEnabled = enabled,
+            proofOfLifeTime = time,
+            proofOfLifeWindowMinutes = windowMinutes,
+        )
+    }
+
+    fun onAnthropicApiKeyChanged(key: String) {
+        _uiState.value = _uiState.value.copy(anthropicApiKey = key)
+    }
+
     fun finishOnboarding() {
         if (_uiState.value.isFinishing) return
         _uiState.value = _uiState.value.copy(isFinishing = true)
@@ -177,6 +206,12 @@ class OnboardingViewModel @Inject constructor(
                         easeInOrder = if (isRamp) index else null,
                     ),
                 )
+            }
+
+            bedtimeRepository.setBedtime(state.bedtimeEnabled, state.bedtimeStart, state.bedtimeEnd)
+            proofOfLifeRepository.setProofOfLife(state.proofOfLifeEnabled, state.proofOfLifeTime, state.proofOfLifeWindowMinutes)
+            if (state.anthropicApiKey.isNotBlank()) {
+                preferencesRepository.setAnthropicApiKey(state.anthropicApiKey.trim())
             }
 
             preferencesRepository.setOnboardingComplete(true)

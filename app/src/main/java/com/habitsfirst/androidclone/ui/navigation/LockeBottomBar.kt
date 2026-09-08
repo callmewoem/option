@@ -2,6 +2,7 @@ package com.habitsfirst.androidclone.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -19,16 +20,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 private data class BottomTab(val screen: Screen, val label: String, val icon: ImageVector)
 
 private val TABS = listOf(
-    BottomTab(Screen.Home, "Home", Icons.Filled.Home),
+    BottomTab(Screen.Home, "Today", Icons.Filled.Home),
     BottomTab(Screen.Habits, "Stats", Icons.Filled.BarChart),
+    BottomTab(Screen.Todo, "To-do", Icons.Filled.Checklist),
 )
 
-/**
- * Shared bottom nav for the app's top-level destinations. A slightly raised, bordered
- * bar (rather than the bare Material default) so it reads as one more deliberately
- * outlined slab -- consistent with every card in the app -- instead of a plain surface
- * that happens to be pinned to the bottom.
- */
+/** Shared bottom nav for the app's top-level destinations -- app mode only, never shown in enforcement mode. */
 @Composable
 fun LockeBottomBar(navController: NavController) {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -52,7 +49,7 @@ fun LockeBottomBar(navController: NavController) {
                 icon = { Icon(tab.icon, contentDescription = tab.label) },
                 label = { Text(tab.label, style = MaterialTheme.typography.labelMedium) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
                     indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,

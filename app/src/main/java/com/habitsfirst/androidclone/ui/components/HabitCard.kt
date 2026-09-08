@@ -1,6 +1,5 @@
 package com.habitsfirst.androidclone.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,17 +24,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 
 /**
- * Flat + bordered rather than elevated -- brutalism has no drop shadows, only outline.
- * [kind]'s accent color runs down the left edge *and*, once the habit is logged for the
- * day, tints the whole card via [accentContainerColor] -- so "done" always reads in
- * that kind's own hue (a completed antihabit slip stays alarming, not a generic green)
- * instead of every kind converging on one identical "success" look.
+ * One info unit: icon/progress, name, one line of context, one trailing status (design
+ * spec §4). Inset, hairline-bordered, no drop shadow. [kind]'s accent color runs down
+ * the left edge and, once logged for the day, tints the whole card in that kind's own
+ * consequence color -- so "done" always reads in that kind's hue (a completed
+ * antihabit slip stays oxide/alarming, not a generic green). A completed item keeps its
+ * row (strikethrough on the subtitle, not removal) rather than vanishing.
  */
 @Composable
 fun HabitCard(
@@ -49,24 +48,21 @@ fun HabitCard(
     val habit = progress.habit
     val accent = kind.accentColor()
     // For an antihabit, isCompleted means "a slip was logged" -- bad, not good -- so
-    // the usual green-on-done mapping inverts.
+    // the usual highlight mapping inverts.
     val isSlip = kind == HabitKind.ANTIHABIT && progress.isCompleted
     val isDone = progress.isCompleted && kind != HabitKind.ANTIHABIT
     val isHighlighted = isSlip || isDone
 
-    Card(
-        onClick = onClick,
+    LockeCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isHighlighted) kind.accentContainerColor() else MaterialTheme.colorScheme.surface,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, if (isHighlighted) accent else MaterialTheme.colorScheme.outlineVariant),
+        onClick = onClick,
+        containerColor = if (isHighlighted) kind.accentContainerColor() else MaterialTheme.colorScheme.surface,
+        borderColor = if (isHighlighted) accent else MaterialTheme.colorScheme.outline,
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(
                 modifier = Modifier
-                    .width(6.dp)
+                    .width(4.dp)
                     .fillMaxHeight()
                     .background(accent),
             )
@@ -84,11 +80,7 @@ fun HabitCard(
                                 .size(40.dp)
                                 .clip(MaterialTheme.shapes.small)
                                 .background(
-                                    if (isSlip) {
-                                        MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHigh
-                                    },
+                                    if (isSlip) accent.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHigh,
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -96,14 +88,14 @@ fun HabitCard(
                                 imageVector = if (isSlip) Icons.Filled.WarningAmber else Icons.Outlined.Circle,
                                 contentDescription = null,
                                 modifier = Modifier.size(22.dp),
-                                tint = if (isSlip) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                                tint = if (isSlip) accent else MaterialTheme.colorScheme.outline,
                             )
                         }
                     } else {
                         CircularProgressIndicator(
                             progress = { progress.fraction },
                             modifier = Modifier.size(44.dp),
-                            strokeWidth = 4.dp,
+                            strokeWidth = 3.dp,
                             color = accent,
                             trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         )
@@ -117,7 +109,11 @@ fun HabitCard(
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = habit.name, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = habit.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        textDecoration = if (isDone) TextDecoration.LineThrough else null,
+                    )
                     val subtitle = when {
                         kind == HabitKind.ANTIHABIT -> if (isSlip) "Slipped today" else "Clean so far"
                         habit.type == HabitType.PHOTO ->

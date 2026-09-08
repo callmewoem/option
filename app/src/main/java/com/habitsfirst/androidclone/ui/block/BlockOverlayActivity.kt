@@ -5,11 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.OnBackPressedCallback
-import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.MainActivity
-import com.habitsfirst.androidclone.ui.theme.AppThemeViewModel
+import com.habitsfirst.androidclone.ui.theme.LockeMode
 import com.habitsfirst.androidclone.ui.theme.LockeTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -37,9 +34,7 @@ class BlockOverlayActivity : ComponentActivity() {
         )
 
         setContent {
-            val themeViewModel: AppThemeViewModel = hiltViewModel()
-            val variant by themeViewModel.selectedVariant.collectAsStateWithLifecycle()
-            LockeTheme(darkTheme = true, variant = variant) {
+            LockeTheme(mode = LockeMode.Enforcement) {
                 BlockScreen(
                     onTakeBreak = ::goHome,
                     onOpenHabitsFirst = ::openHabitsFirst,

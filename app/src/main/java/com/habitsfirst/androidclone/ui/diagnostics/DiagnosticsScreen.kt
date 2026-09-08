@@ -18,15 +18,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -42,6 +38,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.service.AppUsageHabitSyncResult
+import com.habitsfirst.androidclone.ui.components.LockeCard
+import com.habitsfirst.androidclone.ui.components.LockeGhostButton
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
+import com.habitsfirst.androidclone.ui.theme.LockeColor
 import com.habitsfirst.androidclone.util.PermissionUtils
 import java.text.DateFormat
 import java.util.Date
@@ -93,9 +93,10 @@ fun DiagnosticsScreen(
                             )
                         }
                         if (!state.hasUsageAccess) {
-                            OutlinedButton(onClick = { context.startActivity(PermissionUtils.usageAccessSettingsIntent(context)) }) {
-                                Text("Grant")
-                            }
+                            LockeGhostButton(
+                                text = "Grant",
+                                onClick = { context.startActivity(PermissionUtils.usageAccessSettingsIntent(context)) },
+                            )
                         }
                     }
                 }
@@ -144,19 +145,19 @@ fun DiagnosticsScreen(
             }
 
             item {
-                Button(
+                LockePrimaryButton(
+                    text = "Run sync now",
                     onClick = viewModel::runManualSync,
                     enabled = !state.isRunningManualSync,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (state.isRunningManualSync) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Run sync now")
-                }
+                    leadingIcon = {
+                        if (state.isRunningManualSync) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                    },
+                )
             }
 
             state.manualSyncCrash?.let { crash ->
@@ -202,7 +203,7 @@ private fun SectionCard(
     accentColor: Color = Color.Unspecified,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors()) {
+    LockeCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 title,
@@ -234,15 +235,10 @@ private fun ErrorText(message: String) {
 @Composable
 private fun SyncResultCard(result: AppUsageHabitSyncResult) {
     val hitTarget = result.liveComputedMinutes >= result.targetMinutes
-    Card(
+    LockeCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (result.writeError != null) {
-                MaterialTheme.colorScheme.errorContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+        containerColor = if (result.writeError != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+        borderColor = if (result.writeError != null) LockeColor.Oxide else MaterialTheme.colorScheme.outline,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

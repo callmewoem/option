@@ -11,9 +11,11 @@ sealed class Screen(val route: String) {
     data object OnboardingPickApps : Screen("onboarding/pick_apps")
     data object OnboardingPickHabits : Screen("onboarding/pick_habits")
     data object OnboardingPermissions : Screen("onboarding/permissions")
+    data object OnboardingCurfewCheckIn : Screen("onboarding/curfew_checkin")
 
     data object Home : Screen("home")
     data object Habits : Screen("habits")
+    data object Todo : Screen("todo")
     data object AppPicker : Screen("app_picker")
     data object UrlBlockList : Screen("url_block_list")
     data object Settings : Screen("settings")

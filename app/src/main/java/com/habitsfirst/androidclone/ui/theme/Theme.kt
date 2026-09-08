@@ -1,203 +1,153 @@
 package com.habitsfirst.androidclone.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.habitsfirst.androidclone.domain.model.ThemeVariant
 
 /**
- * Every [ThemeVariant] is the same paper/concrete neutral scale underneath -- only the
- * primary/secondary accent pair changes. Centralizing that shared wiring here (rather
- * than repeating ~15 neutral role assignments per variant, per light/dark) is what
- * makes it possible to fill in the *entire* Material tonal system -- including the
- * surfaceContainer ladder that [androidx.compose.material3.NavigationBar], dialogs,
- * bottom sheets and snackbars pull from by default -- without six-way copy/paste drift.
- * Before this, those roles were left at Material's baseline (blue-gray) neutrals
- * because `lightColorScheme`/`darkColorScheme` default them when not passed explicitly,
- * so a NavigationBar or AlertDialog quietly broke the app's warm concrete/paper look.
+ * Locke's one bold move (design spec §3): every screen is either *navigating* (app
+ * mode -- bone, light) or *taking something away / demanding something* (enforcement
+ * mode -- iron, dark). This isn't a light/dark theme preference -- it never follows the
+ * system setting -- it's picked per screen by what that screen is doing. See
+ * [LockeTheme].
  */
-private fun lightScheme(
-    primary: Color,
-    onPrimary: Color,
-    primaryContainer: Color,
-    onPrimaryContainer: Color,
-    secondary: Color,
-    onSecondary: Color,
-    secondaryContainer: Color,
-    onSecondaryContainer: Color,
-    outline: Color = Concrete40,
-) = lightColorScheme(
-    primary = primary,
-    onPrimary = onPrimary,
-    primaryContainer = primaryContainer,
-    onPrimaryContainer = onPrimaryContainer,
-    secondary = secondary,
-    onSecondary = onSecondary,
-    secondaryContainer = secondaryContainer,
-    onSecondaryContainer = onSecondaryContainer,
-    background = Concrete99,
-    onBackground = Concrete10,
-    surface = Concrete99,
-    onSurface = Concrete10,
-    surfaceVariant = Concrete95,
-    onSurfaceVariant = Concrete30,
-    outline = outline,
-    outlineVariant = Concrete90,
-    error = Error40,
-    onError = Concrete99,
-    errorContainer = ErrorContainerLight,
-    onErrorContainer = OnErrorContainerLight,
-    surfaceContainerLowest = Concrete99,
-    surfaceContainerLow = Concrete97,
-    surfaceContainer = Concrete95,
-    surfaceContainerHigh = Concrete93,
-    surfaceContainerHighest = Concrete90,
-    surfaceDim = Concrete90,
-    surfaceBright = Concrete99,
-    inverseSurface = Concrete20,
-    inverseOnSurface = Concrete95,
+enum class LockeMode { App, Enforcement }
+
+val LocalLockeMode = staticCompositionLocalOf { LockeMode.App }
+
+/**
+ * Builds a Material3 [androidx.compose.material3.ColorScheme] entirely from
+ * [LockeColor] -- iron/bone/verdigris/brass/oxide, no other hue anywhere. Intermediate
+ * "container" tones are linear blends toward the mode's own surface rather than a
+ * separate design token, since the spec's palette has no room for a sixth color.
+ * [ColorScheme.surfaceTint][androidx.compose.material3.ColorScheme] is pinned to
+ * [Color.Transparent] so Material3's automatic dark-theme elevation overlay can't tint
+ * an iron card green on its own -- every surface stays flat and every accent stays
+ * intentional.
+ */
+private fun appColorScheme() = lightColorScheme(
+    background = LockeColor.Bone,
+    onBackground = LockeColor.OnBone,
+    surface = LockeColor.Bone,
+    onSurface = LockeColor.OnBone,
+    surfaceVariant = LockeColor.BoneIn,
+    onSurfaceVariant = LockeColor.OnBoneMuted,
+    surfaceContainerLowest = LockeColor.Bone,
+    surfaceContainerLow = LockeColor.Bone,
+    surfaceContainer = LockeColor.BoneIn,
+    surfaceContainerHigh = lerp(LockeColor.BoneIn, LockeColor.Iron, 0.06f),
+    surfaceContainerHighest = lerp(LockeColor.BoneIn, LockeColor.Iron, 0.12f),
+    surfaceDim = LockeColor.BoneIn,
+    surfaceBright = LockeColor.Bone,
+    surfaceTint = Color.Transparent,
+    inverseSurface = LockeColor.Iron,
+    inverseOnSurface = LockeColor.Bone,
+    primary = LockeColor.Verdigris,
+    onPrimary = LockeColor.OnVerdigris,
+    primaryContainer = lerp(LockeColor.Bone, LockeColor.Verdigris, 0.16f),
+    onPrimaryContainer = LockeColor.Verdigris,
+    // Material3's own default styling for FilterChip/SegmentedButton (a plain "this
+    // option is selected" state, not a reward) pulls straight from
+    // secondary/secondaryContainer -- so these two stay a neutral iron/bone blend
+    // rather than brass, or every filter chip and segmented button in the app would
+    // read as "earned" (design spec §2, §4: brass is earned-only, never decorative).
+    // Anywhere something is genuinely earned, it's colored from LockeColor.Brass
+    // directly instead of through this role.
+    secondary = lerp(LockeColor.Bone, LockeColor.Iron, 0.55f),
+    onSecondary = LockeColor.Bone,
+    secondaryContainer = lerp(LockeColor.Bone, LockeColor.Iron, 0.10f),
+    onSecondaryContainer = lerp(LockeColor.Bone, LockeColor.Iron, 0.6f),
+    tertiary = lerp(LockeColor.Bone, LockeColor.Iron, 0.55f),
+    onTertiary = LockeColor.Bone,
+    tertiaryContainer = lerp(LockeColor.Bone, LockeColor.Iron, 0.10f),
+    onTertiaryContainer = lerp(LockeColor.Bone, LockeColor.Iron, 0.6f),
+    error = LockeColor.Oxide,
+    onError = LockeColor.OnOxide,
+    errorContainer = lerp(LockeColor.Bone, LockeColor.Oxide, 0.16f),
+    onErrorContainer = LockeColor.Oxide,
+    outline = LockeColor.BorderOnBone,
+    outlineVariant = LockeColor.BorderOnBone.copy(alpha = 0.08f),
 )
 
-private fun darkScheme(
-    primary: Color,
-    onPrimary: Color,
-    primaryContainer: Color,
-    onPrimaryContainer: Color,
-    secondary: Color,
-    onSecondary: Color,
-    secondaryContainer: Color,
-    onSecondaryContainer: Color,
-    outline: Color = Concrete60,
-    onSurfaceVariant: Color = Concrete80,
-) = darkColorScheme(
-    primary = primary,
-    onPrimary = onPrimary,
-    primaryContainer = primaryContainer,
-    onPrimaryContainer = onPrimaryContainer,
-    secondary = secondary,
-    onSecondary = onSecondary,
-    secondaryContainer = secondaryContainer,
-    onSecondaryContainer = onSecondaryContainer,
-    background = Concrete10,
-    onBackground = Concrete90,
-    surface = Concrete10,
-    onSurface = Concrete90,
-    surfaceVariant = Concrete20,
-    onSurfaceVariant = onSurfaceVariant,
-    outline = outline,
-    outlineVariant = Concrete30,
-    error = Error80,
-    onError = Concrete10,
-    errorContainer = Error40,
-    onErrorContainer = OnErrorContainerDark,
-    surfaceContainerLowest = Concrete10,
-    surfaceContainerLow = Concrete15,
-    surfaceContainer = Concrete20,
-    surfaceContainerHigh = Concrete30,
-    surfaceContainerHighest = Concrete40,
-    surfaceDim = Concrete10,
-    surfaceBright = Concrete40,
-    inverseSurface = Concrete90,
-    inverseOnSurface = Concrete20,
+private fun enforcementColorScheme() = darkColorScheme(
+    background = LockeColor.Iron,
+    onBackground = LockeColor.OnIron,
+    surface = LockeColor.Iron,
+    onSurface = LockeColor.OnIron,
+    surfaceVariant = LockeColor.Iron2,
+    onSurfaceVariant = LockeColor.OnIronMuted,
+    surfaceContainerLowest = LockeColor.Iron,
+    surfaceContainerLow = LockeColor.Iron,
+    surfaceContainer = LockeColor.Iron2,
+    surfaceContainerHigh = lerp(LockeColor.Iron2, LockeColor.Bone, 0.06f),
+    surfaceContainerHighest = lerp(LockeColor.Iron2, LockeColor.Bone, 0.12f),
+    surfaceDim = LockeColor.Iron,
+    surfaceBright = LockeColor.Iron2,
+    surfaceTint = Color.Transparent,
+    inverseSurface = LockeColor.Bone,
+    inverseOnSurface = LockeColor.Iron,
+    primary = LockeColor.VerdigrisLight,
+    onPrimary = LockeColor.Iron,
+    primaryContainer = lerp(LockeColor.Iron2, LockeColor.Verdigris, 0.55f),
+    onPrimaryContainer = LockeColor.VerdigrisLight,
+    // See appColorScheme()'s comment -- kept neutral for the same reason: a default
+    // FilterChip/SegmentedButton selection is not a reward.
+    secondary = lerp(LockeColor.Iron, LockeColor.Bone, 0.55f),
+    onSecondary = LockeColor.Iron,
+    secondaryContainer = lerp(LockeColor.Iron, LockeColor.Bone, 0.14f),
+    onSecondaryContainer = lerp(LockeColor.Iron, LockeColor.Bone, 0.65f),
+    tertiary = lerp(LockeColor.Iron, LockeColor.Bone, 0.55f),
+    onTertiary = LockeColor.Iron,
+    tertiaryContainer = lerp(LockeColor.Iron, LockeColor.Bone, 0.14f),
+    onTertiaryContainer = lerp(LockeColor.Iron, LockeColor.Bone, 0.65f),
+    error = LockeColor.OxideLight,
+    onError = LockeColor.Iron,
+    errorContainer = lerp(LockeColor.Iron2, LockeColor.Oxide, 0.5f),
+    onErrorContainer = LockeColor.OxideLight,
+    outline = LockeColor.BorderOnIron,
+    outlineVariant = LockeColor.BorderOnIron.copy(alpha = 0.08f),
 )
 
-private fun lightSchemeFor(variant: ThemeVariant) = when (variant) {
-    ThemeVariant.Moss -> lightScheme(
-        primary = Moss40, onPrimary = Concrete99, primaryContainer = Moss90, onPrimaryContainer = Moss30,
-        secondary = MossSecondary40, onSecondary = Concrete99,
-        secondaryContainer = MossSecondary90, onSecondaryContainer = MossSecondary20,
-    )
-    ThemeVariant.Rust -> lightScheme(
-        primary = Rust40, onPrimary = Concrete99, primaryContainer = Rust90, onPrimaryContainer = Rust30,
-        secondary = RustSecondary40, onSecondary = Concrete99,
-        secondaryContainer = RustSecondary90, onSecondaryContainer = RustSecondary20,
-    )
-    ThemeVariant.Concrete -> lightScheme(
-        primary = Ash40, onPrimary = Concrete99, primaryContainer = Ash90, onPrimaryContainer = Ash30,
-        secondary = AshSecondary40, onSecondary = Concrete99,
-        secondaryContainer = AshSecondary90, onSecondaryContainer = AshSecondary20,
-    )
-    ThemeVariant.Ink -> lightScheme(
-        primary = Ink40, onPrimary = Concrete99, primaryContainer = Ink90, onPrimaryContainer = Ink30,
-        secondary = InkSecondary40, onSecondary = Concrete99,
-        secondaryContainer = InkSecondary90, onSecondaryContainer = InkSecondary20,
-        outline = Concrete10, // Ink is the loudest variant -- a near-black border reads intentional, not muddy.
-    )
-    ThemeVariant.Modern -> lightScheme(
-        primary = Slate40, onPrimary = Concrete99, primaryContainer = Slate90, onPrimaryContainer = Slate30,
-        secondary = SlateSecondary40, onSecondary = Concrete99,
-        secondaryContainer = SlateSecondary90, onSecondaryContainer = SlateSecondary20,
-    )
-    ThemeVariant.Receipt -> lightScheme(
-        primary = Carbon40, onPrimary = Concrete99, primaryContainer = Carbon90, onPrimaryContainer = Carbon30,
-        secondary = CarbonSecondary40, onSecondary = Concrete99,
-        secondaryContainer = CarbonSecondary90, onSecondaryContainer = CarbonSecondary20,
-    )
-}
-
-private fun darkSchemeFor(variant: ThemeVariant) = when (variant) {
-    ThemeVariant.Moss -> darkScheme(
-        primary = Moss80, onPrimary = Moss30, primaryContainer = Moss30, onPrimaryContainer = Moss90,
-        secondary = MossSecondary80, onSecondary = MossSecondary20,
-        secondaryContainer = MossSecondary20, onSecondaryContainer = MossSecondary90,
-    )
-    ThemeVariant.Rust -> darkScheme(
-        primary = Rust80, onPrimary = Rust30, primaryContainer = Rust30, onPrimaryContainer = Rust90,
-        secondary = RustSecondary80, onSecondary = RustSecondary20,
-        secondaryContainer = RustSecondary20, onSecondaryContainer = RustSecondary90,
-    )
-    ThemeVariant.Concrete -> darkScheme(
-        primary = Ash80, onPrimary = Ash30, primaryContainer = Ash30, onPrimaryContainer = Ash90,
-        secondary = AshSecondary80, onSecondary = AshSecondary20,
-        secondaryContainer = AshSecondary20, onSecondaryContainer = AshSecondary90,
-    )
-    ThemeVariant.Ink -> darkScheme(
-        primary = Ink80, onPrimary = Ink30, primaryContainer = Ink30, onPrimaryContainer = Ink90,
-        secondary = InkSecondary80, onSecondary = InkSecondary20,
-        secondaryContainer = InkSecondary20, onSecondaryContainer = InkSecondary90,
-        outline = Concrete70, onSurfaceVariant = Concrete90,
-    )
-    ThemeVariant.Modern -> darkScheme(
-        primary = Slate80, onPrimary = Slate30, primaryContainer = Slate30, onPrimaryContainer = Slate90,
-        secondary = SlateSecondary80, onSecondary = SlateSecondary20,
-        secondaryContainer = SlateSecondary20, onSecondaryContainer = SlateSecondary90,
-    )
-    ThemeVariant.Receipt -> darkScheme(
-        primary = Carbon80, onPrimary = Carbon30, primaryContainer = Carbon30, onPrimaryContainer = Carbon90,
-        secondary = CarbonSecondary80, onSecondary = CarbonSecondary20,
-        secondaryContainer = CarbonSecondary20, onSecondaryContainer = CarbonSecondary90,
-    )
-}
-
+/**
+ * Root theme for every screen. [mode] is the whole design language in one switch --
+ * pass [LockeMode.Enforcement] for anything taking something away or demanding
+ * something (the block cover, curfew, the morning lock, the penalty sheet, the
+ * lootbox reveal) and leave it at the [LockeMode.App] default everywhere else. There is
+ * deliberately no `darkTheme`/system-preference parameter: which mode a screen is in
+ * is a design decision about what that screen *does*, not a user accessibility setting.
+ */
 @Composable
-fun LockeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    variant: ThemeVariant = ThemeVariant.DEFAULT,
-    content: @Composable () -> Unit,
-) {
-    val colorScheme = if (darkTheme) darkSchemeFor(variant) else lightSchemeFor(variant)
+fun LockeTheme(mode: LockeMode = LockeMode.App, content: @Composable () -> Unit) {
+    val colorScheme = if (mode == LockeMode.App) appColorScheme() else enforcementColorScheme()
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
             window.statusBarColor = colorScheme.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            window.navigationBarColor = colorScheme.background.toArgb()
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = mode == LockeMode.App
+            insetsController.isAppearanceLightNavigationBars = mode == LockeMode.App
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = LockeTypography,
-        shapes = LockeShapes,
-        content = content,
-    )
+    CompositionLocalProvider(LocalLockeMode provides mode) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = LockeTypography,
+            shapes = LockeShapes,
+            content = content,
+        )
+    }
 }

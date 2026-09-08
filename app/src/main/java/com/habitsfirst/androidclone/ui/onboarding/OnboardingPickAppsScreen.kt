@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 
 @Composable
 fun OnboardingPickAppsScreen(
@@ -36,17 +36,16 @@ fun OnboardingPickAppsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 2, totalSteps = 4, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 2, totalSteps = 5, onBack = onBack) },
         bottomBar = {
-            Button(
+            LockePrimaryButton(
+                text = stringResource(R.string.onboarding_continue),
                 onClick = onContinue,
                 enabled = state.canContinueFromApps,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp),
-            ) {
-                Text(stringResource(R.string.onboarding_continue))
-            }
+            )
         },
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {

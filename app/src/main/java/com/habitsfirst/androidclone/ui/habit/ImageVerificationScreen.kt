@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +27,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.LockeCard
 import com.habitsfirst.androidclone.ui.components.PhotoVerificationCapture
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +65,7 @@ fun ImageVerificationScreen(
 
             val habit = state.habit
             if (habit != null && (!habit.verificationPrompt.isNullOrBlank() || habit.verificationExampleImagePath != null)) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = "What counts as done", style = MaterialTheme.typography.titleSmall)
                         Spacer(modifier = Modifier.height(6.dp))
@@ -83,7 +81,7 @@ fun ImageVerificationScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(160.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
+                                    .clip(MaterialTheme.shapes.medium),
                             )
                         }
                     }
@@ -101,6 +99,7 @@ fun ImageVerificationScreen(
                 onRetake = viewModel::onRetake,
                 onSubmit = viewModel::onSubmit,
                 onOpenSettings = onOpenSettings,
+                onOverride = viewModel::onOverride,
             )
         }
     }

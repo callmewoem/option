@@ -45,6 +45,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.domain.model.BlockMode
 import com.habitsfirst.androidclone.domain.model.UrlBlockList
+import com.habitsfirst.androidclone.ui.components.ChipConsequence
+import com.habitsfirst.androidclone.ui.components.ConsequenceChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +67,7 @@ fun UrlBlockScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
@@ -167,7 +170,13 @@ private fun BlockListRow(
         ListItem(
             headlineContent = { Text(list.name) },
             supportingContent = {
-                Text(if (list.domainCount == 1) "1 domain" else "${list.domainCount} domains")
+                Column {
+                    Text(if (list.domainCount == 1) "1 domain" else "${list.domainCount} domains")
+                    if (list.isEnabled && list.blockMode == BlockMode.PERMANENT) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ConsequenceChip(text = "Permanent, no bypass", consequence = ChipConsequence.Permanent)
+                    }
+                }
             },
             trailingContent = {
                 Row {

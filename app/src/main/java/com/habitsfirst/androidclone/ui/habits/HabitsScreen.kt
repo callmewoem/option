@@ -22,16 +22,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,9 +55,11 @@ import com.habitsfirst.androidclone.data.repository.ConsistencyStats
 import com.habitsfirst.androidclone.data.repository.TimeOfDayBucket
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.ui.components.Heatmap
+import com.habitsfirst.androidclone.ui.components.LockeCard
 import com.habitsfirst.androidclone.ui.components.accentColor
 import com.habitsfirst.androidclone.ui.components.heatmapFractionColor
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
+import com.habitsfirst.androidclone.ui.theme.LockeColor
 import com.habitsfirst.androidclone.util.ComposeCaptureUtil
 import com.habitsfirst.androidclone.util.captureGraphicsLayer
 import com.habitsfirst.androidclone.util.rememberCaptureGraphicsLayer
@@ -95,8 +95,8 @@ fun HabitsScreen(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Stats") },
+            TopAppBar(
+                title = { Text("Stats", style = MaterialTheme.typography.headlineSmall) },
                 actions = {
                     IconButton(
                         enabled = !isSharingStats,
@@ -127,7 +127,7 @@ fun HabitsScreen(
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
-                colors = TopAppBarDefaults.largeTopAppBarColors(),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         bottomBar = { LockeBottomBar(navController) },
@@ -168,9 +168,12 @@ fun HabitsScreen(
                     val today = LocalDate.now()
                     // Canvas draws in a DrawScope, not a composable context, so these have
                     // to be resolved here and captured by value, not read inside colorForDate.
+                    // Gold star and scarred are drawn straight from LockeColor, not a
+                    // Material role -- neither is ever reinterpreted as anything else
+                    // (design spec §4).
                     val primary = MaterialTheme.colorScheme.primary
-                    val secondary = MaterialTheme.colorScheme.secondary
-                    val error = MaterialTheme.colorScheme.error
+                    val goldStar = LockeColor.GoldStar
+                    val scarred = LockeColor.Scarred
                     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
                     Heatmap(
                         startDate = today.minusWeeks(state.range.weeks),
@@ -178,8 +181,8 @@ fun HabitsScreen(
                         colorForDate = { date ->
                             val score = state.dayScores[date]
                             when {
-                                date in state.goldStarDates -> secondary
-                                date in state.scarredDates -> error
+                                date in state.goldStarDates -> goldStar
+                                date in state.scarredDates -> scarred
                                 score == null -> emptyColor
                                 else -> heatmapFractionColor(score, primary)
                             }
@@ -373,7 +376,7 @@ private fun StreakSummaryRow(
         StatCard(
             label = "Broken",
             value = "$brokenStreaksInRange",
-            valueColor = if (brokenStreaksInRange > 0) MaterialTheme.colorScheme.error else null,
+            valueColor = if (brokenStreaksInRange > 0) LockeColor.Scarred else null,
             modifier = Modifier.weight(1f),
         )
     }
@@ -381,11 +384,7 @@ private fun StreakSummaryRow(
 
 @Composable
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null) {
-    Card(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
+    LockeCard(modifier = modifier, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
