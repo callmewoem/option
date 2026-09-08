@@ -10,11 +10,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.domain.model.UrlBlockList
 import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 
 @Composable
@@ -79,6 +85,36 @@ fun OnboardingPickAppsScreen(
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+                    item {
+                        Text(
+                            text = "BLOCKED WEBSITES",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    items(state.premadeUrlLists, key = { it.id }) { list ->
+                        SiteListRow(list = list, onToggle = { enabled -> viewModel.onUrlListToggled(list.id, enabled) })
+                    }
+                    item {
+                        Text(
+                            text = "Comprehensive lists, kept current automatically. Turning one on blocks it " +
+                                "permanently -- no habit or grace token gets past it, unlike the apps below. " +
+                                "Switch that to gated, or build a custom list, later in Settings.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "LOCKED APPS",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                     items(state.sortedInstalledApps, key = { it.packageName }) { app ->
                         val checked = app.packageName in state.selectedPackageNames
                         val usageMinutes = state.usageMinutesFor(app)
@@ -116,4 +152,18 @@ fun OnboardingPickAppsScreen(
             }
         }
     }
+}
+
+/** One premade blanket list's onboarding row -- a switch since it persists, matching every other blanket-list toggle in the app. */
+@Composable
+private fun SiteListRow(list: UrlBlockList, onToggle: (Boolean) -> Unit) {
+    ListItem(
+        headlineContent = { Text(list.name) },
+        supportingContent = { Text(if (list.domainCount == 1) "1 domain" else "${list.domainCount} domains") },
+        leadingContent = { Icon(Icons.Filled.Public, contentDescription = null) },
+        trailingContent = {
+            Switch(checked = list.isEnabled, onCheckedChange = onToggle)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
