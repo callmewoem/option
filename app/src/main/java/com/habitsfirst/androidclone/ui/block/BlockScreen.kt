@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
@@ -54,13 +53,25 @@ fun BlockScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Bedtime is a hard curfew and a permanent block never lifts -- neither auto-
-    // dismisses just because today's habits happen to be done. Nor does a block that's
-    // holding despite habits being complete (an active penalty, or limited unblocking's
-    // window running out) -- otherwise this would fire the instant it's shown, since
-    // state.allHabitsComplete is already true in exactly that case.
-    LaunchedEffect(state.allHabitsComplete, state.isBedtime, state.isPermanent, state.habitsCompleteButLocked) {
-        if (state.allHabitsComplete && !state.isBedtime && !state.isPermanent && !state.habitsCompleteButLocked) {
+    // Curfew is its own screen entirely -- no buttons, pure countdown (design spec
+    // §4, §9): a hard digital curfew a person mid-craving could still tap "Take a
+    // break" out of isn't a curfew. Branching here, before anything else in this
+    // composable runs, keeps that screen from inheriting any of the single-app cover's
+    // affordances by accident.
+    if (state.isBedtime) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CurfewScreen(bedtimeEnd = state.bedtimeEnd)
+        }
+        return
+    }
+
+    // A permanent block never lifts, so it never auto-dismisses just because today's
+    // habits happen to be done. Nor does a block that's holding despite habits being
+    // complete (an active penalty, or limited unblocking's window running out) --
+    // otherwise this would fire the instant it's shown, since state.allHabitsComplete
+    // is already true in exactly that case.
+    LaunchedEffect(state.allHabitsComplete, state.isPermanent, state.habitsCompleteButLocked) {
+        if (state.allHabitsComplete && !state.isPermanent && !state.habitsCompleteButLocked) {
             onAllHabitsComplete()
         }
     }
@@ -77,10 +88,10 @@ fun BlockScreen(
         ) {
             Spacer(modifier = Modifier.height(32.dp))
 
-            val (icon, iconTint, iconOutlined) = when {
-                state.isBedtime -> Triple(Icons.Filled.Bedtime, MaterialTheme.colorScheme.onSurfaceVariant, false)
-                state.isPermanent -> Triple(Icons.Filled.Block, LockeColor.OnIron, true)
-                else -> Triple(Icons.Filled.Lock, MaterialTheme.colorScheme.primary, false)
+            val (icon, iconTint, iconOutlined) = if (state.isPermanent) {
+                Triple(Icons.Filled.Block, LockeColor.OnIron, true)
+            } else {
+                Triple(Icons.Filled.Lock, MaterialTheme.colorScheme.primary, false)
             }
             Surface(
                 shape = CircleShape,
@@ -99,17 +110,16 @@ fun BlockScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = when {
-                    state.isBedtime -> stringResource(R.string.block_bedtime_title)
-                    state.isPermanent -> stringResource(R.string.block_permanent_title, state.blockedLabel)
-                    else -> stringResource(R.string.block_title, state.blockedLabel)
+                text = if (state.isPermanent) {
+                    stringResource(R.string.block_permanent_title, state.blockedLabel)
+                } else {
+                    stringResource(R.string.block_title, state.blockedLabel)
                 },
                 style = MaterialTheme.typography.headlineMedium,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = when {
-                    state.isBedtime -> stringResource(R.string.block_bedtime_subtitle)
                     state.isPermanent -> stringResource(
                         R.string.block_permanent_subtitle,
                         state.listName.orEmpty(),
@@ -123,7 +133,7 @@ fun BlockScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (state.isBedtime || state.isPermanent) {
+            if (state.isPermanent) {
                 Spacer(modifier = Modifier.weight(1f))
             } else {
                 LazyColumn(

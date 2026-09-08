@@ -8,10 +8,12 @@ import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
+import com.habitsfirst.androidclone.data.repository.UrlBlockRepository
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.InstalledApp
+import com.habitsfirst.androidclone.domain.model.UrlBlockList
 import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.habit.defaultTarget
 import com.habitsfirst.androidclone.util.DateProvider
@@ -58,6 +60,16 @@ data class OnboardingUiState(
      * [com.habitsfirst.androidclone.data.repository.EaseInRepository]).
      */
     val selectedTemplateOrder: List<HabitTemplate> = listOf(onboardingHabitTemplates[0], onboardingHabitTemplates[2]),
+    /**
+     * The two premade "blanket" site lists (porn, social media) -- shown alongside the
+     * app picker so "what gets blocked" covers apps *and* site lists in one step
+     * (design spec's onboarding screen 5), instead of leaving site lists undiscovered
+     * until Settings. Toggling writes straight through to [UrlBlockRepository], same as
+     * the standalone Blocked Websites screen -- not batched at finish, since there's
+     * nothing to batch (an unfinished onboarding just leaves it as the user left it,
+     * same as every other setting here before Continue is pressed).
+     */
+    val premadeUrlLists: List<UrlBlockList> = emptyList(),
     /** Curfew + check-in setup (design spec's onboarding screen 7) -- disclosed here, not sprung later. */
     val bedtimeEnabled: Boolean = false,
     val bedtimeStart: String = "22:30",
@@ -105,6 +117,7 @@ class OnboardingViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val bedtimeRepository: BedtimeRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
+    private val urlBlockRepository: UrlBlockRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -117,6 +130,11 @@ class OnboardingViewModel @Inject constructor(
             // recommended-first ordering, re-sorting live once usage minutes arrive.
             val apps = installedAppsProvider.getLaunchableApps()
             _uiState.value = _uiState.value.copy(installedApps = apps)
+        }
+        viewModelScope.launch {
+            urlBlockRepository.observeBlockLists().collect { lists ->
+                _uiState.value = _uiState.value.copy(premadeUrlLists = lists.filter { it.source.isPremade })
+            }
         }
         refreshUsageAccessState()
     }
@@ -162,6 +180,10 @@ class OnboardingViewModel @Inject constructor(
         if (target == index) return
         current.add(target, current.removeAt(index))
         _uiState.value = _uiState.value.copy(selectedTemplateOrder = current)
+    }
+
+    fun onUrlListToggled(listId: String, enabled: Boolean) {
+        viewModelScope.launch { urlBlockRepository.setListEnabled(listId, enabled) }
     }
 
     fun onBedtimeChanged(enabled: Boolean, start: String, end: String) {

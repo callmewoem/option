@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.ui.block
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.repository.BedtimeRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.domain.model.HabitProgress
@@ -24,6 +25,8 @@ data class BlockUiState(
     val incompleteHabits: List<HabitProgress> = emptyList(),
     val allHabitsComplete: Boolean = false,
     val isBedtime: Boolean = false,
+    /** [isBedtime] only: "HH:mm" the curfew window ends, for the pure countdown on [CurfewScreen]. */
+    val bedtimeEnd: String = "06:30",
     /** True when this block kicked in despite [allHabitsComplete] -- an active penalty, or limited unblocking's window running out. Set once at launch, same as [isBedtime]/[isPermanent]; see [com.habitsfirst.androidclone.service.AppBlockAccessibilityService.LockState.Locked]. */
     val habitsCompleteButLocked: Boolean = false,
     val graceTokenCount: Int = 0,
@@ -34,6 +37,7 @@ data class BlockUiState(
 class BlockOverlayViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val lootboxRepository: LootboxRepository,
+    private val bedtimeRepository: BedtimeRepository,
     installedAppsProvider: InstalledAppsProvider,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -62,7 +66,8 @@ class BlockOverlayViewModel @Inject constructor(
         blockedLabel,
         lootboxRepository.graceTokenCount,
         graceRedeemed,
-    ) { progress, label, graceTokens, redeemed ->
+        bedtimeRepository.settings,
+    ) { progress, label, graceTokens, redeemed, bedtimeSettings ->
         val incomplete = progress.filterNot { it.isCompleted }
         BlockUiState(
             blockedLabel = label,
@@ -72,6 +77,7 @@ class BlockOverlayViewModel @Inject constructor(
             incompleteHabits = incomplete,
             allHabitsComplete = progress.isNotEmpty() && incomplete.isEmpty(),
             isBedtime = isBedtime,
+            bedtimeEnd = bedtimeSettings.end,
             habitsCompleteButLocked = habitsCompleteButLocked,
             graceTokenCount = graceTokens,
             graceRedeemed = redeemed,
