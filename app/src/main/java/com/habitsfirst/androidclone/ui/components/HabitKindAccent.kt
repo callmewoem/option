@@ -4,28 +4,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.habitsfirst.androidclone.domain.model.HabitKind
+import com.habitsfirst.androidclone.ui.theme.LocalLockeMode
+import com.habitsfirst.androidclone.ui.theme.LockeColor
+import com.habitsfirst.androidclone.ui.theme.LockeMode
 
 /**
- * The color signal that tells Gating/Tracked/Antihabit apart at a glance, so kind
- * doesn't have to be read off a label every time -- used as the accent bar on
- * [HabitCard] everywhere it appears (Home, Habits).
+ * The color signal that tells Gating/Tracked/Antihabit apart at a glance -- coded by
+ * *consequence*, matching [ConsequenceChip] (design spec §4): gating is verdigris
+ * ("gates your apps"), tracked is a plain neutral grey ("just tracked" -- brass is
+ * earned-only and never stands in for a merely-tracked habit), antihabit is oxide
+ * ("abstinence").
  */
 @Composable
 fun HabitKind.accentColor(): Color = when (this) {
     HabitKind.GATING -> MaterialTheme.colorScheme.primary
-    HabitKind.TRACKED -> MaterialTheme.colorScheme.secondary
-    HabitKind.ANTIHABIT -> MaterialTheme.colorScheme.error
+    HabitKind.TRACKED -> if (LocalLockeMode.current == LockeMode.Enforcement) LockeColor.NeutralOnIron else LockeColor.NeutralOnBone
+    HabitKind.ANTIHABIT -> LockeColor.Oxide
 }
 
-/**
- * The tinted-container counterpart of [accentColor] -- what a completed [HabitCard]
- * fills with, so "done" always reads in the same hue as the kind's own accent bar
- * instead of every kind converging on one generic "success green".
- */
+/** The tinted-container counterpart of [accentColor] -- what a completed [HabitCard] fills with. */
 @Composable
 fun HabitKind.accentContainerColor(): Color = when (this) {
     HabitKind.GATING -> MaterialTheme.colorScheme.primaryContainer
-    HabitKind.TRACKED -> MaterialTheme.colorScheme.secondaryContainer
+    HabitKind.TRACKED -> MaterialTheme.colorScheme.surfaceContainerHigh
     HabitKind.ANTIHABIT -> MaterialTheme.colorScheme.errorContainer
 }
 
@@ -33,6 +34,6 @@ fun HabitKind.accentContainerColor(): Color = when (this) {
 @Composable
 fun HabitKind.onAccentContainerColor(): Color = when (this) {
     HabitKind.GATING -> MaterialTheme.colorScheme.onPrimaryContainer
-    HabitKind.TRACKED -> MaterialTheme.colorScheme.onSecondaryContainer
+    HabitKind.TRACKED -> MaterialTheme.colorScheme.onSurfaceVariant
     HabitKind.ANTIHABIT -> MaterialTheme.colorScheme.onErrorContainer
 }

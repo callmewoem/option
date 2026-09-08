@@ -1,6 +1,5 @@
 package com.habitsfirst.androidclone.ui.home
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,32 +21,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Spa
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,9 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -69,13 +61,18 @@ import com.habitsfirst.androidclone.data.repository.EaseInStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
-import com.habitsfirst.androidclone.domain.model.Todo
-import com.habitsfirst.androidclone.ui.components.CatMood
+import com.habitsfirst.androidclone.ui.components.BigNumber
 import com.habitsfirst.androidclone.ui.components.HabitCard
-import com.habitsfirst.androidclone.ui.components.LockeCat
+import com.habitsfirst.androidclone.ui.components.LockeCard
 import com.habitsfirst.androidclone.ui.components.LootboxRewardDialog
+import com.habitsfirst.androidclone.ui.components.countdownColor
+import com.habitsfirst.androidclone.ui.components.formatCountdown
 import com.habitsfirst.androidclone.ui.navigation.LockeBottomBar
-import com.habitsfirst.androidclone.util.DateProvider
+import com.habitsfirst.androidclone.ui.theme.LockeColor
+import kotlinx.coroutines.delay
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,15 +91,13 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val wonReward by viewModel.wonReward.collectAsStateWithLifecycle()
     var progressDialogTarget by remember { mutableStateOf<HabitProgress?>(null) }
-    var newTodoText by remember { mutableStateOf("") }
-    var newTodoDueTomorrow by remember { mutableStateOf(false) }
     // Which of the tour's steps is showing -- local only, since the tour is meant to be
     // stepped through in one sitting; onTourDismissed() is what actually persists that
     // it's done, so a process death mid-tour just restarts it rather than losing it.
     var tourStep by remember { mutableIntStateOf(0) }
 
     // Everything actionable today, tagged by kind so HabitCard can render its accent --
-    // this is the "do it all from Home" list; Habits/Todos are for managing the lists.
+    // this is the "do it all from Today" list; Stats/To-do are for review and plain tasks.
     val combinedHabits: List<Pair<HabitProgress, HabitKind>> = state.gating.map { it to HabitKind.GATING } +
         state.tracked.map { it to HabitKind.TRACKED } +
         state.antihabits.map { it to HabitKind.ANTIHABIT }
@@ -110,8 +105,8 @@ fun HomeScreen(
     Scaffold(
         bottomBar = { LockeBottomBar(navController) },
         topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(greetingRes())) },
+            TopAppBar(
+                title = { Text("Today", style = MaterialTheme.typography.headlineSmall) },
                 actions = {
                     IconButton(
                         onClick = viewModel::refreshDataDrivenHabits,
@@ -130,7 +125,7 @@ fun HomeScreen(
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_title))
                     }
                 },
-                colors = TopAppBarDefaults.largeTopAppBarColors(),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         floatingActionButton = {
@@ -159,6 +154,19 @@ fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // The check-in countdown outranks everything else on the page while it's
+            // active (design spec §8) -- the device is effectively unusable for
+            // anything else right now, so this goes first, above the streak card.
+            if (state.proofOfLifeDue) {
+                item {
+                    CheckInCountdownBanner(
+                        deadlineTime = state.proofOfLifeTime,
+                        windowMinutes = state.proofOfLifeWindowMinutes,
+                        onClick = onCheckIn,
+                    )
+                }
+            }
+
             if (state.showTour) {
                 item {
                     HomeTourBanner(
@@ -193,10 +201,6 @@ fun HomeScreen(
                 item { EaseInBanner(status) }
             }
 
-            if (state.proofOfLifeDue) {
-                item { ProofOfLifeBanner(onClick = onCheckIn) }
-            }
-
             if (state.showPhotoVerificationPrompt) {
                 item {
                     PhotoVerificationPromptBanner(
@@ -210,19 +214,10 @@ fun HomeScreen(
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.home_todays_habits),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    IconButton(onClick = onManageApps) {
-                        Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.home_manage_apps))
-                    }
-                }
+                Text(
+                    text = stringResource(R.string.home_todays_habits),
+                    style = MaterialTheme.typography.titleLarge,
+                )
             }
 
             if (combinedHabits.isEmpty()) {
@@ -249,44 +244,6 @@ fun HomeScreen(
                 }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(stringResource(R.string.todos_title), style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newTodoText,
-                        onValueChange = { newTodoText = it },
-                        label = { Text(stringResource(R.string.todos_add_hint)) },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
-                        onClick = {
-                            viewModel.onAddTodo(newTodoText, newTodoDueTomorrow)
-                            newTodoText = ""
-                            newTodoDueTomorrow = false
-                        },
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add")
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                DueDatePicker(
-                    dueTomorrow = newTodoDueTomorrow,
-                    onDueTomorrowChanged = { newTodoDueTomorrow = it },
-                )
-            }
-
-            items(state.pendingTodos, key = { "todo-${it.id}" }) { todo ->
-                QuickTodoRow(
-                    todo = todo,
-                    onToggle = { viewModel.onToggleTodoDone(todo) },
-                    onDelete = { viewModel.onDeleteTodo(todo) },
-                )
-            }
-
             item { Spacer(modifier = Modifier.height(4.dp)) }
         }
     }
@@ -307,63 +264,94 @@ fun HomeScreen(
     }
 }
 
-/** Lets the user pick whether a new todo is due today or tomorrow -- todos aren't day-dependent beyond that. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The check-in window's remaining time, at a glance, without opening the lock screen
+ * itself (design spec §7, §8) -- the oversized-number countdown treatment, ticking
+ * live, escalating verdigris -> brass -> oxide as the deadline nears then passes. Its
+ * own card is drawn in enforcement colors even though the rest of Today stays in app
+ * mode -- the one exception that signals "something is being demanded of you right
+ * now" without switching the whole screen dark.
+ */
 @Composable
-private fun DueDatePicker(dueTomorrow: Boolean, onDueTomorrowChanged: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        FilterChip(
-            selected = !dueTomorrow,
-            onClick = { onDueTomorrowChanged(false) },
-            label = { Text("Today") },
-        )
-        FilterChip(
-            selected = dueTomorrow,
-            onClick = { onDueTomorrowChanged(true) },
-            label = { Text("Tomorrow") },
-        )
+private fun CheckInCountdownBanner(deadlineTime: String, windowMinutes: Int, onClick: () -> Unit) {
+    var remainingSeconds by remember(deadlineTime, windowMinutes) {
+        mutableIntStateOf(secondsUntilCheckInDeadline(deadlineTime, windowMinutes))
     }
-}
+    LaunchedEffect(deadlineTime, windowMinutes) {
+        while (true) {
+            remainingSeconds = secondsUntilCheckInDeadline(deadlineTime, windowMinutes)
+            if (remainingSeconds <= 0) break
+            delay(1_000)
+        }
+    }
+    // The window has closed (penalty already applied) -- Today returns to normal rather
+    // than showing a stalled 00:00.
+    if (remainingSeconds <= 0) return
 
-@Composable
-private fun QuickTodoRow(todo: Todo, onToggle: () -> Unit, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+    val totalWindowSeconds = (windowMinutes * 60).coerceAtLeast(1)
+    val fractionElapsed = 1f - (remainingSeconds.toFloat() / totalWindowSeconds)
+    val color = countdownColor(fractionElapsed = fractionElapsed, isPastDeadline = false)
+
+    LockeCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        containerColor = LockeColor.Iron,
+        borderColor = color,
+        borderWidth = 1.5.dp,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(checked = todo.isDone, onCheckedChange = { onToggle() })
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = todo.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
-                )
-                if (!DateProvider.isToday(todo.date)) {
-                    Text(
-                        text = "Tomorrow",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.todos_delete))
-            }
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "CHECK-IN DUE",
+                style = MaterialTheme.typography.labelLarge,
+                color = LockeColor.OnIronMuted,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            BigNumber(
+                value = formatCountdown(remainingSeconds),
+                caption = "left to prove you're up, or the block extends",
+                color = color,
+                captionColor = LockeColor.OnIronMuted,
+                size = 48.sp,
+            )
         }
     }
 }
 
-/** One stop on the first-run Home tour: what to notice, and why it's worth knowing. */
+/** Seconds from now until [deadlineTime] + [windowMinutes] today; 0 once past. */
+private fun secondsUntilCheckInDeadline(deadlineTime: String, windowMinutes: Int): Int {
+    val target = runCatching { LocalTime.parse(deadlineTime) }.getOrDefault(LocalTime.of(8, 0))
+    val deadline = LocalDateTime.of(LocalDate.now(), target).plusMinutes(windowMinutes.toLong())
+    val seconds = Duration.between(LocalDateTime.now(), deadline).seconds
+    return seconds.coerceAtLeast(0L).toInt()
+}
+
+@Composable
+private fun BlockedAttemptsChip(count: Int) {
+    Row(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        val timesWord = if (count == 1) "time" else "times"
+        Text(
+            text = "Tried to open a locked app or site $count $timesWord today",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** One stop on the first-run Today tour: what to notice, and why it's worth knowing. */
 private data class TourStep(val title: String, val body: String)
 
 private val HOME_TOUR_STEPS = listOf(
@@ -374,30 +362,20 @@ private val HOME_TOUR_STEPS = listOf(
     ),
     TourStep(
         title = "Nothing here is fixed",
-        body = "Tap the lock icon above to add or remove locked apps anytime, and the + " +
-            "button to add a new habit -- onboarding was just a starting point.",
+        body = "Locked apps and habits can be added or removed anytime from Settings -- " +
+            "onboarding was just a starting point.",
     ),
     TourStep(
         title = "Finish for a reward",
         body = "Complete every gating habit in a day and Locke opens a daily lootbox -- " +
-            "grace tokens, task-skip tokens, or a new theme accent.",
+            "tokens, or a kept cosmetic.",
     ),
 )
 
-/**
- * A short, dismissible spotlight tour shown once on Home after onboarding -- same banner
- * pattern as [EaseInBanner] and [ProofOfLifeBanner] rather than an overlay, so it reads as
- * one more card in the list instead of blocking anything underneath it.
- */
 @Composable
 private fun HomeTourBanner(step: Int, onNext: () -> Unit, onSkip: () -> Unit) {
     val current = HOME_TOUR_STEPS[step]
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-    ) {
+    LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.primaryContainer) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -436,12 +414,7 @@ private fun HomeTourBanner(step: Int, onNext: () -> Unit, onSkip: () -> Unit) {
 @Composable
 private fun EaseInBanner(status: EaseInStatus) {
     val remaining = (status.requiredStreak - status.activeHabitStreak).coerceAtLeast(0)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-    ) {
+    LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -449,47 +422,12 @@ private fun EaseInBanner(status: EaseInStatus) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(Icons.Filled.Spa, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
             val dayWord = if (remaining == 1) "day" else "days"
             Text(
                 text = "$remaining more $dayWord on \"${status.activeHabitName}\" unlocks \"${status.nextHabitName}\"",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun ProofOfLifeBanner(onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Morning check-in due",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-                Text(
-                    text = "Tap to prove you're up before apps stay locked longer.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-            }
         }
     }
 }
@@ -501,12 +439,7 @@ private fun ProofOfLifeBanner(onClick: () -> Unit) {
  */
 @Composable
 private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-    ) {
+    LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -514,24 +447,12 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        Icons.Filled.CameraAlt,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
+                    Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Try photo verification",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
+                    Text(text = "Try photo verification", style = MaterialTheme.typography.titleMedium)
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = "Dismiss",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
+                    Icon(Icons.Filled.Close, contentDescription = "Dismiss")
                 }
             }
             Text(
@@ -539,7 +460,7 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
                     "proof photo should show and Locke verifies it for you. Set one up now, or skip it -- " +
                     "it's always available later from Settings.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -550,10 +471,9 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
 }
 
 /**
- * The hero of Home: today's status at a glance, with [LockeCat] as a small companion
- * reacting to it -- content once nothing's owed, curious the rest of the time. The
- * single strongest lever on this screen, since it's the first thing seen on every open
- * and the thing every other card on the page supports.
+ * The hero of Today: what's left, at a glance -- the single strongest lever on this
+ * screen, since it's the first thing seen on every open. The streak's flame is brass
+ * (earned), the lock chip and progress fill are verdigris (structural).
  */
 @Composable
 private fun SummaryCard(
@@ -571,42 +491,29 @@ private fun SummaryCard(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Card(
+    LockeCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (allDone) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            },
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        containerColor = if (allDone) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (allDone) {
-                            stringResource(R.string.home_all_done_title)
-                        } else {
-                            stringResource(R.string.home_remaining_habits, total - completed, total)
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = onCard,
-                    )
-                    if (allDone) {
-                        Text(
-                            text = stringResource(R.string.home_all_done_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = onCardMuted,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                LockeCat(
-                    mood = if (allDone) CatMood.Content else CatMood.Curious,
-                    size = 48.dp,
+            if (allDone) {
+                Text(
+                    text = stringResource(R.string.home_all_done_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = onCard,
+                )
+                Text(
+                    text = stringResource(R.string.home_all_done_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onCardMuted,
+                )
+            } else {
+                BigNumber(
+                    value = "${total - completed}",
+                    caption = if (total - completed == 1) "habit left today" else "habits left today",
+                    color = onCard,
+                    captionColor = onCardMuted,
+                    size = 44.sp,
                 )
             }
 
@@ -616,7 +523,7 @@ private fun SummaryCard(
                     progress = { fraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
+                        .height(6.dp)
                         .clip(MaterialTheme.shapes.extraSmall),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -633,28 +540,22 @@ private fun SummaryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (allDone) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                } else {
-                                    MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f)
-                                },
-                            ),
+                            .background(LockeColor.Brass.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Filled.LocalFireDepartment,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp),
+                            tint = LockeColor.Brass,
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "$streakDays",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace),
+                        style = MaterialTheme.typography.headlineSmall,
                         color = onCard,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -670,18 +571,14 @@ private fun SummaryCard(
     }
 }
 
-/** The small pill on [SummaryCard] showing how many apps are locked right now -- open or shut, at a glance. */
+/** The small pill on [SummaryCard] showing how many apps are locked right now -- open or shut, at a glance. Verdigris throughout: locking/unlocking is structural, not a reward or a cost. */
 @Composable
 private fun LockStatusChip(allDone: Boolean, lockedAppCount: Int) {
     Row(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraLarge)
             .background(
-                if (allDone) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHighest
-                },
+                if (allDone) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHighest,
             )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -701,67 +598,21 @@ private fun LockStatusChip(allDone: Boolean, lockedAppCount: Int) {
     }
 }
 
-/** "N attempts blocked today" -- a small, non-blocking nudge that impulsivity is showing up today, not just in the weekly stats. Only shown once there's actually something to report. */
-@Composable
-private fun BlockedAttemptsChip(count: Int) {
-    Row(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.extraLarge)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Lock,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        val timesWord = if (count == 1) "time" else "times"
-        Text(
-            text = "Tried to open a locked app/site $count $timesWord today",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 @Composable
 private fun EmptyHabitsCard(onAddHabit: () -> Unit) {
-    Card(
+    LockeCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onAddHabit,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            LockeCat(mood = CatMood.Curious, size = 44.dp)
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Add the first one that gates your locked apps.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(text = "No habits yet", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Add the first one that gates your locked apps.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-    }
-}
-
-private fun greetingRes(): Int {
-    val hour = LocalTime.now().hour
-    return when {
-        hour < 12 -> R.string.home_greeting_morning
-        hour < 18 -> R.string.home_greeting_afternoon
-        else -> R.string.home_greeting_evening
     }
 }

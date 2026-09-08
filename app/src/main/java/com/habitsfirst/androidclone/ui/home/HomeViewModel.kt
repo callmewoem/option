@@ -13,13 +13,11 @@ import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
-import com.habitsfirst.androidclone.data.repository.TodoRepository
 import com.habitsfirst.androidclone.domain.model.BlockedApp
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitProgress
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.LootboxReward
-import com.habitsfirst.androidclone.domain.model.Todo
 import com.habitsfirst.androidclone.service.HealthConnectSyncWorker
 import com.habitsfirst.androidclone.service.UsageTrackingWorker
 import com.habitsfirst.androidclone.service.WorkScheduler
@@ -39,21 +37,24 @@ import javax.inject.Inject
 
 /**
  * Everything doable in one sitting, first thing in the morning: today's gating,
- * tracked and antihabit entries and this and tomorrow's todos, all completable
- * inline -- Habits and Todos are for managing lists, Home is for finishing them.
+ * tracked and antihabit entries, all completable inline. Managing habit lists lives in
+ * Settings; the plain task list lives on its own screen (design spec §9) -- Today is
+ * for finishing things, not managing them.
  */
 data class HomeUiState(
     val isLoading: Boolean = true,
     val gating: List<HabitProgress> = emptyList(),
     val tracked: List<HabitProgress> = emptyList(),
     val antihabits: List<HabitProgress> = emptyList(),
-    /** Due today or tomorrow -- see [Todo]. */
-    val todos: List<Todo> = emptyList(),
     val blockedApps: List<BlockedApp> = emptyList(),
     val streakDays: Int = 0,
     val easeInStatus: EaseInStatus? = null,
-    /** True when the check-in is enabled and the user hasn't confirmed it yet today. */
+    /** True once the check-in window is open and unconfirmed -- see [ProofOfLifeRepository.isDueFlow]. */
     val proofOfLifeDue: Boolean = false,
+    /** The configured check-in time ("HH:mm") -- the window opens here. */
+    val proofOfLifeTime: String = "08:00",
+    /** Minutes after [proofOfLifeTime] before a missed check-in is penalized -- the window's actual deadline. */
+    val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     /** True until the first-run spotlight tour has been stepped through or dismissed. */
     val showTour: Boolean = false,
     /** True only on the same calendar day onboarding finished, until dismissed or a photo-verification habit exists. */
@@ -66,13 +67,19 @@ data class HomeUiState(
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
     val allDone: Boolean get() = totalCount > 0 && completedCount == totalCount
-    val pendingTodos: List<Todo> get() = todos.filterNot { it.isDone }
 }
 
-/** The ease-in ramp's streak length, proof-of-life due-ness, tour visibility, the photo-verification prompt's date/dismissal eligibility, and whether the data-driven-habit refresh is in flight -- grouped only to fit combine()'s 5-flow cap. */
+/** The check-in due-ness, its configured time and window -- grouped so [miscFlow] stays within combine()'s 5-flow cap while still carrying enough for the Today countdown banner (design spec §8). */
+private data class ProofOfLifeMisc(
+    val due: Boolean,
+    val time: String,
+    val windowMinutes: Int,
+)
+
+/** The ease-in ramp's streak length, proof-of-life due-ness/deadline, tour visibility, the photo-verification prompt's date/dismissal eligibility, and whether the data-driven-habit refresh is in flight -- grouped only to fit combine()'s 5-flow cap. */
 private data class HomeMiscState(
     val easeInStreakLength: Int,
-    val proofOfLifeDue: Boolean,
+    val proofOfLife: ProofOfLifeMisc,
     val showTour: Boolean,
     val photoVerificationPromptEligible: Boolean,
     val isRefreshingDataDrivenHabits: Boolean,
@@ -85,7 +92,6 @@ class HomeViewModel @Inject constructor(
     private val blockAttemptRepository: BlockAttemptRepository,
     private val lootboxRepository: LootboxRepository,
     private val penaltyRepository: PenaltyRepository,
-    private val todoRepository: TodoRepository,
     private val preferencesRepository: PreferencesRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
     @ApplicationContext private val appContext: Context,
@@ -129,16 +135,21 @@ class HomeViewModel @Inject constructor(
     private val blockedOpenAttemptsTodayFlow = DateProvider.currentDateFlow()
         .flatMapLatest { date -> blockAttemptRepository.observeAttemptCountForDate(date) }
 
+    private val proofOfLifeMiscFlow = combine(
+        proofOfLifeRepository.isDueFlow,
+        proofOfLifeRepository.settings,
+    ) { due, settings -> ProofOfLifeMisc(due, settings.time, settings.windowMinutes) }
+
     private val miscFlow = combine(
         preferencesRepository.easeInStreakLength,
-        proofOfLifeRepository.isDueFlow,
+        proofOfLifeMiscFlow,
         preferencesRepository.hasSeenHomeTour,
         photoVerificationPromptFlow,
         isRefreshingFlow,
-    ) { easeInStreakLength, proofOfLifeDue, hasSeenTour, photoPromptEligible, isRefreshing ->
+    ) { easeInStreakLength, proofOfLife, hasSeenTour, photoPromptEligible, isRefreshing ->
         HomeMiscState(
             easeInStreakLength,
-            proofOfLifeDue = proofOfLifeDue,
+            proofOfLife = proofOfLife,
             showTour = !hasSeenTour,
             photoVerificationPromptEligible = photoPromptEligible,
             isRefreshingDataDrivenHabits = isRefreshing,
@@ -146,16 +157,13 @@ class HomeViewModel @Inject constructor(
     }
 
     // blockedOpenAttemptsTodayFlow is combined separately (rather than as a 6th flow
-    // here, past kotlinx.coroutines.flow.combine's 5-flow cap) and filled in below --
-    // see that flow's doc for why it needs its own live subscription instead of being
-    // just another one-shot suspend read alongside the rest of this lambda.
+    // here, past kotlinx.coroutines.flow.combine's 5-flow cap) and filled in below.
     private val baseUiState = combine(
         kindsFlow,
         blockedAppRepository.observeBlockedApps(),
         streakRefreshTrigger,
-        todoRepository.observeUpcoming(),
         miscFlow,
-    ) { (gating, tracked, antihabits), blockedApps, _, todos, misc ->
+    ) { (gating, tracked, antihabits), blockedApps, _, misc ->
         val hasImageVerificationHabit =
             (gating + tracked + antihabits).any { it.habit.type == HabitType.PHOTO }
         HomeUiState(
@@ -163,11 +171,12 @@ class HomeViewModel @Inject constructor(
             gating = gating,
             tracked = tracked,
             antihabits = antihabits,
-            todos = todos,
             blockedApps = blockedApps,
             streakDays = habitRepository.computeCurrentStreak(),
             easeInStatus = habitRepository.getEaseInStatus(misc.easeInStreakLength),
-            proofOfLifeDue = misc.proofOfLifeDue,
+            proofOfLifeDue = misc.proofOfLife.due,
+            proofOfLifeTime = misc.proofOfLife.time,
+            proofOfLifeWindowMinutes = misc.proofOfLife.windowMinutes,
             showTour = misc.showTour,
             showPhotoVerificationPrompt = misc.photoVerificationPromptEligible && !hasImageVerificationHabit,
             isRefreshingDataDrivenHabits = misc.isRefreshingDataDrivenHabits,
@@ -223,19 +232,6 @@ class HomeViewModel @Inject constructor(
             if (logged) penaltyRepository.applyAntihabitSlipPenalty(habitName)
             streakRefreshTrigger.value++
         }
-    }
-
-    fun onAddTodo(title: String, dueTomorrow: Boolean = false) {
-        if (title.isBlank()) return
-        viewModelScope.launch { todoRepository.addTodo(title, dueTomorrow = dueTomorrow) }
-    }
-
-    fun onToggleTodoDone(todo: Todo) {
-        viewModelScope.launch { todoRepository.setDone(todo, !todo.isDone) }
-    }
-
-    fun onDeleteTodo(todo: Todo) {
-        viewModelScope.launch { todoRepository.delete(todo) }
     }
 
     fun refreshStreak() {

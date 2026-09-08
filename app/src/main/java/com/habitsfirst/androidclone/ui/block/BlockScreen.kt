@@ -1,6 +1,7 @@
 package com.habitsfirst.androidclone.ui.block
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -17,29 +18,32 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
-import com.habitsfirst.androidclone.ui.components.CatMood
-import com.habitsfirst.androidclone.ui.components.LockeCat
+import com.habitsfirst.androidclone.ui.components.LockeCard
+import com.habitsfirst.androidclone.ui.components.LockeGhostButton
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
+import com.habitsfirst.androidclone.ui.components.LockeQuietButton
+import com.habitsfirst.androidclone.ui.theme.LockeColor
 
+/**
+ * The single most-seen screen in the app -- the everyday block cover over one locked
+ * app or site. Iron/enforcement mode, no mascot, no praise, no nagging (design spec
+ * §4, §6.4): a plain statement of what's locked and what unlocks it.
+ */
 @Composable
 fun BlockScreen(
     onTakeBreak: () -> Unit,
@@ -66,34 +70,33 @@ fun BlockScreen(
             modifier = Modifier
                 .fillMaxSize()
                 // BlockOverlayActivity never calls enableEdgeToEdge() itself, but API 35
-                // enforces edge-to-edge regardless -- without this, "Open Habits" / "Go
-                // home" below render under the system navigation bar and can't be tapped.
+                // enforces edge-to-edge regardless -- without this, the buttons below
+                // render under the system navigation bar and can't be tapped.
                 .systemBarsPadding()
                 .padding(24.dp),
         ) {
             Spacer(modifier = Modifier.height(32.dp))
-            if (state.isBedtime) {
-                // Cats sleep -- the one lock state a mascot fits without undercutting it.
-                LockeCat(mood = CatMood.Sleepy, size = 72.dp)
-            } else {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(64.dp),
+
+            val (icon, iconTint, iconOutlined) = when {
+                state.isBedtime -> Triple(Icons.Filled.Bedtime, MaterialTheme.colorScheme.onSurfaceVariant, false)
+                state.isPermanent -> Triple(Icons.Filled.Block, LockeColor.OnIron, true)
+                else -> Triple(Icons.Filled.Lock, MaterialTheme.colorScheme.primary, false)
+            }
+            Surface(
+                shape = CircleShape,
+                color = if (iconOutlined) Color.Transparent else iconTint.copy(alpha = 0.14f),
+                border = if (iconOutlined) BorderStroke(1.5.dp, LockeColor.PermanentOutline) else null,
+                modifier = Modifier.size(64.dp),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = if (state.isPermanent) Icons.Filled.Block else Icons.Filled.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
+                    Icon(imageVector = icon, contentDescription = null, tint = iconTint)
                 }
             }
+
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = when {
@@ -128,12 +131,7 @@ fun BlockScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.incompleteHabits, key = { it.habit.id }) { progress ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
-                        ) {
+                        LockeCard(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
                                     text = progress.habit.name,
@@ -151,31 +149,28 @@ fun BlockScreen(
                 }
 
                 if (state.graceTokenCount > 0 && !state.graceRedeemed) {
-                    TextButton(
+                    LockeQuietButton(
+                        text = stringResource(R.string.block_use_grace_token, state.graceTokenCount),
                         onClick = { viewModel.onRedeemGraceToken(onGraceRedeemed) },
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.block_use_grace_token, state.graceTokenCount))
-                    }
+                        contentColor = LockeColor.Brass,
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Button(
+            LockePrimaryButton(
+                text = stringResource(R.string.block_open_habits),
                 onClick = onOpenHabitsFirst,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(),
-            ) {
-                Text(stringResource(R.string.block_open_habits))
-            }
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(
+            LockeGhostButton(
+                text = stringResource(R.string.block_go_home),
                 onClick = onTakeBreak,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.block_go_home))
-            }
+            )
         }
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.data.verification.ImageVerificationClient
 import com.habitsfirst.androidclone.data.verification.ImageVerificationException
@@ -16,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -27,6 +29,12 @@ data class ProofOfLifeUiState(
     val errorMessage: String? = null,
     val missingApiKey: Boolean = false,
     val isDone: Boolean = false,
+    /** The configured check-in time ("HH:mm") -- the window's countdown starts here. */
+    val deadlineTime: String = "08:00",
+    /** Minutes after [deadlineTime] before a missed check-in is penalized -- the countdown's actual zero. */
+    val windowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
+    /** Priced exactly, per design spec §6.3 -- shown on the "take the penalty now" control. */
+    val penaltyMinutes: Int = ProofOfLifeRepository.PENALTY_MINUTES,
 )
 
 /**
@@ -45,6 +53,13 @@ class ProofOfLifeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ProofOfLifeUiState())
     val uiState: StateFlow<ProofOfLifeUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            val settings = proofOfLifeRepository.settings.first()
+            _uiState.value = _uiState.value.copy(deadlineTime = settings.time, windowMinutes = settings.windowMinutes)
+        }
+    }
 
     /** Called once the camera or gallery hands back a photo; scales it into a scratch file. */
     fun onImageCaptured(uri: Uri) {
@@ -100,6 +115,26 @@ class ProofOfLifeViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isVerifying = false, errorMessage = "Something went wrong. Try again.")
             }
+        }
+    }
+
+    /**
+     * Automated judgment is always overridable (design spec §6.2): confirms today's
+     * check-in without the vision model's approval, after it rejected (or failed on)
+     * the submitted photo.
+     */
+    fun onOverride() {
+        viewModelScope.launch {
+            proofOfLifeRepository.confirmToday()
+            _uiState.value = _uiState.value.copy(isDone = true)
+        }
+    }
+
+    /** Ends the check-in window early at a stated cost, instead of waiting out the countdown (design spec §7). */
+    fun onTakePenaltyNow() {
+        viewModelScope.launch {
+            proofOfLifeRepository.takePenaltyNow()
+            _uiState.value = _uiState.value.copy(isDone = true)
         }
     }
 

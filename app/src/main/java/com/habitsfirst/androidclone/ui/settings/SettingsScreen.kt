@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -35,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -44,6 +42,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,7 +56,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -73,14 +71,23 @@ import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.BuddyConnectionStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
+import com.habitsfirst.androidclone.ui.components.LockeCard
+import com.habitsfirst.androidclone.ui.components.LockeGhostButton
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.habits.StatsRange
+import com.habitsfirst.androidclone.ui.theme.LockeColor
 import com.habitsfirst.androidclone.util.PermissionUtils
 import com.habitsfirst.androidclone.util.exportShareIntent
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * Index ordered hardest-to-change things first (design spec §9): hard mode and the
+ * locks it freezes, then the block list, then curfew/check-in, then everything easier
+ * to walk back -- habits, rewards, and account-level odds and ends last.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -153,46 +160,53 @@ fun SettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        // Both insets matter here: without the top one, the TopAppBar visually and
-        // functionally covers the first section header/row underneath it -- with a
-        // single habit, that's the only habit, leaving nothing tappable to edit or
-        // delete it.
         LazyColumn(
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
             ),
         ) {
-            item { SectionHeader(stringResource(R.string.settings_habits)) }
-            items(state.habits, key = { it.id }) { habit ->
-                ListItem(
-                    headlineContent = { Text(habit.name) },
-                    supportingContent = {
-                        val target = habit.displayTarget.ifBlank { "Custom check-in" }
-                        val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
-                        Text("${habit.kind.label} · $target${schedule.orEmpty()}")
-                    },
-                    leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onEditHabit(habit.id) },
-                )
-                HorizontalDivider()
-            }
+            // -- Hardest to change first ---------------------------------------------
+            item { SectionHeader("Hard mode") }
             item {
+                val cooldownDaysLeft = daysUntil(state.hardModeToggleLockedUntilEpochMillis)
+                val toggleLocked = cooldownDaysLeft > 0
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_add_habit)) },
-                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onAddHabit),
+                    headlineContent = { Text("Hard mode") },
+                    supportingContent = {
+                        Text(
+                            buildString {
+                                append(
+                                    if (state.hardModeEnabled) {
+                                        "Gates and blocked apps can only be added, never removed."
+                                    } else {
+                                        "Locks in your gates and blocked apps. Grants 5 grace tokens."
+                                    },
+                                )
+                                if (toggleLocked) {
+                                    append(
+                                        " Can't be toggled again for $cooldownDaysLeft more " +
+                                            if (cooldownDaysLeft == 1) "day." else "days.",
+                                    )
+                                }
+                            },
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                    trailingContent = {
+                        Switch(
+                            checked = state.hardModeEnabled,
+                            onCheckedChange = viewModel::onHardModeToggled,
+                            enabled = !toggleLocked,
+                        )
+                    },
                 )
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
             item { SectionHeader(stringResource(R.string.settings_blocked_apps)) }
@@ -277,96 +291,7 @@ fun SettingsScreen(
                 HorizontalDivider()
             }
 
-            item { SectionHeader("Theme") }
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    ThemeVariant.entries.forEach { variant ->
-                        val unlocked = variant in state.unlockedThemeVariants
-                        FilterChip(
-                            selected = state.selectedThemeVariant == variant,
-                            onClick = { viewModel.onThemeVariantSelected(variant) },
-                            enabled = unlocked,
-                            // A fillMaxWidth Row with 4 chips can squeeze one below its
-                            // natural width and wrap "Concrete"/"Ink" onto a second line;
-                            // scrolling (above) avoids that squeeze, and this is the
-                            // belt-and-suspenders fallback -- overflow with an ellipsis
-                            // rather than ever wrapping to a second line.
-                            label = { Text(variant.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            leadingIcon = if (!unlocked) {
-                                { Icon(Icons.Filled.Lock, contentDescription = "Locked", modifier = Modifier.size(16.dp)) }
-                            } else {
-                                null
-                            },
-                        )
-                    }
-                }
-                Text(
-                    "Locked themes are won from the daily lootbox -- or unlocked instantly with a code below.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = themeCodeInput,
-                        onValueChange = { themeCodeInput = it },
-                        label = { Text("Theme code") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.onRedeemThemeCode(themeCodeInput)
-                            themeCodeInput = ""
-                        },
-                        enabled = themeCodeInput.isNotBlank(),
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                    ) {
-                        Text("Redeem")
-                    }
-                }
-                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
-            }
-
-            item { SectionHeader("Rewards") }
-            item {
-                ListItem(
-                    headlineContent = { Text("Grace tokens") },
-                    supportingContent = { Text("1-minute unblock, redeemed from a lock screen") },
-                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null) },
-                    trailingContent = { Text("${state.graceTokenCount}", style = MaterialTheme.typography.titleMedium) },
-                )
-                ListItem(
-                    headlineContent = { Text("Task-skip tokens") },
-                    supportingContent = { Text("Force-completes one gating habit for today") },
-                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null) },
-                    trailingContent = { Text("${state.taskSkipTokenCount}", style = MaterialTheme.typography.titleMedium) },
-                )
-                if (state.taskSkipTokenCount > 0) {
-                    OutlinedButton(
-                        onClick = { showSkipHabitDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                    ) {
-                        Text("Skip a habit today")
-                    }
-                }
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-            }
-
-            item { SectionHeader("Bedtime lock") }
+            item { SectionHeader("Bedtime + check-in") }
             item {
                 BedtimeAndReminderSection(
                     bedtimeEnabled = state.bedtimeEnabled,
@@ -385,43 +310,6 @@ fun SettingsScreen(
                     weeklyDigestTime = state.weeklyDigestTime,
                     onWeeklyDigestChanged = viewModel::onWeeklyDigestChanged,
                 )
-            }
-
-            item { SectionHeader("Hard mode") }
-            item {
-                val cooldownDaysLeft = daysUntil(state.hardModeToggleLockedUntilEpochMillis)
-                val toggleLocked = cooldownDaysLeft > 0
-                ListItem(
-                    headlineContent = { Text("Hard mode") },
-                    supportingContent = {
-                        Text(
-                            buildString {
-                                append(
-                                    if (state.hardModeEnabled) {
-                                        "Gates and blocked apps can only be added, never removed."
-                                    } else {
-                                        "Locks in your gates and blocked apps. Grants 5 grace tokens."
-                                    },
-                                )
-                                if (toggleLocked) {
-                                    append(
-                                        " Can't be toggled again for $cooldownDaysLeft more " +
-                                            if (cooldownDaysLeft == 1) "day." else "days.",
-                                    )
-                                }
-                            },
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
-                    trailingContent = {
-                        Switch(
-                            checked = state.hardModeEnabled,
-                            onCheckedChange = viewModel::onHardModeToggled,
-                            enabled = !toggleLocked,
-                        )
-                    },
-                )
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
             item { SectionHeader("Ease into it") }
@@ -447,6 +335,118 @@ fun SettingsScreen(
                     }
                 }
                 HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+            }
+
+            // -- Easier to change ------------------------------------------------------
+            item { SectionHeader(stringResource(R.string.settings_habits)) }
+            items(state.habits, key = { it.id }) { habit ->
+                ListItem(
+                    headlineContent = { Text(habit.name) },
+                    supportingContent = {
+                        val target = habit.displayTarget.ifBlank { "Custom check-in" }
+                        val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
+                        Text("${habit.kind.label} · $target${schedule.orEmpty()}")
+                    },
+                    leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onEditHabit(habit.id) },
+                )
+                HorizontalDivider()
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.home_add_habit)) },
+                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onAddHabit),
+                )
+                HorizontalDivider()
+            }
+
+            item { SectionHeader("Rewards") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Grace tokens") },
+                    supportingContent = { Text("1-minute unblock, redeemed from a lock screen") },
+                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = LockeColor.Brass) },
+                    trailingContent = { Text("${state.graceTokenCount}", style = MaterialTheme.typography.titleMedium, color = LockeColor.Brass) },
+                )
+                ListItem(
+                    headlineContent = { Text("Task-skip tokens") },
+                    supportingContent = { Text("Force-completes one gating habit for today") },
+                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = LockeColor.Brass) },
+                    trailingContent = { Text("${state.taskSkipTokenCount}", style = MaterialTheme.typography.titleMedium, color = LockeColor.Brass) },
+                )
+                if (state.taskSkipTokenCount > 0) {
+                    LockeGhostButton(
+                        text = "Skip a habit today",
+                        onClick = { showSkipHabitDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
+            item { SectionHeader("Cosmetics") }
+            item {
+                Text(
+                    "Kept, not worn -- the palette itself never changes. A collected record of what's been " +
+                        "won from the daily lootbox, or unlocked instantly with a code below.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ThemeVariant.entries.forEach { variant ->
+                        val unlocked = variant in state.unlockedThemeVariants
+                        FilterChip(
+                            selected = unlocked,
+                            onClick = {},
+                            enabled = false,
+                            label = { Text(variant.displayName) },
+                            leadingIcon = if (!unlocked) {
+                                { Icon(Icons.Filled.Lock, contentDescription = "Not yet kept", modifier = Modifier.size(16.dp)) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = themeCodeInput,
+                        onValueChange = { themeCodeInput = it },
+                        label = { Text("Cosmetic code") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    LockePrimaryButton(
+                        text = "Redeem",
+                        onClick = {
+                            viewModel.onRedeemThemeCode(themeCodeInput)
+                            themeCodeInput = ""
+                        },
+                        enabled = themeCodeInput.isNotBlank(),
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
             }
 
             if (state.healthConnectAvailable) {
@@ -495,7 +495,7 @@ fun SettingsScreen(
                 )
             }
 
-            item { SectionHeader("Photo verification") }
+            item { SectionHeader("Photo checking") }
             item {
                 ApiKeyField(
                     apiKey = state.anthropicApiKey,
@@ -503,7 +503,7 @@ fun SettingsScreen(
                 )
             }
 
-            item { SectionHeader("Accountability") }
+            item { SectionHeader("Buddies") }
             item {
                 AccountabilitySection(
                     baseUrl = state.accountabilityBaseUrl,
@@ -532,7 +532,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("Diagnostics") },
-                    supportingContent = { Text("Live app-usage tracking status, for testing why a habit's progress isn't updating") },
+                    supportingContent = { Text("Plain-language status and a fix button for every tracking failure") },
                     trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -635,6 +635,57 @@ private fun BedtimeAndReminderSection(
     }
     HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
 
+    SectionHeader("Morning check-in")
+    Text(
+        "A daily photo proving you're up -- miss the window and apps stay locked " +
+            "${ProofOfLifeRepository.PENALTY_MINUTES} minutes longer.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    ListItem(
+        headlineContent = { Text("Enable check-in") },
+        trailingContent = {
+            Switch(
+                checked = proofOfLifeEnabled,
+                onCheckedChange = { onProofOfLifeChanged(it, checkInTime, proofOfLifeWindowMinutes) },
+            )
+        },
+    )
+    if (proofOfLifeEnabled) {
+        OutlinedTextField(
+            value = checkInTime,
+            onValueChange = { checkInTime = it; onProofOfLifeChanged(proofOfLifeEnabled, it, proofOfLifeWindowMinutes) },
+            label = { Text("Time (HH:mm)") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            singleLine = true,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Window before the penalty lands",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(15, 30, 60).forEach { minutes ->
+                FilterChip(
+                    selected = proofOfLifeWindowMinutes == minutes,
+                    onClick = { onProofOfLifeChanged(proofOfLifeEnabled, checkInTime, minutes) },
+                    label = { Text("$minutes min") },
+                )
+            }
+        }
+    }
+    HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+
     SectionHeader("Daily todos")
     ListItem(
         headlineContent = { Text("Morning reminder") },
@@ -696,57 +747,6 @@ private fun BedtimeAndReminderSection(
             singleLine = true,
         )
     }
-    HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
-
-    SectionHeader("Morning check-in")
-    Text(
-        "A daily photo proving you're up -- miss the window and apps stay locked " +
-            "${ProofOfLifeRepository.PENALTY_MINUTES} minutes longer.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp),
-    )
-    ListItem(
-        headlineContent = { Text("Enable check-in") },
-        trailingContent = {
-            Switch(
-                checked = proofOfLifeEnabled,
-                onCheckedChange = { onProofOfLifeChanged(it, checkInTime, proofOfLifeWindowMinutes) },
-            )
-        },
-    )
-    if (proofOfLifeEnabled) {
-        OutlinedTextField(
-            value = checkInTime,
-            onValueChange = { checkInTime = it; onProofOfLifeChanged(proofOfLifeEnabled, it, proofOfLifeWindowMinutes) },
-            label = { Text("Time (HH:mm)") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            singleLine = true,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "Grace window",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf(15, 30, 60).forEach { minutes ->
-                FilterChip(
-                    selected = proofOfLifeWindowMinutes == minutes,
-                    onClick = { onProofOfLifeChanged(proofOfLifeEnabled, checkInTime, minutes) },
-                    label = { Text("$minutes min") },
-                )
-            }
-        }
-    }
 }
 
 /** Whole days remaining until [untilEpochMillis], rounded up so "a few hours left" still reads as 1, not 0. 0 once it's passed. */
@@ -800,7 +800,13 @@ private fun SectionHeader(text: String) {
     )
 }
 
-/** Where the user pastes their own Anthropic API key so photo-verification habits can verify photos. */
+/**
+ * Where the user pastes their own Anthropic API key so photo-verification habits and
+ * the morning check-in can check submitted photos. What leaves the device, in order
+ * (design spec's "photo-checking detail" settings screen): a submitted photo, this
+ * habit's own description and example photo (if any) -- sent to Anthropic's API for
+ * that one check, nothing else, nothing continuous.
+ */
 @Composable
 private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
     var text by remember(apiKey) { mutableStateOf(apiKey.orEmpty()) }
@@ -808,11 +814,25 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = "Habits with photo verification use your own Anthropic API key to check proof photos. " +
-                "Get one at console.anthropic.com.",
+            text = "Habits with photo verification, and the morning check-in, use your own Anthropic API " +
+                "key to check proof photos. Get one at console.anthropic.com.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("What leaves the device, in order:", style = MaterialTheme.typography.labelLarge)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "1. The photo you just submitted.\n" +
+                        "2. That habit's own description and example photo, if you set one.\n" +
+                        "Sent once, per check, to Anthropic's API -- nothing else about your usage leaves the device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = text,
@@ -836,9 +856,9 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
 
 /**
  * Client-side scaffolding for a future accountability-buddy backend -- see
- * `data/repository/AccountabilityRepository.kt`. There is no default backend today, so
- * every action here is a no-op (with a snackbar explaining why) until a base URL is set
- * below and something is actually listening there.
+ * `data/repository/AccountabilityRepository.kt`. Offline-first: buddy data shown here
+ * is whatever was last synced, and every action is a no-op (with a snackbar explaining
+ * why) until a base URL is set below and something is actually listening there.
  */
 @Composable
 private fun AccountabilitySection(
@@ -856,8 +876,9 @@ private fun AccountabilitySection(
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = "Pair with a friend to share your daily progress and see theirs. Requires your own " +
-                "backend server -- nothing is hosted by default.",
+            text = "Pair with a friend to share your daily progress and see theirs. Offline-first -- what's " +
+                "shown below is whatever was last synced, labeled as such. Requires your own backend " +
+                "server; nothing is hosted by default.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -876,7 +897,7 @@ private fun AccountabilitySection(
         headlineContent = { Text("Your pairing code") },
         supportingContent = { Text(pairingCode ?: "Not generated yet") },
         trailingContent = {
-            OutlinedButton(onClick = onRegenerateCode) { Text("Regenerate") }
+            LockeGhostButton(text = "Regenerate", onClick = onRegenerateCode)
         },
     )
 
@@ -895,9 +916,7 @@ private fun AccountabilitySection(
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        Button(onClick = { onAddBuddy(addBuddyCode); addBuddyCode = "" }) {
-            Text("Add")
-        }
+        LockePrimaryButton(text = "Add", onClick = { onAddBuddy(addBuddyCode); addBuddyCode = "" })
     }
 
     if (buddies.isNotEmpty()) {
@@ -927,10 +946,11 @@ private fun AccountabilitySection(
     )
 }
 
+/** Stale data is named plainly, not hidden or silently retried (design spec §5). */
 private fun buddySyncStatusLabel(status: BuddyConnectionStatus): String = when (status) {
     BuddyConnectionStatus.Pending -> "Pending -- no sync yet"
     BuddyConnectionStatus.Connected -> "Connected"
-    is BuddyConnectionStatus.Error -> "Sync failed: ${status.message}"
+    is BuddyConnectionStatus.Error -> "Showing the last synced data -- can't reach the backend: ${status.message}"
 }
 
 /**
@@ -963,9 +983,7 @@ private fun HealthConnectSection(
                     style = MaterialTheme.typography.labelLarge,
                 )
             } else {
-                OutlinedButton(onClick = onRequestPermissions) {
-                    Text(stringResource(R.string.permission_grant))
-                }
+                LockeGhostButton(text = stringResource(R.string.permission_grant), onClick = onRequestPermissions)
             }
         },
     )
@@ -1026,20 +1044,8 @@ private fun DataExportSection(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedButton(
-            onClick = onExportCsv,
-            enabled = !isExporting,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text("Export as CSV")
-        }
-        OutlinedButton(
-            onClick = onExportJson,
-            enabled = !isExporting,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text("Export as JSON")
-        }
+        LockeGhostButton(text = "Export as CSV", onClick = onExportCsv, enabled = !isExporting, modifier = Modifier.weight(1f))
+        LockeGhostButton(text = "Export as JSON", onClick = onExportJson, enabled = !isExporting, modifier = Modifier.weight(1f))
     }
     HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 }

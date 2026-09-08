@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,12 +27,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.LockeCard
+import com.habitsfirst.androidclone.ui.components.LockeGhostButton
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.util.PermissionUtils
 
 @Composable
 fun OnboardingPermissionsScreen(
     onBack: () -> Unit,
-    onFinish: () -> Unit,
+    onContinue: () -> Unit,
     viewModel: OnboardingViewModel,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -51,19 +50,15 @@ fun OnboardingPermissionsScreen(
     val hasOverlay = remember(refreshTick) { PermissionUtils.hasOverlayPermission(context) }
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 4, totalSteps = 4, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 4, totalSteps = 5, onBack = onBack) },
         bottomBar = {
-            Button(
-                onClick = {
-                    viewModel.finishOnboarding()
-                },
-                enabled = !state.isFinishing,
+            LockePrimaryButton(
+                text = stringResource(R.string.onboarding_continue),
+                onClick = onContinue,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp),
-            ) {
-                Text(stringResource(R.string.onboarding_finish))
-            }
+            )
         },
     ) { padding ->
         Column(
@@ -109,10 +104,7 @@ fun OnboardingPermissionsScreen(
             // Onboarding only sets up the basics (a handful of apps, a couple of
             // starter habits) -- this is a deliberate pointer at the rest of what
             // Locke can do, so it isn't left undiscovered in Settings.
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
+            LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceVariant) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         stringResource(R.string.onboarding_permissions_whats_next_title),
@@ -128,10 +120,6 @@ fun OnboardingPermissionsScreen(
             }
         }
     }
-
-    if (state.finished) {
-        androidx.compose.runtime.LaunchedEffect(Unit) { onFinish() }
-    }
 }
 
 @Composable
@@ -141,15 +129,9 @@ private fun PermissionCard(
     granted: Boolean,
     onGrant: () -> Unit,
 ) {
-    Card(
+    LockeCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (granted) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
+        containerColor = if (granted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
@@ -165,9 +147,7 @@ private fun PermissionCard(
                         modifier = Modifier.align(Alignment.CenterVertically),
                     )
                 } else {
-                    OutlinedButton(onClick = onGrant) {
-                        Text(stringResource(R.string.permission_grant))
-                    }
+                    LockeGhostButton(text = stringResource(R.string.permission_grant), onClick = onGrant)
                 }
             }
         }

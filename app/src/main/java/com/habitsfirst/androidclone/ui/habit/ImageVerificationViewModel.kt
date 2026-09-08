@@ -31,6 +31,8 @@ data class ImageVerificationUiState(
     val errorMessage: String? = null,
     val missingApiKey: Boolean = false,
     val isDone: Boolean = false,
+    /** True once [ImageVerificationViewModel.onOverride] has been used -- see [ImageVerificationViewModel.onCleared]. */
+    val overridden: Boolean = false,
 )
 
 /** Drives the "submit today's proof photo" flow for one [com.habitsfirst.androidclone.domain.model.HabitType.PHOTO] habit. */
@@ -119,10 +121,33 @@ class ImageVerificationViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Automated judgment is always overridable (design spec §6.2): marks today's photo
+     * done without the vision model's approval, after it rejected (or failed on) the
+     * submitted photo. The override itself is recorded in the completion's reasoning
+     * text so it's visible later, distinct from a genuine model approval.
+     */
+    fun onOverride() {
+        val state = _uiState.value
+        val habit = state.habit ?: return
+        val capturedPath = state.capturedImagePath ?: return
+        viewModelScope.launch {
+            habitRepository.setImageVerificationResult(
+                habitId = habit.id,
+                approved = true,
+                reasoning = "Marked done manually -- overriding an automated rejection.",
+                imagePath = capturedPath,
+            )
+            _uiState.value = _uiState.value.copy(isDone = true, overridden = true)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        // A captured photo that was never approved isn't proof of anything -- don't keep it around.
-        if (_uiState.value.result?.approved != true) {
+        // A captured photo that was never approved (and never overridden) isn't proof
+        // of anything -- don't keep it around. An overridden photo's path is already
+        // saved as this completion's verificationImagePath, so it must survive.
+        if (_uiState.value.result?.approved != true && !_uiState.value.overridden) {
             ImageStore.deleteQuietly(_uiState.value.capturedImagePath)
         }
     }

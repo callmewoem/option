@@ -20,8 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Redeem
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,8 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.habitsfirst.androidclone.R
-import com.habitsfirst.androidclone.ui.components.CatMood
-import com.habitsfirst.androidclone.ui.components.LockeCat
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 
 @Composable
 fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
@@ -55,10 +52,6 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // Locke's own mascot greets you first -- a little warmth up front, before
-            // the "we're locking your apps" pitch that follows.
-            LockeCat(mood = CatMood.Curious, size = 96.dp)
-            Spacer(modifier = Modifier.height(28.dp))
             Text(
                 text = stringResource(R.string.onboarding_welcome_title),
                 style = MaterialTheme.typography.displaySmall,
@@ -93,17 +86,15 @@ fun OnboardingWelcomeScreen(onGetStarted: () -> Unit) {
             }
         }
 
-        Button(
+        LockePrimaryButton(
+            text = stringResource(R.string.onboarding_get_started),
             onClick = onGetStarted,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(24.dp)
                 .height(52.dp),
-            colors = ButtonDefaults.buttonColors(),
-        ) {
-            Text(stringResource(R.string.onboarding_get_started), style = MaterialTheme.typography.titleMedium)
-        }
+        )
     }
 }
 

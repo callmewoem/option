@@ -3,97 +3,82 @@ package com.habitsfirst.androidclone.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Eco-brutalist palette: raw, low-saturation tones -- poured concrete and paper for
- * structure, a single loud "organic" accent for signal. No pastels, and still no
- * decorative gradients -- but every Material tonal role (including the surface
- * *container* ladder used by nav bars, sheets, dialogs and snackbars) is now wired to
- * this same concrete/paper scale instead of falling back to Material's stock neutral
- * grays, so the whole app reads as one consistent material rather than a themed layer
- * over an unthemed one. Every [ThemeVariant] shares these neutrals and only swaps its
- * accent pair, so unlocking a new theme (see the lootbox system) never changes the
- * app's underlying shape/type language -- just its signal color.
+ * Locke's entire palette. Five materials -- iron, bone, verdigris, brass, oxide -- and
+ * nothing else; see the design spec's "Visual tokens" section. Each color keeps exactly
+ * one meaning everywhere it appears:
+ *
+ * - [Verdigris] is the only "safe/structural" color -- gating actions, progress fill,
+ *   anything that moves a habit or a lock forward.
+ * - [Brass]/[BrassLight] is *earned only* -- tokens, streaks, the lootbox. Never used to
+ *   decorate something the user didn't win.
+ * - [Oxide]/[OxideLight] is *cost only* -- penalties, scarred days, antihabit slips.
+ *   Never reused for generic "error" chrome that isn't actually a cost.
+ *
+ * There's no separate light/dark *theme* -- see [LockeMode]. [Iron]/[Iron2] are
+ * enforcement-mode surfaces, [Bone]/[BoneIn] are app-mode surfaces, and [Concrete] is
+ * the dead page color behind the app (status/nav bar scrim, never a content surface).
  */
+object LockeColor {
+    /** Enforcement-mode page surface: the block cover, curfew, morning lock, penalty sheet. */
+    val Iron = Color(0xFF1D2126)
 
-// Concrete / paper neutrals -- shared by every variant. The 93/97/15 steps exist only
-// to give the surfaceContainer ladder (Theme.kt) fine-enough gradations between the
-// coarser 90/95/99/10/20 stops everything else already used.
-val Concrete10 = Color(0xFF141311)
-val Concrete15 = Color(0xFF1B1916)
-val Concrete20 = Color(0xFF211F1B)
-val Concrete30 = Color(0xFF332F29)
-val Concrete40 = Color(0xFF4A443B)
-val Concrete50 = Color(0xFF615A4E)
-val Concrete60 = Color(0xFF7C7364)
-val Concrete70 = Color(0xFF9A8F7D)
-val Concrete80 = Color(0xFFBBAE99)
-val Concrete90 = Color(0xFFDDD2C0)
-val Concrete93 = Color(0xFFE6DCC7)
-val Concrete95 = Color(0xFFEDE6D8)
-val Concrete97 = Color(0xFFF2EEE3)
-val Concrete99 = Color(0xFFF7F3EA) // "paper" background
+    /** Enforcement-mode card surface, one step up from [Iron]. */
+    val Iron2 = Color(0xFF282D34)
 
-val Error40 = Color(0xFF8C1D14)
-val Error80 = Color(0xFFFFB4A4)
-val ErrorContainerLight = Color(0xFFF9DEDC)
-val OnErrorContainerLight = Color(0xFF410E0B)
-val OnErrorContainerDark = Color(0xFFFFDAD4)
+    /** App-mode page surface: Today, Stats, Settings, onboarding, everything "navigating". */
+    val Bone = Color(0xFFEDECE5)
 
-/** Moss -- default. The "eco" half of eco-brutalist: an overgrown, unapologetic green. */
-val Moss30 = Color(0xFF243D00)
-val Moss40 = Color(0xFF3C5700)
-val Moss80 = Color(0xFFA3D256)
-val Moss90 = Color(0xFFCDEB9A)
-val MossSecondary40 = Color(0xFFA6431A) // rust, paired as secondary
-val MossSecondary80 = Color(0xFFFFB59B)
-val MossSecondary20 = Color(0xFF5C1F00)
-val MossSecondary90 = Color(0xFFFFDBCB)
+    /** App-mode card surface, one step in from [Bone]. */
+    val BoneIn = Color(0xFFE2E1D8)
 
-/** Rust -- clay/terracotta as the primary signal, moss demoted to secondary. */
-val Rust30 = Color(0xFF5C1F00)
-val Rust40 = Color(0xFF8C3316)
-val Rust80 = Color(0xFFFFB59B)
-val Rust90 = Color(0xFFFFDBCB)
-val RustSecondary40 = Color(0xFF4F7300)
-val RustSecondary80 = Color(0xFFA3D256)
-val RustSecondary20 = Color(0xFF243D00)
-val RustSecondary90 = Color(0xFFCDEB9A)
+    /** The page itself, behind the app -- system bars only, never a content surface. */
+    val Concrete = Color(0xFFD6D5CC)
 
-/** Concrete -- monochrome poured-slab variant, only a dull mustard breaks the gray. */
-val Ash30 = Color(0xFF2E2B25)
-val Ash40 = Color(0xFF4A443B)
-val Ash80 = Color(0xFFC9BCA3)
-val Ash90 = Color(0xFFE4D9C4)
-val AshSecondary40 = Color(0xFF7A5F00)
-val AshSecondary80 = Color(0xFFE8C355)
-val AshSecondary20 = Color(0xFF453600)
-val AshSecondary90 = Color(0xFFF5DE93)
+    /** Safe / structural / gating. Progress fill, primary actions, "this moves you forward". */
+    val Verdigris = Color(0xFF2C6A5D)
+    val VerdigrisLight = Color(0xFF4E9484)
 
-/** Ink -- the loudest variant: stark near-black on paper, blood-rust for signal. */
-val Ink30 = Color(0xFF1C1B19)
-val Ink40 = Color(0xFF2E2C28)
-val Ink80 = Color(0xFFD8D2C6)
-val Ink90 = Color(0xFFECE7DB)
-val InkSecondary40 = Color(0xFFA6191A)
-val InkSecondary80 = Color(0xFFFFB3AE)
-val InkSecondary20 = Color(0xFF680002)
-val InkSecondary90 = Color(0xFFFFDAD5)
+    /** Earned only -- tokens, streaks, the lootbox. Never decorative. */
+    val Brass = Color(0xFFA9801F)
+    val BrassLight = Color(0xFFD9B450)
 
-/** Modern -- unlocked by default alongside Moss. A cool slate-blue signal, mustard demoted to secondary: the same brutalist shapes read calmer and more contemporary than the earthy variants. */
-val Slate30 = Color(0xFF1A3547)
-val Slate40 = Color(0xFF2C5069)
-val Slate80 = Color(0xFFA9CCDF)
-val Slate90 = Color(0xFFD1E6F0)
-val SlateSecondary40 = Color(0xFF8A5A00)
-val SlateSecondary80 = Color(0xFFFFC066)
-val SlateSecondary20 = Color(0xFF4D3000)
-val SlateSecondary90 = Color(0xFFFFE0A6)
+    /** Cost only -- penalties, scarred days, antihabit slips. Never generic "error" chrome. */
+    val Oxide = Color(0xFF9A3D2C)
+    val OxideLight = Color(0xFFC97A63)
 
-/** Receipt -- carbon-copy black on paper, a "past due" stamp red for signal. Neutral and cooler than Ink's warm near-black, and the red leans clean/scarlet rather than blood-rust. */
-val Carbon30 = Color(0xFF1A1A1A)
-val Carbon40 = Color(0xFF2B2B2B)
-val Carbon80 = Color(0xFFD6D6D6)
-val Carbon90 = Color(0xFFECECEC)
-val CarbonSecondary40 = Color(0xFFB3261E)
-val CarbonSecondary80 = Color(0xFFFFB4A9)
-val CarbonSecondary20 = Color(0xFF690500)
-val CarbonSecondary90 = Color(0xFFFFDAD4)
+    /** Text/icons on [Iron]/[Iron2] -- full-strength bone. */
+    val OnIron = Bone
+
+    /** Muted text on [Iron]/[Iron2] -- captions, secondary lines. */
+    val OnIronMuted = Bone.copy(alpha = 0.64f)
+
+    /** Text/icons on [Bone]/[BoneIn] -- full-strength iron. */
+    val OnBone = Iron
+
+    /** Muted text on [Bone]/[BoneIn] -- captions, secondary lines. */
+    val OnBoneMuted = Iron.copy(alpha = 0.60f)
+
+    /** Reads on [Verdigris] or [Oxide] fills alike -- both are dark enough for bone text. */
+    val OnVerdigris = Bone
+    val OnOxide = Bone
+
+    /** Brass is light enough that dark iron text reads better on it than bone would. */
+    val OnBrass = Iron
+
+    /** Hairline inset borders -- app mode (on [Bone]/[BoneIn]) and enforcement mode (on [Iron]/[Iron2]). */
+    val BorderOnBone = Iron.copy(alpha = 0.14f)
+    val BorderOnIron = Bone.copy(alpha = 0.16f)
+
+    /** The permanent-list "no bypass" outline -- near-black, deliberately heavier than [BorderOnBone]. */
+    val PermanentOutline = Iron.copy(alpha = 0.9f)
+
+    /** "Just tracked" chip -- consequence-neutral grey, on either surface. */
+    val NeutralOnBone = Iron.copy(alpha = 0.5f)
+    val NeutralOnIron = Bone.copy(alpha = 0.5f)
+
+    /** The scarred/broken heatmap cell -- always oxide, never reinterpreted (spec §4). */
+    val Scarred = Oxide
+
+    /** The gold-star cosmetic heatmap cell -- always brass. */
+    val GoldStar = Brass
+}

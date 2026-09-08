@@ -23,6 +23,7 @@ import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
 import com.habitsfirst.androidclone.ui.habit.TimedHabitTimerScreen
 import com.habitsfirst.androidclone.ui.habits.HabitsScreen
 import com.habitsfirst.androidclone.ui.home.HomeScreen
+import com.habitsfirst.androidclone.ui.onboarding.OnboardingCurfewCheckInScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPermissionsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickAppsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickHabitsScreen
@@ -31,6 +32,7 @@ import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
 import com.habitsfirst.androidclone.ui.proofoflife.ProofOfLifeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
+import com.habitsfirst.androidclone.ui.todo.TodoScreen
 import com.habitsfirst.androidclone.ui.urlblock.UrlBlockScreen
 
 @Composable
@@ -86,6 +88,15 @@ fun HabitsFirstNavHost() {
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingPermissionsScreen(
                 onBack = { navController.popBackStack() },
+                onContinue = { navController.navigate(Screen.OnboardingCurfewCheckIn.route) },
+                viewModel = onboardingViewModel,
+            )
+        }
+        composable(Screen.OnboardingCurfewCheckIn.route) {
+            val onboardingViewModel: OnboardingViewModel =
+                hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
+            OnboardingCurfewCheckInScreen(
+                onBack = { navController.popBackStack() },
                 onFinish = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
@@ -115,6 +126,10 @@ fun HabitsFirstNavHost() {
                 navController = navController,
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
             )
+        }
+
+        composable(Screen.Todo.route) {
+            TodoScreen(navController = navController)
         }
 
         composable(Screen.AppPicker.route) {

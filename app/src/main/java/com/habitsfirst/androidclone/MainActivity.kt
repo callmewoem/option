@@ -8,11 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.ui.navigation.HabitsFirstNavHost
-import com.habitsfirst.androidclone.ui.theme.AppThemeViewModel
+import com.habitsfirst.androidclone.ui.theme.LockeMode
 import com.habitsfirst.androidclone.ui.theme.LockeTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -27,10 +24,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * App mode at the root -- individual screens (the block cover, curfew, the morning
+ * lock) switch to [LockeMode.Enforcement] themselves via their own [LockeTheme] call,
+ * same pattern as [com.habitsfirst.androidclone.ui.block.BlockOverlayActivity].
+ */
 @Composable
-private fun LockeRoot(themeViewModel: AppThemeViewModel = hiltViewModel()) {
-    val variant by themeViewModel.selectedVariant.collectAsStateWithLifecycle()
-    LockeTheme(variant = variant) {
+private fun LockeRoot() {
+    LockeTheme(mode = LockeMode.App) {
         Surface(modifier = Modifier.fillMaxSize()) {
             HabitsFirstNavHost()
         }

@@ -90,6 +90,22 @@ class ProofOfLifeRepository @Inject constructor(
         penaltyRepository.extendBlock(PENALTY_MINUTES, reason = "missed morning check-in")
     }
 
+    /**
+     * Ends the check-in window early at a stated cost (design spec §7): applies the
+     * same penalty [checkAndPenalizeIfMissed] would apply once the window actually
+     * ran out, right now instead of waiting for it. Also settles today's window (as if
+     * confirmed) -- the cost has already landed, so the lock has nothing left to gain
+     * by continuing to demand a photo for the rest of today. A no-op if today's
+     * check-in is already confirmed.
+     */
+    suspend fun takePenaltyNow() {
+        if (isConfirmedToday()) return
+        val today = DateProvider.todayString()
+        preferencesRepository.setProofOfLifeLastPenalizedDate(today)
+        penaltyRepository.extendBlock(PENALTY_MINUTES, reason = "took the morning check-in penalty early")
+        preferencesRepository.setProofOfLifeConfirmedDate(today)
+    }
+
     companion object {
         const val PENALTY_MINUTES = 30
         private const val MINUTE_TICK_INTERVAL_MILLIS = 60_000L

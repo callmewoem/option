@@ -28,14 +28,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -61,6 +59,8 @@ import com.habitsfirst.androidclone.R
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
 import com.habitsfirst.androidclone.domain.model.toScheduleLabel
+import com.habitsfirst.androidclone.ui.components.LockeGhostButton
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.components.label
 import java.time.DayOfWeek
@@ -259,22 +259,20 @@ fun AddEditHabitScreen(
             )
 
             Spacer(modifier = Modifier.height(32.dp))
-            Button(
+            LockePrimaryButton(
+                text = stringResource(R.string.add_habit_save),
                 onClick = viewModel::onSave,
                 enabled = state.isValid && !state.isSaving,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.add_habit_save))
-            }
+            )
 
             if (!state.isNew && state.type == HabitType.TIMED_MINUTES) {
                 Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
+                LockeGhostButton(
+                    text = "Open timer",
                     onClick = { onOpenTimer(state.habitId) },
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Open timer")
-                }
+                )
             }
         }
     }
@@ -433,17 +431,14 @@ private fun VerificationSetupSection(
             }
         }
     } else {
-        OutlinedButton(
+        LockeGhostButton(
+            text = "Add example photo (optional)",
             onClick = {
                 pickImageLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
             },
             enabled = !locked,
-        ) {
-            Icon(Icons.Filled.AddAPhoto, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Add example photo (optional)")
-        }
+        )
     }
 }

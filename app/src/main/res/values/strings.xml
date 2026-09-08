@@ -39,7 +39,7 @@
     <string name="onboarding_permissions_title">Make it real</string>
     <string name="onboarding_permissions_subtitle">Everything so far has been on paper. These three permissions are what let Locke actually see a blocked app open and put the lock screen in front of it. All are optional right now -- skip any and finish setup anyway, then grant them later from Settings. Until they\'re granted, nothing you set up above actually locks anything.</string>
     <string name="onboarding_permissions_whats_next_title">Worth exploring once you\'re in</string>
-    <string name="onboarding_permissions_whats_next_body">Photo verification (add an Anthropic API key in Settings), a hard bedtime curfew, antihabits you pay a time penalty for slipping on, and the daily lootbox that hands out grace tokens and skip tokens -- all live in Settings, ready whenever you want them.</string>
+    <string name="onboarding_permissions_whats_next_body">Antihabits you pay a time penalty for slipping on, and the daily lootbox that hands out grace tokens and skip tokens -- both live in Settings, ready whenever you want them. Curfew and the morning check-in are next, one screen over.</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_finish">Start locking in</string>
 

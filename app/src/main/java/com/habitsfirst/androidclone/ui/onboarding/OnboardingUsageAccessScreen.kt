@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -23,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitsfirst.androidclone.R
+import com.habitsfirst.androidclone.ui.components.LockeCard
+import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.util.PermissionUtils
 
 /**
@@ -47,20 +46,17 @@ fun OnboardingUsageAccessScreen(
     }
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 1, totalSteps = 4, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 1, totalSteps = 5, onBack = onBack) },
         bottomBar = {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
                 if (state.hasUsageAccess) {
-                    Button(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.onboarding_continue))
-                    }
+                    LockePrimaryButton(text = stringResource(R.string.onboarding_continue), onClick = onContinue, modifier = Modifier.fillMaxWidth())
                 } else {
-                    Button(
+                    LockePrimaryButton(
+                        text = stringResource(R.string.onboarding_usage_access_grant),
                         onClick = { context.startActivity(PermissionUtils.usageAccessSettingsIntent(context)) },
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.onboarding_usage_access_grant))
-                    }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(onClick = onContinue, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.onboarding_usage_access_skip))
@@ -86,15 +82,13 @@ fun OnboardingUsageAccessScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
 
-            Card(
+            LockeCard(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (state.hasUsageAccess) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                ),
+                containerColor = if (state.hasUsageAccess) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(

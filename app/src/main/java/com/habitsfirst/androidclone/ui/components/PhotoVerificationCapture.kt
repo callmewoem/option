@@ -14,18 +14,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,11 +41,13 @@ import java.io.File
 
 /**
  * The "take a photo, submit it, show the vision-model verdict" flow shared by every
- * photo-verification surface in the app -- a habit's daily proof photo and the proof-of-life
- * check-in alike. Camera-only by design (see the comment at the capture button) -- no
- * gallery picker, so a stored photo can't stand in for today's proof. Screens own their
- * own [android.net.Uri]-to-bytes plumbing and what "approved" means; this composable only
- * owns the capture UI and result rendering.
+ * photo-verification surface in the app -- a habit's daily proof photo, the morning
+ * check-in lock alike. Camera-only by design (see the comment at the capture button) --
+ * no gallery picker, so a stored photo can't stand in for today's proof.
+ *
+ * Any automated rejection carries a visible "I did this -- mark it done anyway" path
+ * (design spec §6.2): automated judgment is always overridable, never a dead end.
+ * [onOverride] is null when no override is available for this surface.
  */
 @Composable
 fun PhotoVerificationCapture(
@@ -63,6 +60,7 @@ fun PhotoVerificationCapture(
     onRetake: () -> Unit,
     onSubmit: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOverride: (() -> Unit)? = null,
     promptText: String = "Take a photo that proves you did this today.",
 ) {
     val context = LocalContext.current
@@ -99,11 +97,11 @@ fun PhotoVerificationCapture(
         Spacer(modifier = Modifier.height(16.dp))
         // Camera-only, deliberately: a gallery picker would let an old or unrelated photo
         // stand in for today's proof, defeating the point of verification.
-        Button(onClick = { launchCamera() }) {
-            Icon(Icons.Filled.CameraAlt, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Take photo")
-        }
+        LockePrimaryButton(
+            text = "Take photo",
+            onClick = { launchCamera() },
+            leadingIcon = { Icon(Icons.Filled.CameraAlt, contentDescription = null) },
+        )
     } else {
         AsyncImage(
             model = capturedImagePath,
@@ -112,7 +110,7 @@ fun PhotoVerificationCapture(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(280.dp)
-                .clip(RoundedCornerShape(16.dp)),
+                .clip(MaterialTheme.shapes.medium),
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -128,8 +126,12 @@ fun PhotoVerificationCapture(
                 VerdictCard(approved = false, reasoning = result.reasoning)
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onRetake) { Text("Retake") }
-                    Button(onClick = onSubmit) { Text("Try again") }
+                    LockeGhostButton(text = "Retake", onClick = onRetake)
+                    LockePrimaryButton(text = "Try again", onClick = onSubmit)
+                }
+                if (onOverride != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LockeQuietButton(text = "I did this -- mark it done anyway", onClick = onOverride)
                 }
             }
             result != null && result.approved -> {
@@ -137,10 +139,8 @@ fun PhotoVerificationCapture(
             }
             else -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onRetake) { Text("Retake") }
-                    Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth()) {
-                        Text("Submit for verification")
-                    }
+                    LockeGhostButton(text = "Retake", onClick = onRetake)
+                    LockePrimaryButton(text = "Submit for verification", onClick = onSubmit, modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -150,7 +150,12 @@ fun PhotoVerificationCapture(
             Text(text = message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             if (missingApiKey) {
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(onClick = onOpenSettings) { Text("Open Settings") }
+                LockeGhostButton(text = "Open Settings", onClick = onOpenSettings)
+            } else if (onOverride != null) {
+                // A failure that isn't a clean rejection (network error, etc.) still
+                // deserves the same override, not just a dead end.
+                Spacer(modifier = Modifier.height(8.dp))
+                LockeQuietButton(text = "I did this -- mark it done anyway", onClick = onOverride)
             }
         }
     }
@@ -158,26 +163,28 @@ fun PhotoVerificationCapture(
 
 @Composable
 private fun VerdictCard(approved: Boolean, reasoning: String) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (approved) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.errorContainer
-            },
-        ),
+    val accent = if (approved) MaterialTheme.colorScheme.primary else com.habitsfirst.androidclone.ui.theme.LockeColor.Oxide
+    LockeCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = if (approved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+        borderColor = accent,
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (approved) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                imageVector = if (approved) Icons.Filled.CheckCircle else Icons.Filled.WarningAmber,
                 contentDescription = null,
+                tint = accent,
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(
-                    text = if (approved) "Verified!" else "Not quite",
+                    text = if (approved) "Verified" else "Not verified",
                     style = MaterialTheme.typography.titleSmall,
+                    color = accent,
                 )
+                // Failure/rejection states state the specific fact, not a score or a
+                // vague "try again" (design spec §5) -- reasoning is the model's own
+                // stated reason, shown verbatim.
                 Text(text = reasoning, style = MaterialTheme.typography.bodyMedium)
             }
         }
