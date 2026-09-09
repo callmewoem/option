@@ -224,6 +224,28 @@ internal val MIGRATION_10_11_SQL: List<String> = listOf(
 val MIGRATION_10_11: Migration = sqlMigration(10, 11, MIGRATION_10_11_SQL)
 
 /**
+ * SQL for [MIGRATION_11_12]: added six nullable `habits` columns for four new habit
+ * "connections" -- [com.habitsfirst.androidclone.domain.model.HabitType.VISIT_LOCATION]'s
+ * saved target (`targetLatitude`/`targetLongitude`/`targetRadiusMeters`/`targetLocationLabel`),
+ * [com.habitsfirst.androidclone.domain.model.HabitType.GITHUB_CONTRIBUTION]'s saved
+ * username (`targetGithubUsername`), and
+ * [com.habitsfirst.androidclone.domain.model.HabitType.TAG_SCAN]'s NFC/QR payload
+ * (`tagPayload`). All six are nullable with no backfill needed for existing rows, same
+ * shape as [MIGRATION_1_2_SQL]'s four verification columns above.
+ */
+internal val MIGRATION_11_12_SQL: List<String> = listOf(
+    "ALTER TABLE `habits` ADD COLUMN `targetLatitude` REAL",
+    "ALTER TABLE `habits` ADD COLUMN `targetLongitude` REAL",
+    "ALTER TABLE `habits` ADD COLUMN `targetRadiusMeters` INTEGER",
+    "ALTER TABLE `habits` ADD COLUMN `targetLocationLabel` TEXT",
+    "ALTER TABLE `habits` ADD COLUMN `targetGithubUsername` TEXT",
+    "ALTER TABLE `habits` ADD COLUMN `tagPayload` TEXT",
+)
+
+/** v11 -> v12, see [MIGRATION_11_12_SQL]. */
+val MIGRATION_11_12: Migration = sqlMigration(11, 12, MIGRATION_11_12_SQL)
+
+/**
  * Every real migration this database has, in order, for
  * [com.habitsfirst.androidclone.di.AppModule.provideDatabase] to install via
  * `addMigrations(*ALL_MIGRATIONS)`.
@@ -239,6 +261,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_8_9,
     MIGRATION_9_10,
     MIGRATION_10_11,
+    MIGRATION_11_12,
 )
 
 /** Builds a [Migration] that just runs [statements] in order via [SupportSQLiteDatabase.execSQL]. */

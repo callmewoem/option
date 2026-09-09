@@ -502,6 +502,32 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionHeader("Connections") }
+            item {
+                ConnectionKeyField(
+                    title = "WakaTime",
+                    description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
+                        "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
+                    label = "WakaTime API key",
+                    placeholder = "waka_...",
+                    value = state.wakaTimeApiKey,
+                    onValueChanged = viewModel::onWakaTimeApiKeyChanged,
+                )
+            }
+            item {
+                ConnectionKeyField(
+                    title = "GitHub",
+                    description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
+                        "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
+                        "needed for public activity) to raise that limit and count private contributions too.",
+                    label = "GitHub personal access token",
+                    placeholder = "ghp_...",
+                    value = state.githubToken,
+                    onValueChanged = viewModel::onGithubTokenChanged,
+                )
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
             item { SectionHeader("Buddies") }
             item {
                 AccountabilitySection(
@@ -823,6 +849,49 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
             onValueChange = { text = it; onApiKeyChanged(it) },
             label = { Text("Anthropic API key") },
             placeholder = { Text("sk-ant-...") },
+            singleLine = true,
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { visible = !visible }) {
+                    Icon(
+                        imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = if (visible) "Hide key" else "Show key",
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * A "paste your own key" row for one third-party connection (WakaTime, GitHub) -- same
+ * shape as [ApiKeyField] but without that one's Anthropic-specific "what leaves the
+ * device" card, since these calls carry no user content, just the key itself and a
+ * username/timestamp.
+ */
+@Composable
+private fun ConnectionKeyField(
+    title: String,
+    description: String,
+    label: String,
+    placeholder: String,
+    value: String?,
+    onValueChanged: (String) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value.orEmpty()) }
+    var visible by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleSmall)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it; onValueChanged(it) },
+            label = { Text(label) },
+            placeholder = { Text(placeholder) },
             singleLine = true,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {

@@ -66,6 +66,8 @@ data class SettingsUiState(
     val healthConnectAvailable: Boolean = false,
     val healthConnectPermissionsGranted: Boolean = false,
     val healthConnectSyncEnabled: Boolean = false,
+    val wakaTimeApiKey: String? = null,
+    val githubToken: String? = null,
     val accountabilityBaseUrl: String? = null,
     val myPairingCode: String? = null,
     val shareDailyStatsEnabled: Boolean = false,
@@ -73,6 +75,14 @@ data class SettingsUiState(
     val exportRange: StatsRange = StatsRange.TWELVE_WEEKS,
     val isExporting: Boolean = false,
 )
+
+/**
+ * The user's own WakaTime/GitHub keys for
+ * [com.habitsfirst.androidclone.domain.model.HabitType.WAKATIME_CODING_MINUTES]/
+ * [com.habitsfirst.androidclone.domain.model.HabitType.GITHUB_CONTRIBUTION] habits --
+ * grouped only to keep the final combine() within its 5-flow cap.
+ */
+private data class ConnectionKeys(val wakaTimeApiKey: String?, val githubToken: String?)
 
 /** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
 private data class AccountabilitySettings(
@@ -208,6 +218,12 @@ class SettingsViewModel @Inject constructor(
         ::ExtraSettings,
     )
 
+    private val connectionKeys = combine(
+        preferencesRepository.wakaTimeApiKey,
+        preferencesRepository.githubToken,
+        ::ConnectionKeys,
+    )
+
     private val accountabilitySettings = combine(
         preferencesRepository.accountabilityBaseUrl,
         accountabilityRepository.myPairingCode,
@@ -265,12 +281,18 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<SettingsUiState> = combine(baseUiState, accountabilitySettings) { base, accountability ->
+    val uiState: StateFlow<SettingsUiState> = combine(
+        baseUiState,
+        accountabilitySettings,
+        connectionKeys,
+    ) { base, accountability, connections ->
         base.copy(
             accountabilityBaseUrl = accountability.baseUrl,
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
             buddies = accountability.buddies,
+            wakaTimeApiKey = connections.wakaTimeApiKey,
+            githubToken = connections.githubToken,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -280,6 +302,14 @@ class SettingsViewModel @Inject constructor(
 
     fun onAnthropicApiKeyChanged(key: String) {
         viewModelScope.launch { preferencesRepository.setAnthropicApiKey(key) }
+    }
+
+    fun onWakaTimeApiKeyChanged(key: String) {
+        viewModelScope.launch { preferencesRepository.setWakaTimeApiKey(key) }
+    }
+
+    fun onGithubTokenChanged(token: String) {
+        viewModelScope.launch { preferencesRepository.setGithubToken(token) }
     }
 
     fun onThemeVariantSelected(variant: ThemeVariant) {

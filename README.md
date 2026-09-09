@@ -60,6 +60,23 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
    - *Tally* -- a plain manual check-in, no automatic tracking.
    - *Walk N steps* -- synced from Health Connect once permission is granted in
      Settings (manual fallback otherwise).
+   - *Visit a place* -- be physically near a saved location today. Set up by
+     standing at the spot and tapping "Use my current location"; checked every
+     30 minutes against the device's already-cached last-known location (no
+     background-location permission needed -- see `DeviceLocationProvider`), with
+     a manual "I was there" tap always available as a fallback.
+   - *GitHub* -- contribute on GitHub today, for a saved username; checked every
+     30 minutes against GitHub's Events API. Works with just a public username;
+     add a personal access token in Settings to raise the rate limit and count
+     private contributions too.
+   - *Code (WakaTime)* -- code for N minutes today, synced from your own
+     WakaTime account (paste an API key in Settings) every 30 minutes, same
+     shape as the Health Connect types above.
+   - *Scan a tag* -- tap an NFC tag or scan a QR code to prove you're at a
+     physical spot. Setup generates a random code once; write it to a spare NFC
+     tag, display/print its QR code, or both -- either confirms the habit later
+     from a dedicated scan screen (camera-only for QR, same as photo
+     verification), with an "I'm there anyway" override for a lost or unreadable tag.
 6. **Stats tab** -- a GitHub-style heatmap (Canvas-drawn, shaded by the fraction of
    gating habits completed each day in 5 buckets like GitHub's, with a cosmetic
    gold-star overlay on days a lootbox awarded one; a day marked broken by a
@@ -175,11 +192,15 @@ code entered in Settings → *Theme* (`domain/model/ThemeRedeemCode.kt`).
 | Accessibility Service | Detects when you switch into a locked app so the cover can appear immediately. |
 | Display over other apps (`SYSTEM_ALERT_WINDOW`) | Lets the lock screen actually cover the app underneath. |
 | Notifications | Habit reminders, streak nudges, and the morning todo reminder (optional, toggleable in Settings). |
-| Camera | Required for *photo verification* -- capture is camera-only, with no gallery-picker fallback, so a proof photo can't be swapped for an old one. |
-| Internet | Sends a submitted proof photo to the Claude API for *photo verification* habits — only used if you've set an API key in Settings, and only for that request. |
+| Camera | Required for *photo verification* and a *Scan a tag* habit's QR option -- capture is camera-only, with no gallery-picker fallback, so an old photo can't stand in for today's proof. |
+| Internet | Sends a submitted proof photo to the Claude API for *photo verification* habits, and syncs *GitHub*/*Code (WakaTime)* habits against their own APIs — only used if you've set the relevant key/token in Settings. |
+| Location (`ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION`) | *Visit a place* habits only -- reads the OS's already-cached last-known location, never a live/continuous fix, so no background-location permission is requested at all. |
+| NFC | *Scan a tag* habits' NFC option only -- reads/writes a plain text record on a tag you choose; nothing else about the tag or your phone is read. |
 
 All three special permissions are requested with plain-language explanations
-during onboarding and can be revisited any time from Settings.
+during onboarding and can be revisited any time from Settings; the newer
+location/NFC/camera-for-QR permissions above are requested inline, the first
+time you set up a habit that needs them.
 
 ## Building
 

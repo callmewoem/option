@@ -35,6 +35,9 @@ sealed class Screen(val route: String) {
     data object VerifyHabit : Screen("habit/{habitId}/verify") {
         fun createRoute(habitId: Long) = "habit/$habitId/verify"
     }
+    data object ScanTag : Screen("habit/{habitId}/scan") {
+        fun createRoute(habitId: Long) = "habit/$habitId/scan"
+    }
     data object ProofOfLife : Screen("proof_of_life")
 
     companion object {

@@ -25,6 +25,13 @@ class BootCompletedReceiver : BroadcastReceiver() {
         WorkScheduler.scheduleMorningTodoReminder(appContext)
         WorkScheduler.scheduleProofOfLifeCheck(appContext)
         WorkScheduler.scheduleBlocklistRefresh(appContext)
+        // Same reasoning as scheduleUsageTracking above: unconditional and cheap (each
+        // worker no-ops if there's no habit of its type yet), so a fresh install or a
+        // reboot before the app's next foreground open still keeps VISIT_LOCATION/
+        // GITHUB_CONTRIBUTION/WAKATIME_CODING_MINUTES habits in sync.
+        WorkScheduler.scheduleLocationSync(appContext)
+        WorkScheduler.scheduleGithubSync(appContext)
+        WorkScheduler.scheduleWakaTimeSync(appContext)
 
         // Health Connect sync and the weekly digest are both opt-in (unlike the four
         // above), so only re-assert them if the user had actually turned them on before

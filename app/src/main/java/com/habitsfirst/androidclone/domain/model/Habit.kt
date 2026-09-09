@@ -38,16 +38,41 @@ data class Habit(
      * A GATING habit only counts toward that day's lock/streak on a day it's due.
      */
     val scheduledDays: Set<DayOfWeek> = emptySet(),
+    /** [HabitType.VISIT_LOCATION] only: the saved target's latitude. */
+    val targetLatitude: Double? = null,
+    /** [HabitType.VISIT_LOCATION] only: the saved target's longitude. */
+    val targetLongitude: Double? = null,
+    /** [HabitType.VISIT_LOCATION] only: how close counts as "there", in meters. */
+    val targetRadiusMeters: Int? = null,
+    /** [HabitType.VISIT_LOCATION] only: a friendly name for the saved target, e.g. "The gym". */
+    val targetLocationLabel: String? = null,
+    /** [HabitType.GITHUB_CONTRIBUTION] only: the GitHub username to check for today's activity. */
+    val targetGithubUsername: String? = null,
+    /**
+     * [HabitType.TAG_SCAN] only: the random payload written to this habit's NFC tag and/or
+     * encoded in its QR code -- generated once when the type is first picked (see
+     * `AddEditHabitViewModel.onTypeChanged`) and compared against whatever's scanned in
+     * `ui/habit/ScanTagScreen`.
+     */
+    val tagPayload: String? = null,
 ) {
     val displayTarget: String
         get() = if (!type.isMeasurable) "" else "$targetValue ${type.unit}"
 
     val isDaily: Boolean get() = scheduledDays.isEmpty()
 
+    /** [HabitType.VISIT_LOCATION] only: whether a target location has actually been saved yet. */
+    val hasTargetLocation: Boolean get() = targetLatitude != null && targetLongitude != null
+
     /** e.g. "Every day", "Every Sun", or "Every Mon, Wed, Fri". */
     val scheduleLabel: String get() = scheduledDays.toScheduleLabel()
 
     fun isDueOn(dayOfWeek: DayOfWeek): Boolean = isDaily || dayOfWeek in scheduledDays
+
+    companion object {
+        /** Default/fallback radius for a [HabitType.VISIT_LOCATION] habit's target, in meters -- shared by the add/edit form's radius picker and [com.habitsfirst.androidclone.service.LocationSyncWorker]'s fallback for an old row saved before a radius was chosen. */
+        const val DEFAULT_VISIT_LOCATION_RADIUS_METERS = 150
+    }
 }
 
 /** e.g. "Every day", "Every Sun", or "Every Mon, Wed, Fri" -- empty means every day. */
