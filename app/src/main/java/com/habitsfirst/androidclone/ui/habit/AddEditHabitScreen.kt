@@ -1,5 +1,7 @@
 package com.habitsfirst.androidclone.ui.habit
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -49,9 +52,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -170,7 +175,9 @@ fun AddEditHabitScreen(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 HabitType.entries.drop(4).forEach { type ->
@@ -240,6 +247,57 @@ fun AddEditHabitScreen(
                     onExampleImageCleared = viewModel::onExampleImageCleared,
                     locked = state.isKindLocked,
                 )
+            }
+
+            if (state.type == HabitType.VISIT_LOCATION) {
+                Spacer(modifier = Modifier.height(20.dp))
+                LocationSetupSection(
+                    label = state.targetLocationLabel,
+                    onLabelChanged = viewModel::onLocationLabelChanged,
+                    hasLocation = state.targetLatitude != null && state.targetLongitude != null,
+                    isCapturing = state.isCapturingLocation,
+                    captureFailed = state.locationCaptureFailed,
+                    radiusMeters = state.targetRadiusMeters,
+                    onRadiusChanged = viewModel::onRadiusMetersChanged,
+                    onCaptureLocation = viewModel::onCaptureCurrentLocation,
+                    locked = state.isKindLocked,
+                )
+            }
+
+            if (state.type == HabitType.GITHUB_CONTRIBUTION) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(text = "GitHub username", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = state.targetGithubUsername,
+                    onValueChange = viewModel::onGithubUsernameChanged,
+                    enabled = !state.isKindLocked,
+                    label = { Text("Username") },
+                    placeholder = { Text("octocat") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Checked periodically for today's public activity. Add a personal access " +
+                        "token in Settings to also raise the rate limit and count private contributions.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (state.type == HabitType.WAKATIME_CODING_MINUTES) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    "Synced from your WakaTime account -- add your API key in Settings to turn this on.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (state.type == HabitType.TAG_SCAN) {
+                Spacer(modifier = Modifier.height(20.dp))
+                state.tagPayload?.let { payload -> TagSetupSection(payload) }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -440,5 +498,107 @@ private fun VerificationSetupSection(
             },
             enabled = !locked,
         )
+    }
+}
+
+/**
+ * Setup for a [HabitType.VISIT_LOCATION] habit: capture the target from the device's own
+ * current location (see [AddEditHabitViewModel.onCaptureCurrentLocation]) rather than a
+ * map picker -- meant to be done while physically standing at the spot -- plus an
+ * optional friendly name and how close counts as "there".
+ *
+ * @param locked Hard mode on a locked gate: same reasoning as [VerificationSetupSection]'s
+ * own [locked] param -- moving a locked gate's target, or loosening its radius, would
+ * defeat it as surely as unblocking the app would.
+ */
+@Composable
+private fun LocationSetupSection(
+    label: String,
+    onLabelChanged: (String) -> Unit,
+    hasLocation: Boolean,
+    isCapturing: Boolean,
+    captureFailed: Boolean,
+    radiusMeters: Int,
+    onRadiusChanged: (Int) -> Unit,
+    onCaptureLocation: () -> Unit,
+    locked: Boolean = false,
+) {
+    val context = LocalContext.current
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results -> if (results.values.any { it }) onCaptureLocation() }
+
+    Text(text = "Where", style = MaterialTheme.typography.titleMedium)
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = "Stand at the place you want to gate on, then tap below. Checked periodically " +
+            "against your device's last-known location, with a manual tap always available too.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    OutlinedTextField(
+        value = label,
+        onValueChange = onLabelChanged,
+        enabled = !locked,
+        label = { Text("Name (optional)") },
+        placeholder = { Text("e.g. \"The gym\"") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+    LockeGhostButton(
+        text = when {
+            isCapturing -> "Finding your location…"
+            hasLocation -> "Location set -- update to here"
+            else -> "Use my current location"
+        },
+        enabled = !locked && !isCapturing,
+        onClick = {
+            val hasFineOrCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+            if (hasFineOrCoarse) {
+                onCaptureLocation()
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                )
+            }
+        },
+    )
+    if (hasLocation) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "✓ Location saved",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    if (captureFailed) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Couldn't get a location -- make sure location services are on and try again.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = "How close counts as \"there\"",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(50, 100, 150, 300).forEach { meters ->
+            FilterChip(
+                selected = radiusMeters == meters,
+                onClick = { onRadiusChanged(meters) },
+                enabled = !locked,
+                label = { Text("${meters}m") },
+            )
+        }
     }
 }

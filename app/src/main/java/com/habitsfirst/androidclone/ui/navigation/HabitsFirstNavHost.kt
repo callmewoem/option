@@ -20,6 +20,7 @@ import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.diagnostics.DiagnosticsScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
 import com.habitsfirst.androidclone.ui.habit.ImageVerificationScreen
+import com.habitsfirst.androidclone.ui.habit.ScanTagScreen
 import com.habitsfirst.androidclone.ui.habit.TimedHabitTimerScreen
 import com.habitsfirst.androidclone.ui.habits.HabitsScreen
 import com.habitsfirst.androidclone.ui.home.HomeScreen
@@ -112,6 +113,7 @@ fun HabitsFirstNavHost() {
                 onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onOpenHabit = { habitId -> navController.navigate(Screen.TimedHabitTimer.createRoute(habitId)) },
                 onVerifyHabit = { habitId -> navController.navigate(Screen.VerifyHabit.createRoute(habitId)) },
+                onScanTag = { habitId -> navController.navigate(Screen.ScanTag.createRoute(habitId)) },
                 onCheckIn = { navController.navigate(Screen.ProofOfLife.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
@@ -200,6 +202,12 @@ fun HabitsFirstNavHost() {
                 onDone = { navController.popBackStack() },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
             )
+        }
+        composable(
+            route = Screen.ScanTag.route,
+            arguments = listOf(navArgument(Screen.ARG_HABIT_ID) { type = NavType.StringType }),
+        ) {
+            ScanTagScreen(onDone = { navController.popBackStack() })
         }
         composable(Screen.ProofOfLife.route) {
             ProofOfLifeScreen(

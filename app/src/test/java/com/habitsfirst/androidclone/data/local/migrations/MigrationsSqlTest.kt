@@ -66,6 +66,7 @@ class MigrationsSqlTest {
         MIGRATION_8_9_SQL,
         MIGRATION_9_10_SQL,
         MIGRATION_10_11_SQL,
+        MIGRATION_11_12_SQL,
     )
 
     private fun newV1Database(): Connection {
@@ -143,7 +144,8 @@ class MigrationsSqlTest {
                     "id", "name", "type", "targetValue", "targetPackageName", "targetAppLabel",
                     "sortOrder", "createdAtEpochMillis", "isArchived", "verificationPrompt",
                     "verificationExampleImagePath", "kind", "expiresAfterDate", "easeInOrder",
-                    "scheduledDaysMask",
+                    "scheduledDaysMask", "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                    "targetLocationLabel", "targetGithubUsername", "tagPayload",
                 ),
                 db.columnNames("habits"),
             )
@@ -182,6 +184,45 @@ class MigrationsSqlTest {
                 ),
                 db.columnNames("pending_stats_sync"),
             )
+        }
+    }
+
+    @Test
+    fun `migration 11 to 12 adds the location, github, and tag columns as nullable with no backfill`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(10).forEach { db.runSql(it) } // 1->2 .. 10->11, i.e. up to v11
+
+            db.runSql(
+                listOf(
+                    "INSERT INTO `habits` (`name`, `type`, `targetValue`, `targetPackageName`, `targetAppLabel`, `sortOrder`, `createdAtEpochMillis`, `isArchived`) " +
+                        "VALUES ('Read', 'TALLY', 0, NULL, NULL, 0, 0, 0)",
+                ),
+            )
+
+            db.runSql(MIGRATION_11_12_SQL)
+
+            assertEquals(
+                listOf(
+                    "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                    "targetLocationLabel", "targetGithubUsername", "tagPayload",
+                ).sorted(),
+                db.columnNames("habits").filter {
+                    it in setOf(
+                        "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                        "targetLocationLabel", "targetGithubUsername", "tagPayload",
+                    )
+                }.sorted(),
+            )
+            db.createStatement().use { statement ->
+                statement.executeQuery(
+                    "SELECT `targetLatitude`, `targetGithubUsername`, `tagPayload` FROM `habits` WHERE `name` = 'Read'",
+                ).use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals(null, rs.getObject("targetLatitude"))
+                    assertEquals(null, rs.getObject("targetGithubUsername"))
+                    assertEquals(null, rs.getObject("tagPayload"))
+                }
+            }
         }
     }
 

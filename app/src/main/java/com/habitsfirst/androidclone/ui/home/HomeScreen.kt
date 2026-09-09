@@ -91,6 +91,7 @@ fun HomeScreen(
     onAddHabit: () -> Unit,
     onOpenHabit: (Long) -> Unit,
     onVerifyHabit: (Long) -> Unit,
+    onScanTag: (Long) -> Unit,
     onCheckIn: () -> Unit,
     onOpenSettings: () -> Unit,
     onManageApps: () -> Unit,
@@ -264,7 +265,10 @@ fun HomeScreen(
                                 kind == HabitKind.ANTIHABIT ->
                                     viewModel.onToggleAntihabitSlip(progress.habit.id, progress.habit.name, !progress.isCompleted)
                                 progress.habit.type == HabitType.PHOTO -> onVerifyHabit(progress.habit.id)
-                                progress.habit.type == HabitType.TALLY ->
+                                progress.habit.type == HabitType.TAG_SCAN -> onScanTag(progress.habit.id)
+                                progress.habit.type == HabitType.TALLY ||
+                                    progress.habit.type == HabitType.VISIT_LOCATION ||
+                                    progress.habit.type == HabitType.GITHUB_CONTRIBUTION ->
                                     viewModel.onTallyHabitToggled(progress.habit.id, !progress.isCompleted)
                                 progress.habit.type == HabitType.TIMED_MINUTES -> onOpenHabit(progress.habit.id)
                                 // Tracked automatically -- no manual correction, tapping does nothing.

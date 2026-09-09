@@ -188,6 +188,21 @@ class HabitRepository @Inject constructor(
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
     }
 
+    /**
+     * Marks a habit done for today if it isn't already -- for presence-style background
+     * checks ([com.habitsfirst.androidclone.service.LocationSyncWorker],
+     * [com.habitsfirst.androidclone.service.GithubSyncWorker]) that can only ever detect a
+     * positive signal (you were there / you did contribute), never a negative one.
+     * Deliberately never un-marks: unlike [HealthConnectSyncWorker][com.habitsfirst.androidclone.service.HealthConnectSyncWorker]'s
+     * absolute overwrite, a "no signal this tick" reading here must not clobber an
+     * earlier detection or a manual tap back to incomplete.
+     */
+    suspend fun markDoneIfDetected(habitId: Long, date: String = DateProvider.todayString()) {
+        val existing = completionDao.getCompletion(habitId, date)
+        if (existing?.isCompleted == true) return
+        setProgress(habitId, 1, target = 1, date = date)
+    }
+
     /** Records a vision-model verdict on a submitted proof photo for a [HabitType.PHOTO] habit. */
     suspend fun setImageVerificationResult(
         habitId: Long,
@@ -239,6 +254,24 @@ class HabitRepository @Inject constructor(
         habitDao.getActiveHabitsOnce()
             .map { it.toDomain() }
             .filter { it.type in HEALTH_CONNECT_HABIT_TYPES }
+
+    /** Active [HabitType.VISIT_LOCATION] habits that actually have a target saved, for [com.habitsfirst.androidclone.service.LocationSyncWorker]. */
+    suspend fun getVisitLocationHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.VISIT_LOCATION && it.hasTargetLocation }
+
+    /** Active [HabitType.GITHUB_CONTRIBUTION] habits that have a username saved, for [com.habitsfirst.androidclone.service.GithubSyncWorker]. */
+    suspend fun getGithubHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.GITHUB_CONTRIBUTION && !it.targetGithubUsername.isNullOrBlank() }
+
+    /** Active [HabitType.WAKATIME_CODING_MINUTES] habits, for [com.habitsfirst.androidclone.service.WakaTimeSyncWorker]. */
+    suspend fun getWakaTimeHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.WAKATIME_CODING_MINUTES }
 
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0

@@ -42,6 +42,18 @@ data class HabitEntity(
      */
     @ColumnInfo(defaultValue = "0")
     val scheduledDaysMask: Int = 0,
+    /** [HabitType.VISIT_LOCATION] only. Added by MIGRATION_11_12, see `data/local/migrations`. */
+    val targetLatitude: Double? = null,
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetLongitude: Double? = null,
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetRadiusMeters: Int? = null,
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetLocationLabel: String? = null,
+    /** [HabitType.GITHUB_CONTRIBUTION] only. */
+    val targetGithubUsername: String? = null,
+    /** [HabitType.TAG_SCAN] only. */
+    val tagPayload: String? = null,
 )
 
 /** Shared by [HabitEntity.scheduledDaysMask] -- kept here since it's the only entity that still needs it. */
@@ -65,6 +77,12 @@ fun HabitEntity.toDomain(): Habit = Habit(
     expiresAfterDate = expiresAfterDate,
     easeInOrder = easeInOrder,
     scheduledDays = scheduledDaysMask.toDayOfWeekSet(),
+    targetLatitude = targetLatitude,
+    targetLongitude = targetLongitude,
+    targetRadiusMeters = targetRadiusMeters,
+    targetLocationLabel = targetLocationLabel,
+    targetGithubUsername = targetGithubUsername,
+    tagPayload = tagPayload,
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -83,4 +101,10 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     expiresAfterDate = expiresAfterDate,
     easeInOrder = easeInOrder,
     scheduledDaysMask = scheduledDays.toDaysMask(),
+    targetLatitude = targetLatitude,
+    targetLongitude = targetLongitude,
+    targetRadiusMeters = targetRadiusMeters,
+    targetLocationLabel = targetLocationLabel,
+    targetGithubUsername = targetGithubUsername,
+    tagPayload = tagPayload,
 )
