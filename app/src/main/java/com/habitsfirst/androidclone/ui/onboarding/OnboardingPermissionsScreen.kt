@@ -50,7 +50,7 @@ fun OnboardingPermissionsScreen(
     val hasOverlay = remember(refreshTick) { PermissionUtils.hasOverlayPermission(context) }
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 4, totalSteps = 5, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 4, totalSteps = 6, onBack = onBack) },
         bottomBar = {
             LockePrimaryButton(
                 text = stringResource(R.string.onboarding_continue),

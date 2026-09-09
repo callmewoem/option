@@ -9,7 +9,7 @@ import org.json.JSONObject
 /**
  * JSON (de)serialization for the accountability-buddy backend's request/response
  * bodies, matching the plain `org.json` style used in
- * `data/verification/AnthropicImageVerificationClient.kt` -- this repo has no
+ * `data/verification/BackendImageVerificationClient.kt` -- this repo has no
  * Retrofit/Moshi/kotlinx.serialization. Kept separate from `HttpAccountabilityApiClient`
  * so the mapping logic is unit-testable without any networking involved.
  */

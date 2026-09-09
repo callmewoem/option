@@ -77,8 +77,6 @@ data class OnboardingUiState(
     val proofOfLifeEnabled: Boolean = false,
     val proofOfLifeTime: String = "08:00",
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
-    /** Needed for photo verification and the check-in's photo check alike -- asked for here so the dependency is disclosed up front, not sprung later. */
-    val anthropicApiKey: String = "",
     val isFinishing: Boolean = false,
     val finished: Boolean = false,
 ) {
@@ -198,10 +196,6 @@ class OnboardingViewModel @Inject constructor(
         )
     }
 
-    fun onAnthropicApiKeyChanged(key: String) {
-        _uiState.value = _uiState.value.copy(anthropicApiKey = key)
-    }
-
     fun finishOnboarding() {
         if (_uiState.value.isFinishing) return
         _uiState.value = _uiState.value.copy(isFinishing = true)
@@ -232,9 +226,6 @@ class OnboardingViewModel @Inject constructor(
 
             bedtimeRepository.setBedtime(state.bedtimeEnabled, state.bedtimeStart, state.bedtimeEnd)
             proofOfLifeRepository.setProofOfLife(state.proofOfLifeEnabled, state.proofOfLifeTime, state.proofOfLifeWindowMinutes)
-            if (state.anthropicApiKey.isNotBlank()) {
-                preferencesRepository.setAnthropicApiKey(state.anthropicApiKey.trim())
-            }
 
             preferencesRepository.setOnboardingComplete(true)
             preferencesRepository.setOnboardingCompletedDate(DateProvider.todayString())

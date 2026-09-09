@@ -51,7 +51,7 @@ import java.time.LocalTime
 @Composable
 fun ProofOfLifeScreen(
     onDone: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onUpgrade: () -> Unit,
     viewModel: ProofOfLifeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,11 +86,11 @@ fun ProofOfLifeScreen(
                     isVerifying = state.isVerifying,
                     result = state.result,
                     errorMessage = state.errorMessage,
-                    missingApiKey = state.missingApiKey,
+                    requiresPremium = state.requiresPremium,
                     onImageCaptured = viewModel::onImageCaptured,
                     onRetake = viewModel::onRetake,
                     onSubmit = viewModel::onSubmit,
-                    onOpenSettings = onOpenSettings,
+                    onUpgrade = onUpgrade,
                     onOverride = viewModel::onOverride,
                     promptText = "Take a photo that proves you're up right now.",
                 )

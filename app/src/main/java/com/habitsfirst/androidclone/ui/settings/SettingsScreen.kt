@@ -24,8 +24,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -54,8 +53,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -70,8 +67,9 @@ import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.BuddyConnectionStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
+import com.habitsfirst.androidclone.domain.model.PremiumFeature
+import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
-import com.habitsfirst.androidclone.ui.components.LockeCard
 import com.habitsfirst.androidclone.ui.components.LockeGhostButton
 import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.ui.components.icon
@@ -97,6 +95,7 @@ fun SettingsScreen(
     onManageApps: () -> Unit,
     onManageUrls: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onOpenPaywall: (PremiumFeature?) -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -171,6 +170,18 @@ fun SettingsScreen(
                 bottom = padding.calculateBottomPadding() + 24.dp,
             ),
         ) {
+            // Account-level, not habit-difficulty -- shown first regardless of the
+            // "hardest to change first" ordering below, same reason a subscription
+            // status usually sits at the top of any app's settings.
+            item { SectionHeader("Premium") }
+            item {
+                PremiumSection(
+                    isPremium = state.isPremium,
+                    tier = state.subscriptionTier,
+                    onUpgrade = { onOpenPaywall(null) },
+                )
+            }
+
             // -- Hardest to change first ---------------------------------------------
             item { SectionHeader("Hard mode") }
             item {
@@ -497,17 +508,28 @@ fun SettingsScreen(
 
             item { SectionHeader("Photo checking") }
             item {
-                ApiKeyField(
-                    apiKey = state.anthropicApiKey,
-                    onApiKeyChanged = viewModel::onAnthropicApiKeyChanged,
-                )
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(
+                        text = "Habits with photo verification, and the morning check-in, send the submitted " +
+                            "photo (plus that habit's own description and example photo, if any) to Locke's " +
+                            "backend, which checks it with an AI model -- nothing is configured here anymore, " +
+                            "it just works once you're Premium.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!state.isPremium) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LockeGhostButton(text = "Upgrade to Premium", onClick = { onOpenPaywall(PremiumFeature.PHOTO_VERIFICATION) })
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
             item { SectionHeader("Buddies") }
             item {
                 AccountabilitySection(
-                    baseUrl = state.accountabilityBaseUrl,
-                    onBaseUrlChanged = viewModel::onAccountabilityBaseUrlChanged,
+                    isPremium = state.isPremium,
+                    onUpgrade = { onOpenPaywall(PremiumFeature.ACCOUNTABILITY_BUDDY) },
                     pairingCode = state.myPairingCode,
                     onRegenerateCode = viewModel::onRegeneratePairingCode,
                     onAddBuddy = viewModel::onAddBuddy,
@@ -800,70 +822,36 @@ private fun SectionHeader(text: String) {
     )
 }
 
-/**
- * Where the user pastes their own Anthropic API key so photo-verification habits and
- * the morning check-in can check submitted photos. What leaves the device, in order
- * (design spec's "photo-checking detail" settings screen): a submitted photo, this
- * habit's own description and example photo (if any) -- sent to Anthropic's API for
- * that one check, nothing else, nothing continuous.
- */
+/** Subscription status + CTA -- the first thing shown in Settings (see the call site above for why it breaks from "hardest to change first"). */
 @Composable
-private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
-    var text by remember(apiKey) { mutableStateOf(apiKey.orEmpty()) }
-    var visible by remember { mutableStateOf(false) }
-
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-            text = "Habits with photo verification, and the morning check-in, use your own Anthropic API " +
-                "key to check proof photos. Get one at console.anthropic.com.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("What leaves the device, in order:", style = MaterialTheme.typography.labelLarge)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "1. The photo you just submitted.\n" +
-                        "2. That habit's own description and example photo, if you set one.\n" +
-                        "Sent once, per check, to Anthropic's API -- nothing else about your usage leaves the device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it; onApiKeyChanged(it) },
-            label = { Text("Anthropic API key") },
-            placeholder = { Text("sk-ant-...") },
-            singleLine = true,
-            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { visible = !visible }) {
-                    Icon(
-                        imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = if (visible) "Hide key" else "Show key",
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+private fun PremiumSection(isPremium: Boolean, tier: SubscriptionTier, onUpgrade: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(if (isPremium) "Locke Premium" else "Free plan") },
+        supportingContent = {
+            Text(
+                if (isPremium) {
+                    "You're on the ${tier.displayName} plan -- unlimited habits, AI photo checking, and buddies."
+                } else {
+                    "Unlimited habits, AI photo checking, and accountability buddies."
+                },
+            )
+        },
+        leadingContent = { Icon(Icons.Filled.WorkspacePremium, contentDescription = null, tint = LockeColor.Brass) },
+        trailingContent = { if (!isPremium) LockeGhostButton(text = "Upgrade", onClick = onUpgrade) },
+    )
+    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 }
 
 /**
- * Client-side scaffolding for a future accountability-buddy backend -- see
- * `data/repository/AccountabilityRepository.kt`. Offline-first: buddy data shown here
- * is whatever was last synced, and every action is a no-op (with a snackbar explaining
- * why) until a base URL is set below and something is actually listening there.
+ * Accountability buddies, backed by Locke's own backend (`backend/`) -- see
+ * `data/repository/AccountabilityRepository.kt`. A premium feature: while [isPremium] is
+ * false, every control below is replaced by a single upgrade CTA rather than shown
+ * disabled, so there's nothing here that looks broken.
  */
 @Composable
 private fun AccountabilitySection(
-    baseUrl: String?,
-    onBaseUrlChanged: (String) -> Unit,
+    isPremium: Boolean,
+    onUpgrade: () -> Unit,
     pairingCode: String?,
     onRegenerateCode: () -> Unit,
     onAddBuddy: (String) -> Unit,
@@ -871,26 +859,26 @@ private fun AccountabilitySection(
     shareStatsEnabled: Boolean,
     onShareStatsToggled: (Boolean) -> Unit,
 ) {
-    var urlText by remember(baseUrl) { mutableStateOf(baseUrl.orEmpty()) }
     var addBuddyCode by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = "Pair with a friend to share your daily progress and see theirs. Offline-first -- what's " +
-                "shown below is whatever was last synced, labeled as such. Requires your own backend " +
-                "server; nothing is hosted by default.",
+            text = "Pair with a friend to share your daily progress and see theirs, synced through Locke's " +
+                "own backend. Offline-first -- what's shown below is whatever was last synced, labeled as such.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = urlText,
-            onValueChange = { urlText = it; onBaseUrlChanged(it) },
-            label = { Text("Backend base URL") },
-            placeholder = { Text("https://example.com/api") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+    }
+
+    if (!isPremium) {
+        LockeGhostButton(
+            text = "Upgrade to Premium",
+            onClick = onUpgrade,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         )
+        return
     }
 
     ListItem(

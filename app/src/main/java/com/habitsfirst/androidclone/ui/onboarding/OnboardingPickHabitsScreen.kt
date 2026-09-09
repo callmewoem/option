@@ -41,7 +41,7 @@ fun OnboardingPickHabitsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 3, totalSteps = 5, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 3, totalSteps = 6, onBack = onBack) },
         bottomBar = {
             LockePrimaryButton(
                 text = stringResource(R.string.onboarding_continue),

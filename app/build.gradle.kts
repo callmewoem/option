@@ -26,6 +26,20 @@ val keystoreProperties = Properties().apply {
 fun signingProp(propertyName: String, envName: String): String? =
     System.getenv(envName) ?: keystoreProperties.getProperty(propertyName)
 
+// Base URL of Locke's own backend (see `backend/`) -- everything that used to either
+// call a third party straight from the device (the Anthropic API key for photo
+// verification) or need a per-user-configured server (the accountability-buddy
+// scaffolding) now goes through this one instead. Override for local development with
+// `-PBACKEND_BASE_URL=http://10.0.2.2:8787/v1` (the emulator's alias for the host
+// machine's localhost) or an entry in a git-ignored `local.properties`/gradle.properties.
+// The fallback below deliberately resolves to nowhere -- `.invalid` is reserved by
+// RFC 2606 to never be a real, resolvable domain -- so forgetting to set this for a
+// real build fails loudly (every backend call gets a clean "unreachable" error) instead
+// of silently pointing at a host nobody owns.
+val backendBaseUrl = (project.findProperty("BACKEND_BASE_URL") as String?)
+    ?: System.getenv("BACKEND_BASE_URL")
+    ?: "https://backend.locke.invalid/v1"
+
 android {
     namespace = "com.habitsfirst.androidclone"
     compileSdk = 35
@@ -39,6 +53,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
     }
 
     signingConfigs {
@@ -144,6 +159,7 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.coil.compose)
     implementation(libs.okhttp)
+    implementation(libs.billing.ktx)
 
     testImplementation(libs.junit)
     // The Android SDK's org.json classes are unimplemented stubs on the local unit

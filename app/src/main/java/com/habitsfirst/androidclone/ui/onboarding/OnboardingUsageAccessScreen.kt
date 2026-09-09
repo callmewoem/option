@@ -46,7 +46,7 @@ fun OnboardingUsageAccessScreen(
     }
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 1, totalSteps = 5, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 1, totalSteps = 6, onBack = onBack) },
         bottomBar = {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
                 if (state.hasUsageAccess) {

@@ -17,6 +17,7 @@ healthConnect = "1.1.0-alpha07"
 accompanistPermissions = "0.34.0"
 coilCompose = "2.7.0"
 okhttp = "4.12.0"
+billing = "7.1.1"
 junit = "4.13.2"
 sqliteJdbc = "3.49.1.0"
 androidxTestExtJunit = "1.2.1"
@@ -51,6 +52,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanistPermissions" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqliteJdbc" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }

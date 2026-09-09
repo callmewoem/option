@@ -1,6 +1,6 @@
 package com.habitsfirst.androidclone.di
 
-import com.habitsfirst.androidclone.data.verification.AnthropicImageVerificationClient
+import com.habitsfirst.androidclone.data.verification.BackendImageVerificationClient
 import com.habitsfirst.androidclone.data.verification.ImageVerificationClient
 import dagger.Binds
 import dagger.Module
@@ -29,5 +29,5 @@ object NetworkModule {
 abstract class VerificationModule {
 
     @Binds
-    abstract fun bindImageVerificationClient(impl: AnthropicImageVerificationClient): ImageVerificationClient
+    abstract fun bindImageVerificationClient(impl: BackendImageVerificationClient): ImageVerificationClient
 }

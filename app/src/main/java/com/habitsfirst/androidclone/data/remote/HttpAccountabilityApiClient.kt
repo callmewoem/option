@@ -1,15 +1,12 @@
 package com.habitsfirst.androidclone.data.remote
 
 import com.habitsfirst.androidclone.data.remote.dto.toAccountabilityBuddy
-import com.habitsfirst.androidclone.data.remote.dto.toDailySummary
 import com.habitsfirst.androidclone.data.remote.dto.toJson
 import com.habitsfirst.androidclone.data.remote.dto.toPairingCode
-import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.DailySummary
 import com.habitsfirst.androidclone.domain.model.PairingCode
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -22,28 +19,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Talks to a user-configured accountability-buddy backend over plain HTTP(S) + JSON.
- * There is no default backend baked in -- [PreferencesRepository.accountabilityBaseUrl]
- * must be set in Settings first, or every call here fails fast with
- * [AccountabilityApiException.NoBackendConfigured] rather than hitting a hardcoded host
- * or throwing an NPE. A configured-but-unreachable backend (the common case today,
- * since none is hosted anywhere yet) surfaces as [AccountabilityApiException.Network]
- * instead of crashing the caller -- see `di/AccountabilityModule.kt` for the binding.
+ * Talks to Locke's own backend (`backend/`, see `src/routes/buddies.js`) over plain
+ * HTTP(S) + JSON, authenticated as this device via [DeviceIdentityRepository]. See
+ * `di/AccountabilityModule.kt` for the binding.
  *
- * Endpoints assumed of the backend (all under the configured base URL, all JSON):
- * `POST /pairing-codes`, `POST /buddies` (`{"code": ...}`), `POST /daily-summary`,
- * `GET /buddies`. No backend implementing these exists yet -- this is client-side
- * scaffolding for one, not a working integration.
+ * Endpoints (all under [BackendConfig.BASE_URL], all JSON): `POST /pairing-codes`,
+ * `POST /buddies` (`{"code": ...}`), `POST /daily-summary`, `GET /buddies`.
  */
 @Singleton
 class HttpAccountabilityApiClient @Inject constructor(
     private val okHttpClient: OkHttpClient,
-    private val preferencesRepository: PreferencesRepository,
+    private val deviceIdentity: DeviceIdentityRepository,
 ) : AccountabilityApiClient {
 
     override suspend fun createPairingCode(): PairingCode = withContext(Dispatchers.IO) {
-        val base = requireBaseUrl()
-        val json = executeJson(Request.Builder().url("$base/pairing-codes").post(EMPTY_JSON_BODY).build())
+        val json = executeJson(authedRequest("$BASE/pairing-codes").post(EMPTY_JSON_BODY).build())
         try {
             json.toPairingCode()
         } catch (e: Exception) {
@@ -52,11 +42,9 @@ class HttpAccountabilityApiClient @Inject constructor(
     }
 
     override suspend fun addBuddy(code: String): AccountabilityBuddy = withContext(Dispatchers.IO) {
-        val base = requireBaseUrl()
         val body = JSONObject().put("code", code)
         val json = executeJson(
-            Request.Builder()
-                .url("$base/buddies")
+            authedRequest("$BASE/buddies")
                 .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .build(),
         )
@@ -69,10 +57,8 @@ class HttpAccountabilityApiClient @Inject constructor(
 
     override suspend fun pushDailySummary(summary: DailySummary): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val base = requireBaseUrl()
             executeRaw(
-                Request.Builder()
-                    .url("$base/daily-summary")
+                authedRequest("$BASE/daily-summary")
                     .post(summary.toJson().toString().toRequestBody(JSON_MEDIA_TYPE))
                     .build(),
             )
@@ -81,8 +67,7 @@ class HttpAccountabilityApiClient @Inject constructor(
     }
 
     override suspend fun fetchBuddySummaries(): List<AccountabilityBuddy> = withContext(Dispatchers.IO) {
-        val base = requireBaseUrl()
-        val text = executeRaw(Request.Builder().url("$base/buddies").get().build())
+        val text = executeRaw(authedRequest("$BASE/buddies").get().build())
         try {
             val array = JSONArray(text)
             (0 until array.length()).map { i -> array.getJSONObject(i).toAccountabilityBuddy() }
@@ -91,11 +76,17 @@ class HttpAccountabilityApiClient @Inject constructor(
         }
     }
 
-    private suspend fun requireBaseUrl(): String =
-        preferencesRepository.accountabilityBaseUrl.first()
-            ?.trim()?.trimEnd('/')
-            ?.takeIf { it.isNotBlank() }
-            ?: throw AccountabilityApiException.NoBackendConfigured
+    /** A [Request.Builder] pre-seeded with this device's `Authorization` header -- registers the device first if this is the first call ever made. */
+    private suspend fun authedRequest(url: String): Request.Builder =
+        Request.Builder().url(url).addHeader("Authorization", authHeader())
+
+    private suspend fun authHeader(): String = try {
+        deviceIdentity.authHeader()
+    } catch (e: BackendApiException.Network) {
+        throw AccountabilityApiException.Network(e.message ?: "Couldn't reach the accountability backend.", e)
+    } catch (e: BackendApiException.Api) {
+        throw AccountabilityApiException.Api(e.message ?: "Couldn't register this device.")
+    }
 
     private fun executeJson(request: Request): JSONObject =
         try {
@@ -112,6 +103,11 @@ class HttpAccountabilityApiClient @Inject constructor(
             okHttpClient.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
+                    if (response.code == 402) {
+                        throw AccountabilityApiException.Api(
+                            extractErrorMessage(text) ?: "Accountability buddies are a premium feature.",
+                        )
+                    }
                     throw AccountabilityApiException.Api(extractErrorMessage(text) ?: "Request failed (HTTP ${response.code}).")
                 }
                 text
@@ -128,6 +124,7 @@ class HttpAccountabilityApiClient @Inject constructor(
         }
 
     companion object {
+        private val BASE = BackendConfig.BASE_URL
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
         private val EMPTY_JSON_BODY = "{}".toRequestBody(JSON_MEDIA_TYPE)
     }

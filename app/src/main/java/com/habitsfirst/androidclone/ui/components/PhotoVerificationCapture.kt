@@ -55,11 +55,11 @@ fun PhotoVerificationCapture(
     isVerifying: Boolean,
     result: VerificationResult?,
     errorMessage: String?,
-    missingApiKey: Boolean,
+    requiresPremium: Boolean,
     onImageCaptured: (Uri) -> Unit,
     onRetake: () -> Unit,
     onSubmit: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onUpgrade: () -> Unit,
     onOverride: (() -> Unit)? = null,
     promptText: String = "Take a photo that proves you did this today.",
 ) {
@@ -148,9 +148,9 @@ fun PhotoVerificationCapture(
         errorMessage?.let { message ->
             Spacer(modifier = Modifier.height(12.dp))
             Text(text = message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-            if (missingApiKey) {
+            if (requiresPremium) {
                 Spacer(modifier = Modifier.height(8.dp))
-                LockeGhostButton(text = "Open Settings", onClick = onOpenSettings)
+                LockeGhostButton(text = "Upgrade to Premium", onClick = onUpgrade)
             } else if (onOverride != null) {
                 // A failure that isn't a clean rejection (network error, etc.) still
                 // deserves the same override, not just a dead end.

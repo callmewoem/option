@@ -27,7 +27,7 @@ data class ProofOfLifeUiState(
     val isVerifying: Boolean = false,
     val result: VerificationResult? = null,
     val errorMessage: String? = null,
-    val missingApiKey: Boolean = false,
+    val requiresPremium: Boolean = false,
     val isDone: Boolean = false,
     /** The configured check-in time ("HH:mm") -- the window's countdown starts here. */
     val deadlineTime: String = "08:00",
@@ -71,7 +71,7 @@ class ProofOfLifeViewModel @Inject constructor(
                     capturedImagePath = path,
                     result = null,
                     errorMessage = null,
-                    missingApiKey = false,
+                    requiresPremium = false,
                 )
             }
         }
@@ -87,7 +87,7 @@ class ProofOfLifeViewModel @Inject constructor(
         val capturedPath = state.capturedImagePath ?: return
         if (state.isVerifying) return
 
-        _uiState.value = state.copy(isVerifying = true, errorMessage = null, missingApiKey = false, result = null)
+        _uiState.value = state.copy(isVerifying = true, errorMessage = null, requiresPremium = false, result = null)
         viewModelScope.launch {
             try {
                 val submittedBytes = withContext(Dispatchers.IO) { ImageStore.readBytes(capturedPath) }
@@ -108,8 +108,8 @@ class ProofOfLifeViewModel @Inject constructor(
                 } else {
                     _uiState.value = _uiState.value.copy(isVerifying = false, result = result)
                 }
-            } catch (e: ImageVerificationException.MissingApiKey) {
-                _uiState.value = _uiState.value.copy(isVerifying = false, missingApiKey = true, errorMessage = e.message)
+            } catch (e: ImageVerificationException.RequiresPremium) {
+                _uiState.value = _uiState.value.copy(isVerifying = false, requiresPremium = true, errorMessage = e.message)
             } catch (e: ImageVerificationException) {
                 _uiState.value = _uiState.value.copy(isVerifying = false, errorMessage = e.message)
             } catch (e: Exception) {

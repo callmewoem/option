@@ -23,9 +23,12 @@ import javax.inject.Singleton
  * call [AccountabilityApiClient] directly. Buddies and their last-synced summaries are
  * cached in Room (see `data/local/entity/AccountabilityBuddyEntity.kt`), so the buddy
  * list still renders -- and a stats share still queues instead of getting lost -- with
- * no connectivity or no backend configured at all, which is the common case today since
- * no default backend is hosted anywhere. Mirrors the "seam behind a stub-swappable
- * interface" shape of [com.habitsfirst.androidclone.data.billing.EntitlementRepository].
+ * no connectivity. Buddies are a premium feature; callers should check
+ * [com.habitsfirst.androidclone.data.billing.EntitlementRepository.isPremium] before
+ * calling [regeneratePairingCode]/[addBuddy]/enabling [setShareStatsEnabled] and route to
+ * the paywall instead, rather than let the backend's 402 be the primary UX. Mirrors the
+ * "seam behind a stub-swappable interface" shape of
+ * [com.habitsfirst.androidclone.data.billing.EntitlementRepository].
  */
 @Singleton
 class AccountabilityRepository @Inject constructor(

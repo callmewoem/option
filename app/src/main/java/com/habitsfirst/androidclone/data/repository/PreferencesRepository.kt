@@ -34,7 +34,6 @@ class PreferencesRepository @Inject constructor(
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val CACHED_STREAK = intPreferencesKey("cached_streak")
         val CACHED_STREAK_DATE = stringPreferencesKey("cached_streak_date")
-        val ANTHROPIC_API_KEY = stringPreferencesKey("anthropic_api_key")
         val THEME_VARIANT = stringPreferencesKey("theme_variant")
         val UNLOCKED_THEME_VARIANTS = stringSetPreferencesKey("unlocked_theme_variants")
         val GRACE_TOKEN_COUNT = intPreferencesKey("grace_token_count")
@@ -69,7 +68,8 @@ class PreferencesRepository @Inject constructor(
         val LAST_USAGE_SYNC_AT_EPOCH_MILLIS = longPreferencesKey("last_usage_sync_at_epoch_millis")
         val LAST_USAGE_SYNC_HABIT_COUNT = intPreferencesKey("last_usage_sync_habit_count")
         val LAST_USAGE_SYNC_ERROR = stringPreferencesKey("last_usage_sync_error")
-        val ACCOUNTABILITY_BASE_URL = stringPreferencesKey("accountability_base_url")
+        val DEVICE_ID = stringPreferencesKey("backend_device_id")
+        val DEVICE_TOKEN = stringPreferencesKey("backend_device_token")
         val SHARE_DAILY_STATS_ENABLED = booleanPreferencesKey("share_daily_stats_enabled")
         val MY_PAIRING_CODE = stringPreferencesKey("my_pairing_code")
         val WEEKLY_DIGEST_ENABLED = booleanPreferencesKey("weekly_digest_enabled")
@@ -126,15 +126,6 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit {
             it[Keys.CACHED_STREAK] = days
             it[Keys.CACHED_STREAK_DATE] = forDate
-        }
-    }
-
-    /** The user's own Anthropic API key, used to verify photos for [com.habitsfirst.androidclone.domain.model.HabitType.PHOTO] habits. */
-    val anthropicApiKey: Flow<String?> = dataStore.data.map { it[Keys.ANTHROPIC_API_KEY] }
-
-    suspend fun setAnthropicApiKey(key: String?) {
-        dataStore.edit {
-            if (key.isNullOrBlank()) it.remove(Keys.ANTHROPIC_API_KEY) else it[Keys.ANTHROPIC_API_KEY] = key.trim()
         }
     }
 
@@ -474,26 +465,33 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
-    // -- Accountability buddies (backend scaffolding) -----------------------------------
+    // -- Backend device identity ---------------------------------------------------
 
     /**
-     * Base URL of the user's own accountability-buddy backend, e.g.
-     * "https://example.com/api". No backend ships with the app -- until this is set,
-     * every [com.habitsfirst.androidclone.data.remote.AccountabilityApiClient] call
-     * fails fast with a clear "no backend configured" error instead of hitting a
-     * hardcoded host. Trimmed of a trailing slash isn't done here (see
-     * [com.habitsfirst.androidclone.data.remote.HttpAccountabilityApiClient]); blank
-     * clears the key, same pattern as [anthropicApiKey].
+     * This install's identity with Locke's own backend (`backend/`, base URL
+     * [com.habitsfirst.androidclone.data.remote.BackendConfig]) -- minted once by
+     * [com.habitsfirst.androidclone.data.remote.DeviceIdentityRepository] on first
+     * use and cached here, since there's no login: every backend call authenticates
+     * as this one device via its bearer [DeviceIdentity.token].
      */
-    val accountabilityBaseUrl: Flow<String?> = dataStore.data.map { it[Keys.ACCOUNTABILITY_BASE_URL] }
+    data class DeviceIdentity(val id: String, val token: String)
 
-    suspend fun setAccountabilityBaseUrl(url: String?) {
+    val deviceIdentity: Flow<DeviceIdentity?> = dataStore.data.map { prefs ->
+        val id = prefs[Keys.DEVICE_ID]
+        val token = prefs[Keys.DEVICE_TOKEN]
+        if (id != null && token != null) DeviceIdentity(id, token) else null
+    }
+
+    suspend fun setDeviceIdentity(id: String, token: String) {
         dataStore.edit {
-            if (url.isNullOrBlank()) it.remove(Keys.ACCOUNTABILITY_BASE_URL) else it[Keys.ACCOUNTABILITY_BASE_URL] = url.trim()
+            it[Keys.DEVICE_ID] = id
+            it[Keys.DEVICE_TOKEN] = token
         }
     }
 
-    /** Whether today's summary is pushed to the configured backend for buddies to see. Off by default. */
+    // -- Accountability buddies ------------------------------------------------------
+
+    /** Whether today's summary is pushed to the backend for buddies to see. Off by default. */
     val shareDailyStatsEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.SHARE_DAILY_STATS_ENABLED] ?: false }
 
     suspend fun setShareDailyStatsEnabled(enabled: Boolean) {
@@ -586,6 +584,14 @@ class PreferencesRepository @Inject constructor(
     }
 
     companion object {
+        /**
+         * Free-tier cap on new GATING habits -- see
+         * [com.habitsfirst.androidclone.ui.habit.AddEditHabitViewModel.onSave]. Only
+         * gates *creating* a new gate past the cap; existing gates (including ones
+         * the onboarding "ease into it" ramp promotes from TRACKED later) are never
+         * un-gated or blocked from being edited by this.
+         */
+        const val MAX_FREE_GATING_HABITS = 3
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
         const val HARD_MODE_TOGGLE_COOLDOWN_DAYS = 7
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5

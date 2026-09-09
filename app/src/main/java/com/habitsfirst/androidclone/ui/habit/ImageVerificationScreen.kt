@@ -34,7 +34,7 @@ import com.habitsfirst.androidclone.ui.components.PhotoVerificationCapture
 @Composable
 fun ImageVerificationScreen(
     onDone: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onUpgrade: () -> Unit,
     viewModel: ImageVerificationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -94,11 +94,11 @@ fun ImageVerificationScreen(
                 isVerifying = state.isVerifying,
                 result = state.result,
                 errorMessage = state.errorMessage,
-                missingApiKey = state.missingApiKey,
+                requiresPremium = state.requiresPremium,
                 onImageCaptured = viewModel::onImageCaptured,
                 onRetake = viewModel::onRetake,
                 onSubmit = viewModel::onSubmit,
-                onOpenSettings = onOpenSettings,
+                onUpgrade = onUpgrade,
                 onOverride = viewModel::onOverride,
             )
         }

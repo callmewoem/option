@@ -19,8 +19,8 @@ interface ImageVerificationClient {
 }
 
 sealed class ImageVerificationException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    /** No Anthropic API key is configured yet -- point the user at Settings. */
-    object MissingApiKey : ImageVerificationException("No Anthropic API key is set. Add one in Settings.")
+    /** Photo verification is a premium feature -- point the user at the paywall, not Settings. */
+    object RequiresPremium : ImageVerificationException("Photo verification is a premium feature. Upgrade to use it.")
     class Network(message: String, cause: Throwable? = null) : ImageVerificationException(message, cause)
     class Api(message: String) : ImageVerificationException(message)
 }

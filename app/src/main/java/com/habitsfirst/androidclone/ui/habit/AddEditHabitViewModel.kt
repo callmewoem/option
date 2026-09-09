@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.billing.EntitlementRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.Habit
@@ -21,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
@@ -53,6 +55,8 @@ data class AddEditHabitUiState(
     val originalTargetValue: Int = 0,
     val installedApps: List<InstalledApp> = emptyList(),
     val savedSuccessfully: Boolean = false,
+    /** True once [AddEditHabitViewModel.onSave] blocked a new gate past the free-tier cap -- [AddEditHabitScreen] shows a paywall CTA, not a plain error. */
+    val requiresPremium: Boolean = false,
 ) {
     val isValid: Boolean
         get() = name.isNotBlank() &&
@@ -77,6 +81,7 @@ class AddEditHabitViewModel @Inject constructor(
     private val installedAppsProvider: InstalledAppsProvider,
     @ApplicationContext private val appContext: Context,
     private val preferencesRepository: PreferencesRepository,
+    private val entitlementRepository: EntitlementRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -218,8 +223,19 @@ class AddEditHabitViewModel @Inject constructor(
     fun onSave() {
         val state = _uiState.value
         if (!state.isValid || state.isSaving) return
-        _uiState.value = state.copy(isSaving = true)
+        _uiState.value = state.copy(isSaving = true, requiresPremium = false)
         viewModelScope.launch {
+            // Free tier caps new gates -- only creating one past the cap is blocked;
+            // an existing gate (including one the onboarding "ease into it" ramp
+            // promotes later from TRACKED) is never un-gated or blocked from being
+            // edited by this.
+            if (state.isNew && state.kind == HabitKind.GATING) {
+                val gatingCount = habitRepository.observeHabitsByKind(HabitKind.GATING).first().size
+                if (gatingCount >= PreferencesRepository.MAX_FREE_GATING_HABITS && !entitlementRepository.isPremium()) {
+                    _uiState.value = _uiState.value.copy(isSaving = false, requiresPremium = true)
+                    return@launch
+                }
+            }
             habitRepository.saveHabit(
                 Habit(
                     id = state.habitId,
@@ -248,6 +264,10 @@ class AddEditHabitViewModel @Inject constructor(
             }
             _uiState.value = _uiState.value.copy(isSaving = false, savedSuccessfully = true)
         }
+    }
+
+    fun onRequiresPremiumShown() {
+        _uiState.value = _uiState.value.copy(requiresPremium = false)
     }
 
     fun onDelete() {

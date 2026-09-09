@@ -12,11 +12,13 @@ import java.io.File
 
 /**
  * Guards the "fail fast, never crash" contract from [AccountabilityApiClient]'s doc:
- * with no backend base URL configured (the default, since none ships with the app),
- * every call must surface [AccountabilityApiException.NoBackendConfigured] instead of
- * throwing an NPE or silently hitting a hardcoded host. The [OkHttpClient] passed in is
- * never actually used in this state -- [requireBaseUrl] short-circuits before any
- * network call is attempted.
+ * with the backend unreachable (as it always is from this JVM-only unit test sandbox --
+ * [BackendConfig.BASE_URL] points at a placeholder host with no DNS entry), every call
+ * must surface [AccountabilityApiException.Network] instead of throwing an unchecked
+ * exception. Device registration ([DeviceIdentityRepository]) is on the same critical
+ * path (every call registers the device first if it hasn't yet), so this also exercises
+ * that it fails the same clean way rather than crashing differently from everything
+ * downstream of it.
  */
 class HttpAccountabilityApiClientTest {
 
@@ -24,74 +26,58 @@ class HttpAccountabilityApiClientTest {
         val dataStore = PreferenceDataStoreFactory.create(
             produceFile = { File(tempDir, "test_prefs.preferences_pb") },
         )
-        return HttpAccountabilityApiClient(OkHttpClient(), PreferencesRepository(dataStore))
+        val okHttpClient = OkHttpClient()
+        val preferencesRepository = PreferencesRepository(dataStore)
+        val deviceIdentity = DeviceIdentityRepository(okHttpClient, preferencesRepository)
+        return HttpAccountabilityApiClient(okHttpClient, deviceIdentity)
     }
 
     @Test
-    fun `createPairingCode fails fast with no backend configured`() = withTempDir { tempDir ->
+    fun `createPairingCode surfaces Network when the backend is unreachable`() = withTempDir { tempDir ->
         val client = newClient(tempDir)
         runBlocking {
             try {
                 client.createPairingCode()
-                fail("expected NoBackendConfigured")
-            } catch (e: AccountabilityApiException.NoBackendConfigured) {
+                fail("expected AccountabilityApiException.Network")
+            } catch (e: AccountabilityApiException.Network) {
                 // expected
             }
         }
     }
 
     @Test
-    fun `addBuddy fails fast with no backend configured`() = withTempDir { tempDir ->
+    fun `addBuddy surfaces Network when the backend is unreachable`() = withTempDir { tempDir ->
         val client = newClient(tempDir)
         runBlocking {
             try {
                 client.addBuddy("SOME-CODE")
-                fail("expected NoBackendConfigured")
-            } catch (e: AccountabilityApiException.NoBackendConfigured) {
+                fail("expected AccountabilityApiException.Network")
+            } catch (e: AccountabilityApiException.Network) {
                 // expected
             }
         }
     }
 
     @Test
-    fun `fetchBuddySummaries fails fast with no backend configured`() = withTempDir { tempDir ->
+    fun `fetchBuddySummaries surfaces Network when the backend is unreachable`() = withTempDir { tempDir ->
         val client = newClient(tempDir)
         runBlocking {
             try {
                 client.fetchBuddySummaries()
-                fail("expected NoBackendConfigured")
-            } catch (e: AccountabilityApiException.NoBackendConfigured) {
+                fail("expected AccountabilityApiException.Network")
+            } catch (e: AccountabilityApiException.Network) {
                 // expected
             }
         }
     }
 
     @Test
-    fun `pushDailySummary surfaces NoBackendConfigured as a failed Result rather than throwing`() = withTempDir { tempDir ->
+    fun `pushDailySummary surfaces Network as a failed Result rather than throwing`() = withTempDir { tempDir ->
         val client = newClient(tempDir)
         runBlocking {
             val result = client.pushDailySummary(DailySummary("2026-09-05", 1, 2, 3))
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull() is AccountabilityApiException.NoBackendConfigured)
-        }
-    }
-
-    @Test
-    fun `a blank base URL is treated the same as unset`() = withTempDir { tempDir ->
-        val dataStore = PreferenceDataStoreFactory.create(
-            produceFile = { File(tempDir, "test_prefs.preferences_pb") },
-        )
-        val preferencesRepository = PreferencesRepository(dataStore)
-        runBlocking { preferencesRepository.setAccountabilityBaseUrl("   ") }
-        val client = HttpAccountabilityApiClient(OkHttpClient(), preferencesRepository)
-
-        runBlocking {
-            try {
-                client.createPairingCode()
-                fail("expected NoBackendConfigured")
-            } catch (e: AccountabilityApiException.NoBackendConfigured) {
-                // expected
-            }
+            assertTrue(result.exceptionOrNull() is AccountabilityApiException.Network)
         }
     }
 

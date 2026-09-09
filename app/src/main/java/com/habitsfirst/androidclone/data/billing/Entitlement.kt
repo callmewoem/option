@@ -6,9 +6,8 @@ import com.habitsfirst.androidclone.domain.model.SubscriptionTier
  * The current state of a user's premium access.
  *
  * [isPremium] is the single source of truth callers should check -- never infer premium
- * status from `tier != SubscriptionTier.NONE`. Today [isPremium] is hardcoded `true`
- * regardless of [tier] (see [StubEntitlementRepository]), so the two can legitimately
- * disagree until real Play Billing is wired up.
+ * status from `tier != SubscriptionTier.NONE` directly, since [isPremium] also accounts
+ * for [expiresAtEpochMillis] having passed.
  */
 data class Entitlement(
     val tier: SubscriptionTier,

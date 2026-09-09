@@ -42,7 +42,7 @@ fun OnboardingPickAppsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { OnboardingTopBar(step = 2, totalSteps = 5, onBack = onBack) },
+        topBar = { OnboardingTopBar(step = 2, totalSteps = 6, onBack = onBack) },
         bottomBar = {
             LockePrimaryButton(
                 text = stringResource(R.string.onboarding_continue),

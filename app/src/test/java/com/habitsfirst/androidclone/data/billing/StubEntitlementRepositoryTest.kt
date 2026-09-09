@@ -4,14 +4,15 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 /**
- * Guards the current hardcoding in [StubEntitlementRepository]: `isPremium` must report
- * `true` no matter what tier is actually stored, so that the seam is a no-op today and
- * only starts mattering once a real Play-Billing-backed implementation replaces it.
+ * [StubEntitlementRepository] derives `isPremium` purely from the locally stored tier and
+ * expiry: false with nothing purchased, false for [SubscriptionTier.NONE], true for a
+ * purchased tier that hasn't expired, and false again once it has.
  */
 class StubEntitlementRepositoryTest {
 
@@ -23,10 +24,34 @@ class StubEntitlementRepositoryTest {
     }
 
     @Test
-    fun `isPremium is true with no purchase recorded`() = runBlocking {
+    fun `isPremium is false with no purchase recorded`() = runBlocking {
         val tempDir = createTempDir()
         try {
             val repository = newRepository(tempDir)
+            assertFalse(repository.isPremium())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `isPremium is false after recording a NONE tier purchase`() = runBlocking {
+        val tempDir = createTempDir()
+        try {
+            val repository = newRepository(tempDir)
+            repository.recordPurchase(SubscriptionTier.NONE, null)
+            assertFalse(repository.isPremium())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `isPremium is true for a lifetime purchase with no expiry`() = runBlocking {
+        val tempDir = createTempDir()
+        try {
+            val repository = newRepository(tempDir)
+            repository.recordPurchase(SubscriptionTier.LIFETIME, null)
             assertTrue(repository.isPremium())
         } finally {
             tempDir.deleteRecursively()
@@ -34,12 +59,24 @@ class StubEntitlementRepositoryTest {
     }
 
     @Test
-    fun `isPremium is true even after recording a NONE tier purchase`() = runBlocking {
+    fun `isPremium is true for a subscription that has not expired yet`() = runBlocking {
         val tempDir = createTempDir()
         try {
             val repository = newRepository(tempDir)
-            repository.recordPurchase(SubscriptionTier.NONE, null)
+            repository.recordPurchase(SubscriptionTier.MONTHLY, System.currentTimeMillis() + 60_000)
             assertTrue(repository.isPremium())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `isPremium is false for a subscription that already expired`() = runBlocking {
+        val tempDir = createTempDir()
+        try {
+            val repository = newRepository(tempDir)
+            repository.recordPurchase(SubscriptionTier.MONTHLY, System.currentTimeMillis() - 60_000)
+            assertFalse(repository.isPremium())
         } finally {
             tempDir.deleteRecursively()
         }

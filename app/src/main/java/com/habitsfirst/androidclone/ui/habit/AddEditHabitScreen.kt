@@ -72,6 +72,7 @@ import java.util.Locale
 fun AddEditHabitScreen(
     onDone: () -> Unit,
     onOpenTimer: (Long) -> Unit,
+    onUpgrade: () -> Unit,
     viewModel: AddEditHabitViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -314,6 +315,22 @@ fun AddEditHabitScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+
+    // Free tier caps new gates at PreferencesRepository.MAX_FREE_GATING_HABITS -- see
+    // AddEditHabitViewModel.onSave.
+    if (state.requiresPremium) {
+        AlertDialog(
+            onDismissRequest = viewModel::onRequiresPremiumShown,
+            title = { Text("Free plan limit reached") },
+            text = { Text("You've reached the free plan's limit on gating habits. Upgrade to Premium for unlimited habits.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onRequiresPremiumShown(); onUpgrade() }) { Text("Upgrade") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::onRequiresPremiumShown) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

@@ -3,6 +3,7 @@ package com.habitsfirst.androidclone.ui.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.billing.EntitlementRepository
 import com.habitsfirst.androidclone.data.healthconnect.HealthConnectManager
 import com.habitsfirst.androidclone.data.repository.AccountabilityRepository
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
@@ -13,6 +14,7 @@ import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.Habit
+import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.service.WorkScheduler
@@ -39,7 +41,8 @@ import javax.inject.Inject
 data class SettingsUiState(
     val habits: List<Habit> = emptyList(),
     val notificationsEnabled: Boolean = true,
-    val anthropicApiKey: String? = null,
+    val isPremium: Boolean = false,
+    val subscriptionTier: SubscriptionTier = SubscriptionTier.NONE,
     val selectedThemeVariant: ThemeVariant = ThemeVariant.DEFAULT,
     val unlockedThemeVariants: Set<ThemeVariant> = setOf(ThemeVariant.DEFAULT),
     val graceTokenCount: Int = 0,
@@ -66,7 +69,6 @@ data class SettingsUiState(
     val healthConnectAvailable: Boolean = false,
     val healthConnectPermissionsGranted: Boolean = false,
     val healthConnectSyncEnabled: Boolean = false,
-    val accountabilityBaseUrl: String? = null,
     val myPairingCode: String? = null,
     val shareDailyStatsEnabled: Boolean = false,
     val buddies: List<AccountabilityBuddy> = emptyList(),
@@ -76,7 +78,6 @@ data class SettingsUiState(
 
 /** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
 private data class AccountabilitySettings(
-    val baseUrl: String?,
     val pairingCode: String?,
     val shareEnabled: Boolean,
     val buddies: List<AccountabilityBuddy>,
@@ -110,11 +111,10 @@ private data class BlockingSettings(
     val limitedUnblockWindow: PreferencesRepository.LimitedUnblockWindowSettings,
 )
 
-/** Hard mode/limited unblocking, the ease-in ramp's streak length, the photo-verification API key, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
+/** Hard mode/limited unblocking, the ease-in ramp's streak length, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
 private data class ExtraSettings(
     val blocking: BlockingSettings,
     val easeInStreakLength: Int,
-    val anthropicApiKey: String?,
     val healthConnectSyncEnabled: Boolean,
     val healthConnectPermissionsGranted: Boolean,
 )
@@ -135,6 +135,7 @@ class SettingsViewModel @Inject constructor(
     private val limitedUnblockRepository: LimitedUnblockRepository,
     private val healthConnectManager: HealthConnectManager,
     private val accountabilityRepository: AccountabilityRepository,
+    private val entitlementRepository: EntitlementRepository,
     private val statsExportUtil: StatsExportUtil,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -202,14 +203,12 @@ class SettingsViewModel @Inject constructor(
     private val extraSettings = combine(
         blockingSettings,
         preferencesRepository.easeInStreakLength,
-        preferencesRepository.anthropicApiKey,
         preferencesRepository.isHealthConnectSyncEnabled,
         _healthConnectPermissionsGranted,
         ::ExtraSettings,
     )
 
     private val accountabilitySettings = combine(
-        preferencesRepository.accountabilityBaseUrl,
         accountabilityRepository.myPairingCode,
         accountabilityRepository.shareStatsEnabled,
         accountabilityRepository.buddies,
@@ -234,7 +233,6 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(
             habits = habits,
             notificationsEnabled = notificationsEnabled,
-            anthropicApiKey = extra.anthropicApiKey,
             selectedThemeVariant = tt.selectedVariant,
             unlockedThemeVariants = ThemeVariant.entries.filter { it.name in tt.unlockedIds }.toSet(),
             graceTokenCount = tt.graceTokens,
@@ -265,21 +263,22 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<SettingsUiState> = combine(baseUiState, accountabilitySettings) { base, accountability ->
+    val uiState: StateFlow<SettingsUiState> = combine(
+        baseUiState,
+        accountabilitySettings,
+        entitlementRepository.entitlement,
+    ) { base, accountability, entitlement ->
         base.copy(
-            accountabilityBaseUrl = accountability.baseUrl,
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
             buddies = accountability.buddies,
+            isPremium = entitlement.isPremium,
+            subscriptionTier = entitlement.tier,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun onNotificationsToggled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setNotificationsEnabled(enabled) }
-    }
-
-    fun onAnthropicApiKeyChanged(key: String) {
-        viewModelScope.launch { preferencesRepository.setAnthropicApiKey(key) }
     }
 
     fun onThemeVariantSelected(variant: ThemeVariant) {
@@ -398,20 +397,20 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // -- Accountability buddies (backend scaffolding) ------------------------------------
+    // -- Accountability buddies -----------------------------------------------------
 
-    fun onAccountabilityBaseUrlChanged(url: String) {
-        viewModelScope.launch { preferencesRepository.setAccountabilityBaseUrl(url) }
-    }
-
-    /** Mints a new pairing code from the configured backend; feedback surfaces via [accountabilityMessage]. */
+    /** Mints a new pairing code from the backend; feedback surfaces via [accountabilityMessage]. Premium only -- [SettingsScreen] shows an upgrade CTA instead of the buddy controls otherwise, this guard is the defense-in-depth backstop. */
     fun onRegeneratePairingCode() {
         viewModelScope.launch {
+            if (!entitlementRepository.isPremium()) {
+                _accountabilityMessage.value = "Accountability buddies are a premium feature."
+                return@launch
+            }
             val code = accountabilityRepository.regeneratePairingCode()
             _accountabilityMessage.value = if (code != null) {
                 "New pairing code ready."
             } else {
-                "Couldn't reach the backend -- check the base URL in Settings."
+                "Couldn't reach Locke's backend -- check your connection and try again."
             }
         }
     }
@@ -451,22 +450,30 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Redeems a buddy's pairing code with the configured backend; feedback surfaces via [accountabilityMessage]. */
+    /** Redeems a buddy's pairing code with the backend; feedback surfaces via [accountabilityMessage]. Premium only, see [onRegeneratePairingCode]. */
     fun onAddBuddy(code: String) {
         if (code.isBlank()) return
         viewModelScope.launch {
+            if (!entitlementRepository.isPremium()) {
+                _accountabilityMessage.value = "Accountability buddies are a premium feature."
+                return@launch
+            }
             val added = accountabilityRepository.addBuddy(code)
             _accountabilityMessage.value = if (added) {
                 "Buddy added."
             } else {
-                "Couldn't add that buddy -- check the backend and code."
+                "Couldn't add that buddy -- check the code and your connection."
             }
         }
     }
 
-    /** Turning sharing on immediately tries to push today's summary; turning it off is purely local, nothing is retracted from the backend. */
+    /** Turning sharing on immediately tries to push today's summary; turning it off is purely local, nothing is retracted from the backend. Premium only, see [onRegeneratePairingCode]. */
     fun onShareDailyStatsToggled(enabled: Boolean) {
         viewModelScope.launch {
+            if (enabled && !entitlementRepository.isPremium()) {
+                _accountabilityMessage.value = "Accountability buddies are a premium feature."
+                return@launch
+            }
             accountabilityRepository.setShareStatsEnabled(enabled)
             if (enabled) accountabilityRepository.shareTodayStatsIfEnabled()
         }

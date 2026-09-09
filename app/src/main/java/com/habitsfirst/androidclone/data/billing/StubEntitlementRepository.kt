@@ -1,46 +1,49 @@
 package com.habitsfirst.androidclone.data.billing
 
+import android.app.Activity
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
+import com.habitsfirst.androidclone.domain.model.PremiumProduct
 import com.habitsfirst.androidclone.domain.model.SubscriptionTier
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Placeholder [EntitlementRepository] used until real Play Billing is wired up. The
- * stored tier/expiry are persisted for real through [PreferencesRepository] -- so a
- * future [recordPurchase] call from the eventual purchase flow has somewhere real to
- * land -- but the premium *read* is hardcoded true below, independent of that stored
- * state.
+ * The simplest correct [EntitlementRepository]: derives `isPremium` purely from whatever
+ * tier/expiry is locally stored, with no purchase flow and no server verification of its
+ * own. Not bound anywhere in the app (see `di/BillingModule.kt`, which binds
+ * [PlayBillingEntitlementRepository] instead) -- kept as a reference implementation and
+ * for tests that need an [EntitlementRepository] without a real Play Billing connection.
  */
 @Singleton
 class StubEntitlementRepository @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
 ) : EntitlementRepository {
 
-    // TODO(billing): this always reports the user as premium. Once a real
-    // PlayBillingEntitlementRepository is wired up and bound in place of this
-    // stub (see di/BillingModule.kt), remove the hardcoded `true` below and
-    // derive `isPremium` from the stored tier/expiry instead.
     override val entitlement: Flow<Entitlement> = preferencesRepository.subscriptionState.map { stored ->
+        val notExpired = stored.expiresAtEpochMillis == null || stored.expiresAtEpochMillis > System.currentTimeMillis()
         Entitlement(
             tier = stored.tier,
-            isPremium = true,
+            isPremium = stored.tier != SubscriptionTier.NONE && notExpired,
             expiresAtEpochMillis = stored.expiresAtEpochMillis,
         )
     }
 
-    // TODO(billing): same hardcoding as `entitlement` above -- always true regardless
-    // of the stored tier. Remove once real billing is wired up.
-    override suspend fun isPremium(): Boolean = true
+    override suspend fun isPremium(): Boolean = entitlement.first().isPremium
+
+    override val products: Flow<List<PremiumProduct>> = flowOf(emptyList())
+
+    override suspend fun launchPurchase(activity: Activity, productId: String): Result<Unit> =
+        Result.failure(IllegalStateException("Billing isn't available in this build."))
 
     override suspend fun recordPurchase(tier: SubscriptionTier, expiresAtEpochMillis: Long?) {
         preferencesRepository.setSubscriptionState(tier, expiresAtEpochMillis)
     }
 
     override suspend fun refresh() {
-        // No-op placeholder. Once real billing is wired up, this is where a
-        // "re-query Play Billing for the user's current purchases" call will go.
+        // No real store to re-query -- entitlement is already exactly what's stored.
     }
 }

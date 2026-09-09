@@ -2,6 +2,7 @@ package com.habitsfirst.androidclone.ui.navigation
 
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
+import com.habitsfirst.androidclone.domain.model.PremiumFeature
 
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
@@ -12,6 +13,7 @@ sealed class Screen(val route: String) {
     data object OnboardingPickHabits : Screen("onboarding/pick_habits")
     data object OnboardingPermissions : Screen("onboarding/permissions")
     data object OnboardingCurfewCheckIn : Screen("onboarding/curfew_checkin")
+    data object OnboardingPaywall : Screen("onboarding/paywall")
 
     data object Home : Screen("home")
     data object Habits : Screen("habits")
@@ -37,9 +39,15 @@ sealed class Screen(val route: String) {
     }
     data object ProofOfLife : Screen("proof_of_life")
 
+    data object Paywall : Screen("paywall?feature={feature}") {
+        /** [feature] names what the user bounced off of, so the pitch is specific (design spec §5) -- omit for a general "go premium" entry point (e.g. from Settings). */
+        fun createRoute(feature: PremiumFeature? = null) = "paywall?feature=${feature?.name ?: ""}"
+    }
+
     companion object {
         const val ARG_HABIT_ID = "habitId"
         const val ARG_KIND = "kind"
         const val ARG_TYPE = "type"
+        const val ARG_FEATURE = "feature"
     }
 }

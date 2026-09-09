@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.HabitType
+import com.habitsfirst.androidclone.domain.model.PremiumFeature
 import com.habitsfirst.androidclone.ui.apppicker.AppPickerScreen
 import com.habitsfirst.androidclone.ui.diagnostics.DiagnosticsScreen
 import com.habitsfirst.androidclone.ui.habit.AddEditHabitScreen
@@ -24,12 +25,14 @@ import com.habitsfirst.androidclone.ui.habit.TimedHabitTimerScreen
 import com.habitsfirst.androidclone.ui.habits.HabitsScreen
 import com.habitsfirst.androidclone.ui.home.HomeScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingCurfewCheckInScreen
+import com.habitsfirst.androidclone.ui.onboarding.OnboardingPaywallScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPermissionsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickAppsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingPickHabitsScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingUsageAccessScreen
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel
 import com.habitsfirst.androidclone.ui.onboarding.OnboardingWelcomeScreen
+import com.habitsfirst.androidclone.ui.paywall.PaywallScreen
 import com.habitsfirst.androidclone.ui.proofoflife.ProofOfLifeScreen
 import com.habitsfirst.androidclone.ui.settings.SettingsScreen
 import com.habitsfirst.androidclone.ui.todo.TodoScreen
@@ -97,12 +100,21 @@ fun HabitsFirstNavHost() {
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
             OnboardingCurfewCheckInScreen(
                 onBack = { navController.popBackStack() },
+                onContinue = { navController.navigate(Screen.OnboardingPaywall.route) },
+                viewModel = onboardingViewModel,
+            )
+        }
+        composable(Screen.OnboardingPaywall.route) {
+            val onboardingViewModel: OnboardingViewModel =
+                hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
+            OnboardingPaywallScreen(
+                onBack = { navController.popBackStack() },
                 onFinish = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
                     }
                 },
-                viewModel = onboardingViewModel,
+                onboardingViewModel = onboardingViewModel,
             )
         }
 
@@ -148,6 +160,7 @@ fun HabitsFirstNavHost() {
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
                 onManageUrls = { navController.navigate(Screen.UrlBlockList.route) },
                 onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
+                onOpenPaywall = { feature -> navController.navigate(Screen.Paywall.createRoute(feature)) },
             )
         }
 
@@ -173,6 +186,7 @@ fun HabitsFirstNavHost() {
                 onOpenTimer = { habitId ->
                     navController.navigate(Screen.TimedHabitTimer.createRoute(habitId))
                 },
+                onUpgrade = { navController.navigate(Screen.Paywall.createRoute(PremiumFeature.UNLIMITED_HABITS)) },
             )
         }
         composable(
@@ -184,6 +198,7 @@ fun HabitsFirstNavHost() {
                 onOpenTimer = { habitId ->
                     navController.navigate(Screen.TimedHabitTimer.createRoute(habitId))
                 },
+                onUpgrade = { navController.navigate(Screen.Paywall.createRoute(PremiumFeature.UNLIMITED_HABITS)) },
             )
         }
         composable(
@@ -198,13 +213,28 @@ fun HabitsFirstNavHost() {
         ) {
             ImageVerificationScreen(
                 onDone = { navController.popBackStack() },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                onUpgrade = { navController.navigate(Screen.Paywall.createRoute(PremiumFeature.PHOTO_VERIFICATION)) },
             )
         }
         composable(Screen.ProofOfLife.route) {
             ProofOfLifeScreen(
                 onDone = { navController.popBackStack() },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                onUpgrade = { navController.navigate(Screen.Paywall.createRoute(PremiumFeature.PHOTO_VERIFICATION)) },
+            )
+        }
+
+        composable(
+            route = Screen.Paywall.route,
+            arguments = listOf(
+                navArgument(Screen.ARG_FEATURE) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
+            PaywallScreen(
+                onBack = { navController.popBackStack() },
+                onPurchased = { navController.popBackStack() },
             )
         }
     }

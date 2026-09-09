@@ -571,7 +571,7 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Try photo verification", style = MaterialTheme.typography.titleMedium)
+                    Text(text = "Try photo verification (Premium)", style = MaterialTheme.typography.titleMedium)
                 }
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Filled.Close, contentDescription = "Dismiss")
@@ -579,8 +579,9 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
             }
             Text(
                 text = "One habit can be checked by AI instead of the honor system -- describe what a " +
-                    "proof photo should show and Locke verifies it for you. Set one up now, or skip it -- " +
-                    "it's always available later from Settings.",
+                    "proof photo should show and Locke verifies it for you. A premium feature: set one up " +
+                    "now and you'll see the upgrade prompt the first time you verify, or skip it -- it's " +
+                    "always available later from Settings.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
