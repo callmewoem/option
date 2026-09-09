@@ -71,7 +71,6 @@ import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.BuddyConnectionStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
-import com.habitsfirst.androidclone.ui.components.LockeCard
 import com.habitsfirst.androidclone.ui.components.LockeGhostButton
 import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.ui.components.icon
@@ -242,7 +241,7 @@ fun SettingsScreen(
                                 "Once today's habits are done, blocked apps and sites stay open for " +
                                     "${state.limitedUnblockWindowMinutes} minutes, then lock again."
                             } else {
-                                "Off -- blocked apps and sites stay open the rest of the day once habits are done."
+                                "Off. Blocked apps and sites stay open the rest of the day once habits are done."
                             },
                         )
                     },
@@ -395,8 +394,8 @@ fun SettingsScreen(
             item { SectionHeader("Cosmetics") }
             item {
                 Text(
-                    "Kept, not worn -- the palette itself never changes. A collected record of what's been " +
-                        "won from the daily lootbox, or unlocked instantly with a code below.",
+                    "The palette itself never changes. This shows what you've won from the daily " +
+                        "lootbox, or unlocked with a code below.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -602,7 +601,7 @@ private fun BedtimeAndReminderSection(
 
     ListItem(
         headlineContent = { Text("Enable bedtime lock") },
-        supportingContent = { Text("A hard curfew -- no habit or grace token unlocks it") },
+        supportingContent = { Text("A hard curfew. No habit or grace token unlocks it.") },
         trailingContent = {
             Switch(
                 checked = bedtimeEnabled,
@@ -637,7 +636,7 @@ private fun BedtimeAndReminderSection(
 
     SectionHeader("Morning check-in")
     Text(
-        "A daily photo proving you're up -- miss the window and apps stay locked " +
+        "A daily photo proving you're up. Miss the window and apps stay locked " +
             "${ProofOfLifeRepository.PENALTY_MINUTES} minutes longer.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -802,10 +801,8 @@ private fun SectionHeader(text: String) {
 
 /**
  * Where the user pastes their own Anthropic API key so photo-verification habits and
- * the morning check-in can check submitted photos. What leaves the device, in order
- * (design spec's "photo-checking detail" settings screen): a submitted photo, this
- * habit's own description and example photo (if any) -- sent to Anthropic's API for
- * that one check, nothing else, nothing continuous.
+ * the morning check-in can check submitted photos. Only the submitted photo and that
+ * habit's own prompt are sent, per check -- nothing else, nothing continuous.
  */
 @Composable
 private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
@@ -815,24 +812,11 @@ private fun ApiKeyField(apiKey: String?, onApiKeyChanged: (String) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             text = "Habits with photo verification, and the morning check-in, use your own Anthropic API " +
-                "key to check proof photos. Get one at console.anthropic.com.",
+                "key to check proof photos. Only the submitted photo is sent, per check. Get a key at " +
+                "console.anthropic.com.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        LockeCard(modifier = Modifier.fillMaxWidth(), containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("What leaves the device, in order:", style = MaterialTheme.typography.labelLarge)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "1. The photo you just submitted.\n" +
-                        "2. That habit's own description and example photo, if you set one.\n" +
-                        "Sent once, per check, to Anthropic's API -- nothing else about your usage leaves the device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = text,
@@ -876,9 +860,8 @@ private fun AccountabilitySection(
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = "Pair with a friend to share your daily progress and see theirs. Offline-first -- what's " +
-                "shown below is whatever was last synced, labeled as such. Requires your own backend " +
-                "server; nothing is hosted by default.",
+            text = "Pair with a friend to share your daily progress and see theirs. Requires your own " +
+                "backend server; nothing is hosted by default.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -927,7 +910,7 @@ private fun AccountabilitySection(
                 trailingContent = {
                     buddy.lastSummary?.let { summary ->
                         Text(
-                            "${summary.habitsCompleted}/${summary.totalHabits} today -- ${summary.currentStreak}d streak",
+                            "${summary.habitsCompleted}/${summary.totalHabits} today · ${summary.currentStreak}d streak",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -948,9 +931,9 @@ private fun AccountabilitySection(
 
 /** Stale data is named plainly, not hidden or silently retried (design spec §5). */
 private fun buddySyncStatusLabel(status: BuddyConnectionStatus): String = when (status) {
-    BuddyConnectionStatus.Pending -> "Pending -- no sync yet"
+    BuddyConnectionStatus.Pending -> "No sync yet"
     BuddyConnectionStatus.Connected -> "Connected"
-    is BuddyConnectionStatus.Error -> "Showing the last synced data -- can't reach the backend: ${status.message}"
+    is BuddyConnectionStatus.Error -> "Showing last synced data. Can't reach the backend: ${status.message}"
 }
 
 /**
@@ -974,7 +957,7 @@ private fun HealthConnectSection(
     )
     ListItem(
         headlineContent = { Text("Read permissions") },
-        supportingContent = { Text("Step count, workout duration, sleep duration -- read-only") },
+        supportingContent = { Text("Step count, workout duration, sleep duration (read-only)") },
         trailingContent = {
             if (permissionsGranted) {
                 Text(

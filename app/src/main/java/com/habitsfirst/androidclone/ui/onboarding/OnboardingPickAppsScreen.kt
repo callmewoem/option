@@ -98,9 +98,9 @@ fun OnboardingPickAppsScreen(
                     }
                     item {
                         Text(
-                            text = "Comprehensive lists, kept current automatically. Turning one on blocks it " +
-                                "permanently -- no habit or grace token gets past it, unlike the apps below. " +
-                                "Switch that to gated, or build a custom list, later in Settings.",
+                            text = "These lists stay current automatically. Turning one on blocks it " +
+                                "permanently, unlike the apps above. Switch it to gated, or add a custom " +
+                                "list, later in Settings.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),

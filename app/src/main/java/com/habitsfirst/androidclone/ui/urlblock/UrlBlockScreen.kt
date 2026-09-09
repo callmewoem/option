@@ -78,9 +78,8 @@ fun UrlBlockScreen(
             item { SectionHeader("Blanket lists") }
             item {
                 Text(
-                    "Comprehensive lists, kept current automatically. \"Unlock via gating\" opens once " +
-                        "today's habits are done, just like a blocked app -- \"Perma-blocked\" never opens, " +
-                        "no habit or grace token gets past it.",
+                    "Kept current automatically. \"Unlock via gating\" opens once today's habits are " +
+                        "done; \"Perma-blocked\" never opens.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -292,7 +291,7 @@ private fun DomainEditorDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 if (domains.isEmpty()) {
                     Text(
-                        "No domains yet -- add one above.",
+                        "No domains yet. Add one above.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

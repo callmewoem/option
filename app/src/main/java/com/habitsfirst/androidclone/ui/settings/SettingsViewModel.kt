@@ -297,7 +297,7 @@ class SettingsViewModel @Inject constructor(
             _themeCodeMessage.value = when (val result = lootboxRepository.redeemThemeCode(code)) {
                 is ThemeCodeResult.Unlocked ->
                     "Unlocked ${result.variants.joinToString { it.displayName }}!"
-                ThemeCodeResult.AlreadyUnlocked -> "Already unlocked -- nothing new from that code."
+                ThemeCodeResult.AlreadyUnlocked -> "Already unlocked. Nothing new from that code."
                 ThemeCodeResult.Invalid -> "That code doesn't match anything."
             }
         }
@@ -411,7 +411,7 @@ class SettingsViewModel @Inject constructor(
             _accountabilityMessage.value = if (code != null) {
                 "New pairing code ready."
             } else {
-                "Couldn't reach the backend -- check the base URL in Settings."
+                "Couldn't reach the backend. Check the base URL in Settings."
             }
         }
     }
@@ -444,7 +444,7 @@ class SettingsViewModel @Inject constructor(
                 // file's actual location ever drift), and the repository reads
                 // (SQLiteException) all need to land on the same "export failed"
                 // message instead of crashing the app.
-                _exportError.value = "Couldn't export your data -- try again."
+                _exportError.value = "Couldn't export your data. Try again."
             } finally {
                 _isExporting.value = false
             }
@@ -459,7 +459,7 @@ class SettingsViewModel @Inject constructor(
             _accountabilityMessage.value = if (added) {
                 "Buddy added."
             } else {
-                "Couldn't add that buddy -- check the backend and code."
+                "Couldn't add that buddy. Check the backend and code."
             }
         }
     }

@@ -209,7 +209,7 @@ fun AddEditHabitScreen(
                         )
                     },
                     supportingText = if (state.isKindLocked) {
-                        { Text("Locked by Hard Mode -- can only be raised") }
+                        { Text("Locked by Hard Mode: can only be raised") }
                     } else {
                         null
                     },
@@ -365,7 +365,7 @@ private fun FrequencyPicker(
     if (locked) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Locked by Hard Mode -- days can only be added",
+            text = "Locked by Hard Mode: days can only be added",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

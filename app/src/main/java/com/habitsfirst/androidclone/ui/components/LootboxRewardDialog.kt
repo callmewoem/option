@@ -42,7 +42,7 @@ private fun LootboxReward.title(): String = when (this) {
 private fun LootboxReward.description(): String = when (this) {
     LootboxReward.GracePeriod -> "Redeem it from a lock screen for a 1-minute unblock, any time except bedtime."
     LootboxReward.TaskSkip -> "Force-completes one of today's gating habits without doing it. Use it from Settings."
-    is LootboxReward.ThemeUnlock -> "Kept in Settings -- the palette itself never changes, this is a collected marker only."
+    is LootboxReward.ThemeUnlock -> "Kept in Settings. The palette itself never changes; this is a collected marker only."
     LootboxReward.GoldStar -> "A cosmetic mark on today's heatmap cell."
 }
 

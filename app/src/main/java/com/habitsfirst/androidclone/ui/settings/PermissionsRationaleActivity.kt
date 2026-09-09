@@ -43,9 +43,9 @@ class PermissionsRationaleActivity : ComponentActivity() {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             "Locke reads your step count, workout duration, and sleep duration from " +
-                                "Health Connect, read-only, only to fill in progress on a habit you've " +
-                                "created -- so you don't have to log it by hand. Nothing is written back " +
-                                "to Health Connect, and nothing leaves your device.",
+                                "Health Connect, read-only, to fill in progress on habits you've created " +
+                                "instead of logging by hand. Nothing is written back to Health Connect, " +
+                                "and nothing leaves your device.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(modifier = Modifier.height(24.dp))

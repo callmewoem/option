@@ -74,7 +74,7 @@ fun ProofOfLifeScreen(
                 Spacer(modifier = Modifier.height(28.dp))
 
                 Text(
-                    text = "A photo proving you're up -- your kitchen, bathroom, or the view outside. " +
+                    text = "A photo proving you're up: your kitchen, bathroom, or the view outside. " +
                         "Not your bed, not a screen.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = LockeColor.OnIronMuted,
@@ -137,7 +137,7 @@ private fun CheckInCountdown(deadlineTime: String, windowMinutes: Int) {
         Spacer(modifier = Modifier.height(4.dp))
         BigNumber(
             value = formatCountdown(remainingSeconds),
-            caption = if (isPast) "past deadline -- the penalty has landed" else "left to check in",
+            caption = if (isPast) "past deadline, penalty applied" else "left to check in",
             color = color,
             captionColor = LockeColor.OnIronMuted,
             size = 72.sp,

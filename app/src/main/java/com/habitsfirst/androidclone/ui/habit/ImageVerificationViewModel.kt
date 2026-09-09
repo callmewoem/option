@@ -135,7 +135,7 @@ class ImageVerificationViewModel @Inject constructor(
             habitRepository.setImageVerificationResult(
                 habitId = habit.id,
                 approved = true,
-                reasoning = "Marked done manually -- overriding an automated rejection.",
+                reasoning = "Marked done manually, overriding an automated rejection.",
                 imagePath = capturedPath,
             )
             _uiState.value = _uiState.value.copy(isDone = true, overridden = true)

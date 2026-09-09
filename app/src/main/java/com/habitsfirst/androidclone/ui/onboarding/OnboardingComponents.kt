@@ -77,7 +77,7 @@ fun OnboardingTopBar(step: Int, totalSteps: Int, onBack: () -> Unit) {
 }
 
 /**
- * A short, all-caps label above a step's title -- "PART ONE -- THE LOCKS" and so on --
+ * A short, all-caps label above a step's title -- "PART ONE: THE LOCKS" and so on --
  * that threads the three setup screens into one story instead of three unrelated forms.
  */
 @Composable

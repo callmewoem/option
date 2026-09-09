@@ -79,14 +79,14 @@ fun OnboardingCurfewCheckInScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
-            OnboardingKicker("Part five -- the schedule")
+            OnboardingKicker("Part five: the schedule")
             Spacer(modifier = Modifier.height(4.dp))
             Text("Set the schedule", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 "Two more optional pieces: a hard bedtime curfew, and a morning check-in that " +
-                    "proves you're actually up. Both are off by default -- set them now, or skip and " +
-                    "turn them on later from Settings.",
+                    "proves you're up. Both are off by default. Skip them now and turn them on " +
+                    "later from Settings.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -101,7 +101,7 @@ fun OnboardingCurfewCheckInScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Bedtime curfew", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "A hard window -- no habit or grace token unlocks a locked app during it.",
+                                "No habit or grace token unlocks a locked app during this window.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -143,9 +143,9 @@ fun OnboardingCurfewCheckInScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Morning check-in", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "A photo proving you're up, checked by the same AI as photo-verification " +
+                                "A photo proving you're up, checked the same way as photo-verification " +
                                     "habits. Miss the window and the block extends " +
-                                    "${ProofOfLifeRepository.PENALTY_MINUTES} minutes -- priced exactly, every time.",
+                                    "${ProofOfLifeRepository.PENALTY_MINUTES} minutes.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -178,10 +178,9 @@ fun OnboardingCurfewCheckInScreen(
                     Text("Anthropic API key", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Needed for photo verification and the morning check-in's photo check, both above -- " +
-                            "without it, either one just shows \"can't reach the checker\" when tried. Each " +
-                            "submitted photo is sent to Anthropic's API for that one check; nothing else about " +
-                            "your usage leaves the device. Optional now -- add or change it anytime from Settings.",
+                        "Needed for photo verification and the morning check-in above. Without it, both " +
+                            "just show \"can't reach the checker.\" Photos are sent to Anthropic's API only " +
+                            "when checked. You can add this later from Settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

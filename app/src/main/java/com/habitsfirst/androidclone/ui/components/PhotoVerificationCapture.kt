@@ -45,8 +45,8 @@ import java.io.File
  * check-in lock alike. Camera-only by design (see the comment at the capture button) --
  * no gallery picker, so a stored photo can't stand in for today's proof.
  *
- * Any automated rejection carries a visible "I did this -- mark it done anyway" path
- * (design spec §6.2): automated judgment is always overridable, never a dead end.
+ * Any automated rejection carries a visible "Mark done anyway" path (design spec §6.2):
+ * automated judgment is always overridable, never a dead end.
  * [onOverride] is null when no override is available for this surface.
  */
 @Composable
@@ -131,7 +131,7 @@ fun PhotoVerificationCapture(
                 }
                 if (onOverride != null) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    LockeQuietButton(text = "I did this -- mark it done anyway", onClick = onOverride)
+                    LockeQuietButton(text = "Mark done anyway", onClick = onOverride)
                 }
             }
             result != null && result.approved -> {
@@ -155,7 +155,7 @@ fun PhotoVerificationCapture(
                 // A failure that isn't a clean rejection (network error, etc.) still
                 // deserves the same override, not just a dead end.
                 Spacer(modifier = Modifier.height(8.dp))
-                LockeQuietButton(text = "I did this -- mark it done anyway", onClick = onOverride)
+                LockeQuietButton(text = "Mark done anyway", onClick = onOverride)
             }
         }
     }

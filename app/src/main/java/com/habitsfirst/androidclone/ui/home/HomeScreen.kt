@@ -479,18 +479,15 @@ private data class TourStep(val title: String, val body: String)
 private val HOME_TOUR_STEPS = listOf(
     TourStep(
         title = "Your day at a glance",
-        body = "This card tracks what's left today, your streak, and how many apps are " +
-            "still locked -- it updates live as you complete habits below.",
+        body = "Updates live as you complete habits below.",
     ),
     TourStep(
         title = "Nothing here is fixed",
-        body = "Locked apps and habits can be added or removed anytime from Settings -- " +
-            "onboarding was just a starting point.",
+        body = "Locked apps and habits can be added or removed anytime from Settings.",
     ),
     TourStep(
         title = "Finish for a reward",
-        body = "Complete every gating habit in a day and Locke opens a daily lootbox -- " +
-            "tokens, or a kept cosmetic.",
+        body = "Complete every gating habit in a day and Locke opens a daily lootbox with tokens or a cosmetic.",
     ),
 )
 
@@ -505,7 +502,7 @@ private fun HomeTourBanner(step: Int, onNext: () -> Unit, onSkip: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "${step + 1}/${HOME_TOUR_STEPS.size} -- ${current.title}",
+                    text = "${step + 1}/${HOME_TOUR_STEPS.size} · ${current.title}",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.weight(1f),
@@ -578,9 +575,9 @@ private fun PhotoVerificationPromptBanner(onSetUp: () -> Unit, onDismiss: () -> 
                 }
             }
             Text(
-                text = "One habit can be checked by AI instead of the honor system -- describe what a " +
-                    "proof photo should show and Locke verifies it for you. Set one up now, or skip it -- " +
-                    "it's always available later from Settings.",
+                text = "One habit can be checked by AI instead of the honor system. Describe what a " +
+                    "proof photo should show and Locke verifies it for you. You can set this up anytime " +
+                    "from Settings.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -62,8 +62,8 @@ private fun StartLockoutContent(onStart: (minutes: Int) -> Unit, onDismiss: () -
         text = {
             Column {
                 Text(
-                    text = "Every app on your block list stays locked for as long as you pick -- " +
-                        "no habit, no grace token gets you back in early.",
+                    text = "Every app on your block list stays locked for as long as you pick. " +
+                        "Habits and grace tokens won't unlock it early.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -138,7 +138,7 @@ private fun ActiveLockoutContent(
                 if (confirmingCancel) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "You started this yourself -- no habit or grace token would've ended it early. Still want to?",
+                        text = "You started this yourself. Habits and grace tokens can't end it early. Still want to?",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )

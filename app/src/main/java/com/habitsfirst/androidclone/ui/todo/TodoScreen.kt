@@ -80,7 +80,7 @@ fun TodoScreen(
         ) {
             item {
                 Text(
-                    "No locking power -- nothing here gates an app or a habit. Just what to get to.",
+                    "No locking power. Nothing here gates an app or a habit, just what to get to.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

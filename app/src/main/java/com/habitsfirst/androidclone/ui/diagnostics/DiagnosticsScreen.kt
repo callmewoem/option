@@ -87,7 +87,7 @@ fun DiagnosticsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Usage access", style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                if (state.hasUsageAccess) "Granted" else "Not granted -- every habit below will read 0 minutes",
+                                if (state.hasUsageAccess) "Granted" else "Not granted. Every habit below will read 0 minutes.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (state.hasUsageAccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                             )
