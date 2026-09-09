@@ -34,9 +34,10 @@ class TodoRepository @Inject constructor(
     /**
      * Todos still undone from before [today] -- what's left behind once a due date
      * passes without [observeUpcoming]'s today/tomorrow window carrying them along.
-     * Surfaced once per day by [com.habitsfirst.androidclone.ui.todo.TodoViewModel]
-     * so the user can pick which ones to keep for today rather than having them
-     * silently disappear or silently reappear.
+     * Surfaced on the app's next cold launch or resume on a later day (see
+     * [com.habitsfirst.androidclone.AppViewModel.onAppResumed]) so the user can pick
+     * which ones to keep for today rather than having them silently disappear or
+     * silently reappear.
      */
     suspend fun getOverdueTodos(today: String = DateProvider.todayString()): List<Todo> =
         todoDao.getOverdue(today).map { it.toDomain() }
