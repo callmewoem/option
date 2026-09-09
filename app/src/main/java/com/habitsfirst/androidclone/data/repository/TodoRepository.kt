@@ -31,6 +31,22 @@ class TodoRepository @Inject constructor(
             todoDao.observeForDates(today, tomorrow).map { rows -> rows.map { it.toDomain() } }
         }
 
+    /**
+     * Todos still undone from before [today] -- what's left behind once a due date
+     * passes without [observeUpcoming]'s today/tomorrow window carrying them along.
+     * Surfaced once per day by [com.habitsfirst.androidclone.ui.todo.TodoViewModel]
+     * so the user can pick which ones to keep for today rather than having them
+     * silently disappear or silently reappear.
+     */
+    suspend fun getOverdueTodos(today: String = DateProvider.todayString()): List<Todo> =
+        todoDao.getOverdue(today).map { it.toDomain() }
+
+    /** Moves the given todos' due date to [today] -- how a chosen overdue todo "carries over". */
+    suspend fun carryOverToToday(todoIds: List<Long>, today: String = DateProvider.todayString()) {
+        if (todoIds.isEmpty()) return
+        todoDao.setDates(todoIds, today)
+    }
+
     /** Adds a task due today, or tomorrow if [dueTomorrow] is set. */
     suspend fun addTodo(title: String, dueTomorrow: Boolean = false) {
         if (title.isBlank()) return

@@ -3,7 +3,11 @@ package com.habitsfirst.androidclone.domain.model
 /**
  * A one-off task due either today or tomorrow -- todos aren't day-of-week dependent
  * (that's what a recurring [Habit] is for, via [Habit.scheduledDays]); a todo is just
- * a short-lived thing to get done, due on [date].
+ * a short-lived thing to get done, due on [date]. Left undone past its due date, a
+ * todo doesn't just vanish or silently carry itself over: it's surfaced (see
+ * [com.habitsfirst.androidclone.data.repository.TodoRepository.getOverdueTodos]) so
+ * the user can be asked, once per day, which of yesterday's undone todos to keep for
+ * today (see [com.habitsfirst.androidclone.ui.todo.TodoViewModel]).
  */
 data class Todo(
     val id: Long = 0L,

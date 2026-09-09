@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -58,6 +60,15 @@ fun TodoScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var newTodoText by remember { mutableStateOf("") }
     var newTodoDueTomorrow by remember { mutableStateOf(false) }
+
+    state.overduePrompt?.let { prompt ->
+        OverdueTodoDialog(
+            prompt = prompt,
+            onToggle = viewModel::onToggleOverdueSelection,
+            onConfirm = viewModel::onConfirmOverduePrompt,
+            onDismiss = viewModel::onDismissOverduePrompt,
+        )
+    }
 
     Scaffold(
         bottomBar = { LockeBottomBar(navController) },
@@ -140,6 +151,56 @@ fun TodoScreen(
             }
         }
     }
+}
+
+/**
+ * Once-a-day nudge for todos left undone from before today -- rather than having them
+ * silently carry over or silently drop off the list, the user picks which ones still
+ * matter. Every row starts checked (keep everything is the default); confirming
+ * carries only the checked ones over to today, dismissing carries none over but won't
+ * ask again until tomorrow.
+ */
+@Composable
+private fun OverdueTodoDialog(
+    prompt: OverduePromptState,
+    onToggle: (Long) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.todos_overdue_prompt_title)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.todos_overdue_prompt_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                prompt.todos.forEach { todo ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = todo.id in prompt.selectedIds,
+                            onCheckedChange = { onToggle(todo.id) },
+                        )
+                        Text(todo.title, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.todos_overdue_prompt_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.todos_overdue_prompt_dismiss)) }
+        },
+    )
 }
 
 @Composable

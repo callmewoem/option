@@ -49,6 +49,7 @@ class PreferencesRepository @Inject constructor(
         val MORNING_TODO_REMINDER_ENABLED = booleanPreferencesKey("morning_todo_reminder_enabled")
         val MORNING_TODO_REMINDER_TIME = stringPreferencesKey("morning_todo_reminder_time") // "HH:mm"
         val LAST_MORNING_REMINDER_SENT_DATE = stringPreferencesKey("last_morning_reminder_sent_date")
+        val LAST_OVERDUE_TODO_PROMPT_DATE = stringPreferencesKey("last_overdue_todo_prompt_date")
         val APP_BLOCK_MODE = stringPreferencesKey("app_block_mode") // AppBlockMode.name
         val LIMITED_UNBLOCK_ENABLED = booleanPreferencesKey("limited_unblock_enabled")
         val LIMITED_UNBLOCK_WINDOW_DATE = stringPreferencesKey("limited_unblock_window_date")
@@ -276,6 +277,14 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setLastMorningReminderSentDate(date: String) {
         dataStore.edit { it[Keys.LAST_MORNING_REMINDER_SENT_DATE] = date }
+    }
+
+    /** The date the "keep yesterday's undone todos?" dialog was last shown -- see [com.habitsfirst.androidclone.ui.todo.TodoViewModel]. */
+    val lastOverdueTodoPromptDate: Flow<String?> =
+        dataStore.data.map { it[Keys.LAST_OVERDUE_TODO_PROMPT_DATE] }
+
+    suspend fun setLastOverdueTodoPromptDate(date: String) {
+        dataStore.edit { it[Keys.LAST_OVERDUE_TODO_PROMPT_DATE] = date }
     }
 
     // -- App block mode -----------------------------------------------------------------
