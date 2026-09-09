@@ -27,6 +27,14 @@ interface TodoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(todo: TodoEntity): Long
 
+    /** Still-pending todos due before [today] -- see [com.habitsfirst.androidclone.data.repository.TodoRepository.getOverdueTodos]. */
+    @Query("SELECT * FROM todos WHERE date < :today AND isDone = 0 ORDER BY date ASC, createdAtEpochMillis ASC")
+    suspend fun getOverdue(today: String): List<TodoEntity>
+
+    /** Bumps the given todos' due date forward -- see [com.habitsfirst.androidclone.data.repository.TodoRepository.carryOverToToday]. */
+    @Query("UPDATE todos SET date = :date WHERE id IN (:ids)")
+    suspend fun setDates(ids: List<Long>, date: String)
+
     /** [completedAtEpochMillis] should be the current time when [isDone] is true, and null otherwise -- see [com.habitsfirst.androidclone.data.repository.TodoRepository.setDone]. */
     @Query("UPDATE todos SET isDone = :isDone, completedAtEpochMillis = :completedAtEpochMillis WHERE id = :id")
     suspend fun setDone(id: Long, isDone: Boolean, completedAtEpochMillis: Long?)

@@ -16,7 +16,10 @@ data class TodoUiState(val todos: List<Todo> = emptyList())
 
 /**
  * Deliberately the plainest screen in the app -- no locking power, nothing here gates
- * anything (design spec §9). Just today and tomorrow's one-off tasks.
+ * anything (design spec §9). Just today and tomorrow's one-off tasks. The
+ * "you didn't do these yesterday" prompt lives one level up, in
+ * [com.habitsfirst.androidclone.AppViewModel] -- it's tied to the app being opened or
+ * resumed, not to this screen being opened, so it belongs above any one tab.
  */
 @HiltViewModel
 class TodoViewModel @Inject constructor(
