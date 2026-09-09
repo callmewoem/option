@@ -59,7 +59,7 @@ data class HomeUiState(
     val showTour: Boolean = false,
     /** True only on the same calendar day onboarding finished, until dismissed or a photo-verification habit exists. */
     val showPhotoVerificationPrompt: Boolean = false,
-    /** True while the app-usage/Health-Connect one-off refresh kicked off on app open (or the manual refresh button) is still running. */
+    /** True while the app-usage/Health-Connect one-off refresh kicked off on app open/resume (or the manual refresh button) is still running. */
     val isRefreshingDataDrivenHabits: Boolean = false,
     /** How many times a blocked app/URL was actually covered by the block screen today -- an impulse-control signal (see [BlockAttemptRepository]), shown as a small chip only when non-zero. */
     val blockedOpenAttemptsToday: Int = 0,
@@ -196,11 +196,13 @@ class HomeViewModel @Inject constructor(
     init {
         // Data-driven progress (app usage, Health Connect) otherwise only updates on the
         // next 15/30-min periodic tick, so it can be stale first thing after opening the
-        // app -- catch it up right away rather than waiting.
+        // app -- catch it up right away rather than waiting. HomeScreen also re-triggers
+        // this on every ON_RESUME, since this init block only runs once per ViewModel
+        // (i.e. it alone would miss a background/foreground cycle).
         refreshDataDrivenHabits()
     }
 
-    /** Kicks off an immediate refresh of app-usage and (if enabled) Health-Connect-backed habit progress, instead of waiting for their periodic workers. Called on app open (see [init]) and from Home's manual refresh action. */
+    /** Kicks off an immediate refresh of app-usage and (if enabled) Health-Connect-backed habit progress, instead of waiting for their periodic workers. Called on app open and every resume (see [init] and HomeScreen's ON_RESUME effect) and from Home's manual refresh action. */
     fun refreshDataDrivenHabits() {
         viewModelScope.launch {
             WorkScheduler.requestUsageRefreshNow(appContext)
