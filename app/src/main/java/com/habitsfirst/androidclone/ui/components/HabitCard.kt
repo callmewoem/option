@@ -119,6 +119,12 @@ fun HabitCard(
                         habit.type == HabitType.PHOTO ->
                             if (progress.isCompleted) "Verified" else "Tap to verify with a photo"
                         habit.type == HabitType.TALLY -> null
+                        habit.type == HabitType.VISIT_LOCATION ->
+                            if (progress.isCompleted) "Visited today" else "Not detected yet -- tap if you were there"
+                        habit.type == HabitType.GITHUB_CONTRIBUTION ->
+                            if (progress.isCompleted) "Contributed today" else "No activity found yet -- tap to confirm manually"
+                        habit.type == HabitType.TAG_SCAN ->
+                            if (progress.isCompleted) "Scanned today" else "Tap to scan your tag"
                         else -> "${progress.currentValue} / ${habit.targetValue} ${habit.type.unit}".trim()
                     }
                     if (subtitle != null) {

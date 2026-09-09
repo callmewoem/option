@@ -19,11 +19,23 @@
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
-    <!-- Needed to call the vision model that checks image-verification proof photos -->
+    <!-- Needed to call the vision model that checks image-verification proof photos, and to sync WakaTime/GitHub habits -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Needed to take a proof photo for image-verification habits -->
+    <!-- Needed to take a proof photo for image-verification habits, and to photograph a TAG_SCAN habit's QR code -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!--
+      Needed for VISIT_LOCATION habits: only ever reads the OS's already-cached
+      last-known location (see data/location/DeviceLocationProvider.kt), never a
+      continuous stream, so the foreground-only permission is enough; no
+      ACCESS_BACKGROUND_LOCATION is requested or needed.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!-- Needed to tap/write a TAG_SCAN habit's NFC tag -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <application
         android:name=".HabitsFirstApp"

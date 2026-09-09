@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.habitsfirst.androidclone.data.location.DeviceLocationProvider
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.domain.model.Habit
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
+import java.util.UUID
 import javax.inject.Inject
 
 data class AddEditHabitUiState(
@@ -40,6 +42,22 @@ data class AddEditHabitUiState(
     val verificationExampleImagePath: String? = null,
     /** Empty means every day -- see [Habit.scheduledDays]. */
     val scheduledDays: Set<DayOfWeek> = emptySet(),
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetLatitude: Double? = null,
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetLongitude: Double? = null,
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetRadiusMeters: Int = Habit.DEFAULT_VISIT_LOCATION_RADIUS_METERS,
+    /** [HabitType.VISIT_LOCATION] only. */
+    val targetLocationLabel: String = "",
+    /** True while [AddEditHabitViewModel.onCaptureCurrentLocation] is waiting on a fix. */
+    val isCapturingLocation: Boolean = false,
+    /** Set once a location capture attempt finds nothing -- cleared on the next attempt or once one succeeds. */
+    val locationCaptureFailed: Boolean = false,
+    /** [HabitType.GITHUB_CONTRIBUTION] only. */
+    val targetGithubUsername: String = "",
+    /** [HabitType.TAG_SCAN] only: generated once, the first time this type is picked -- see [AddEditHabitViewModel.onTypeChanged]. */
+    val tagPayload: String? = null,
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
@@ -58,7 +76,9 @@ data class AddEditHabitUiState(
         get() = name.isNotBlank() &&
             (type != HabitType.APP_USAGE_MINUTES || targetPackageName != null) &&
             (!type.isMeasurable || targetValue > 0) &&
-            (type != HabitType.PHOTO || verificationPrompt.isNotBlank() || verificationExampleImagePath != null)
+            (type != HabitType.PHOTO || verificationPrompt.isNotBlank() || verificationExampleImagePath != null) &&
+            (type != HabitType.VISIT_LOCATION || (targetLatitude != null && targetLongitude != null)) &&
+            (type != HabitType.GITHUB_CONTRIBUTION || targetGithubUsername.isNotBlank())
 }
 
 fun HabitType.defaultTarget(): Int = when (this) {
@@ -69,6 +89,10 @@ fun HabitType.defaultTarget(): Int = when (this) {
     HabitType.TALLY -> 1
     HabitType.WORKOUT_MINUTES -> 30
     HabitType.SLEEP_HOURS -> 8
+    HabitType.VISIT_LOCATION -> 1
+    HabitType.GITHUB_CONTRIBUTION -> 1
+    HabitType.WAKATIME_CODING_MINUTES -> 30
+    HabitType.TAG_SCAN -> 1
 }
 
 @HiltViewModel
@@ -77,6 +101,7 @@ class AddEditHabitViewModel @Inject constructor(
     private val installedAppsProvider: InstalledAppsProvider,
     @ApplicationContext private val appContext: Context,
     private val preferencesRepository: PreferencesRepository,
+    private val deviceLocationProvider: DeviceLocationProvider,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -117,6 +142,12 @@ class AddEditHabitViewModel @Inject constructor(
                         verificationExampleImagePath = habit.verificationExampleImagePath,
                         scheduledDays = habit.scheduledDays,
                         originalTargetValue = habit.targetValue,
+                        targetLatitude = habit.targetLatitude,
+                        targetLongitude = habit.targetLongitude,
+                        targetRadiusMeters = habit.targetRadiusMeters ?: Habit.DEFAULT_VISIT_LOCATION_RADIUS_METERS,
+                        targetLocationLabel = habit.targetLocationLabel.orEmpty(),
+                        targetGithubUsername = habit.targetGithubUsername.orEmpty(),
+                        tagPayload = habit.tagPayload,
                     )
                 }
                 // Hard mode only ever locks an *existing* gate -- a habit already
@@ -148,11 +179,20 @@ class AddEditHabitViewModel @Inject constructor(
         // Hard mode: swapping a locked gate's type (e.g. photo verification down to a
         // one-tap tally) would loosen it just as much as downgrading its kind would.
         if (_uiState.value.isKindLocked) return
-        _uiState.value = _uiState.value.copy(
+        val current = _uiState.value
+        _uiState.value = current.copy(
             type = type,
             targetValue = type.defaultTarget(),
-            targetPackageName = if (type == HabitType.APP_USAGE_MINUTES) _uiState.value.targetPackageName else null,
-            targetAppLabel = if (type == HabitType.APP_USAGE_MINUTES) _uiState.value.targetAppLabel else null,
+            targetPackageName = if (type == HabitType.APP_USAGE_MINUTES) current.targetPackageName else null,
+            targetAppLabel = if (type == HabitType.APP_USAGE_MINUTES) current.targetAppLabel else null,
+            targetLatitude = if (type == HabitType.VISIT_LOCATION) current.targetLatitude else null,
+            targetLongitude = if (type == HabitType.VISIT_LOCATION) current.targetLongitude else null,
+            targetLocationLabel = if (type == HabitType.VISIT_LOCATION) current.targetLocationLabel else "",
+            targetGithubUsername = if (type == HabitType.GITHUB_CONTRIBUTION) current.targetGithubUsername else "",
+            // Generated once and kept even if the user picks a different type and comes
+            // back -- see the field's own doc -- so a tag already written or printed
+            // doesn't silently stop matching.
+            tagPayload = if (type == HabitType.TAG_SCAN) (current.tagPayload ?: UUID.randomUUID().toString()) else current.tagPayload,
         )
     }
 
@@ -215,6 +255,45 @@ class AddEditHabitViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(verificationExampleImagePath = null)
     }
 
+    /**
+     * Captures the device's current location as a [HabitType.VISIT_LOCATION] habit's
+     * target -- called while the user is physically standing at the place they want to
+     * gate on (e.g. the gym). Requesting the runtime permission itself is
+     * [AddEditHabitScreen]'s job; this assumes it's already granted.
+     */
+    fun onCaptureCurrentLocation() {
+        if (_uiState.value.isKindLocked) return
+        _uiState.value = _uiState.value.copy(isCapturingLocation = true, locationCaptureFailed = false)
+        viewModelScope.launch {
+            val location = deviceLocationProvider.requestCurrentLocation()
+            _uiState.value = if (location != null) {
+                _uiState.value.copy(
+                    isCapturingLocation = false,
+                    locationCaptureFailed = false,
+                    targetLatitude = location.latitude,
+                    targetLongitude = location.longitude,
+                )
+            } else {
+                _uiState.value.copy(isCapturingLocation = false, locationCaptureFailed = true)
+            }
+        }
+    }
+
+    fun onLocationLabelChanged(label: String) {
+        if (_uiState.value.isKindLocked) return
+        _uiState.value = _uiState.value.copy(targetLocationLabel = label)
+    }
+
+    fun onRadiusMetersChanged(meters: Int) {
+        if (_uiState.value.isKindLocked) return
+        _uiState.value = _uiState.value.copy(targetRadiusMeters = meters)
+    }
+
+    fun onGithubUsernameChanged(username: String) {
+        if (_uiState.value.isKindLocked) return
+        _uiState.value = _uiState.value.copy(targetGithubUsername = username)
+    }
+
     fun onSave() {
         val state = _uiState.value
         if (!state.isValid || state.isSaving) return
@@ -236,15 +315,30 @@ class AddEditHabitViewModel @Inject constructor(
                         state.type == HabitType.PHOTO
                     },
                     scheduledDays = state.scheduledDays,
+                    targetLatitude = state.targetLatitude.takeIf { state.type == HabitType.VISIT_LOCATION },
+                    targetLongitude = state.targetLongitude.takeIf { state.type == HabitType.VISIT_LOCATION },
+                    targetRadiusMeters = state.targetRadiusMeters.takeIf { state.type == HabitType.VISIT_LOCATION },
+                    targetLocationLabel = state.targetLocationLabel.trim().takeIf {
+                        state.type == HabitType.VISIT_LOCATION && it.isNotBlank()
+                    },
+                    targetGithubUsername = state.targetGithubUsername.trim().takeIf {
+                        state.type == HabitType.GITHUB_CONTRIBUTION && it.isNotBlank()
+                    },
+                    tagPayload = state.tagPayload.takeIf { state.type == HabitType.TAG_SCAN },
                 ),
             )
-            // The periodic worker that reads UsageStatsManager is otherwise only ever
-            // enqueued once, at the end of onboarding -- an "Use an app" habit added
-            // later (the common case) would silently never get progress without this.
-            // enqueueUniquePeriodicWork's KEEP policy makes this a no-op if it's
-            // already running.
-            if (state.type == HabitType.APP_USAGE_MINUTES) {
-                WorkScheduler.scheduleUsageTracking(appContext)
+            // The periodic worker behind each of these types is otherwise only ever
+            // enqueued once, at the end of onboarding (APP_USAGE_MINUTES) or never at all
+            // (the other three, new since) -- a habit of that type added later (the
+            // common case) would silently never get progress without this.
+            // enqueueUniquePeriodicWork's KEEP policy makes this a no-op if it's already
+            // running.
+            when (state.type) {
+                HabitType.APP_USAGE_MINUTES -> WorkScheduler.scheduleUsageTracking(appContext)
+                HabitType.VISIT_LOCATION -> WorkScheduler.scheduleLocationSync(appContext)
+                HabitType.GITHUB_CONTRIBUTION -> WorkScheduler.scheduleGithubSync(appContext)
+                HabitType.WAKATIME_CODING_MINUTES -> WorkScheduler.scheduleWakaTimeSync(appContext)
+                else -> {}
             }
             _uiState.value = _uiState.value.copy(isSaving = false, savedSuccessfully = true)
         }

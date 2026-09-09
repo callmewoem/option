@@ -144,6 +144,11 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.coil.compose)
     implementation(libs.okhttp)
+    // Pure-Java QR encode/decode for HabitType.TAG_SCAN -- see util/QrCode.kt. Just the
+    // core module, not zxing-android-embedded: encoding renders straight to a Bitmap
+    // this app already draws, and decoding runs against a photo captured by the same
+    // camera-intent flow every other habit type uses, so no live-scanner Activity/UI is needed.
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     // The Android SDK's org.json classes are unimplemented stubs on the local unit

@@ -68,13 +68,18 @@ import com.habitsfirst.androidclone.data.local.entity.TodoEntity
     // cache/outbox for the accountability-buddy backend scaffolding (see
     // data/repository/AccountabilityRepository.kt). No default backend exists yet. See
     // MIGRATION_10_11 in data/local/migrations/Migrations.kt.
+    // v12: added HabitEntity.targetLatitude/targetLongitude/targetRadiusMeters/
+    // targetLocationLabel (HabitType.VISIT_LOCATION's saved target),
+    // targetGithubUsername (HabitType.GITHUB_CONTRIBUTION), and tagPayload
+    // (HabitType.TAG_SCAN's NFC/QR payload) -- four new habit "connections". See
+    // MIGRATION_11_12 in data/local/migrations/Migrations.kt.
     //
-    // Every step through 10->11 now has a real Migration in
+    // Every step through 11->12 now has a real Migration in
     // data/local/migrations/Migrations.kt, wired in by di/AppModule.kt's
     // provideDatabase(). exportSchema is on and app/schemas/ is checked in as the
     // ground truth those migrations are written and tested against -- see
     // Migrations.kt's file-level KDoc and MigrationsSqlTest before touching either.
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
