@@ -68,6 +68,7 @@
     <string name="home_streak_day_plural">days streak</string>
     <string name="home_add_habit">Add habit</string>
     <string name="home_refresh_data_driven_habits">Refresh app-usage and health data</string>
+    <string name="home_quick_actions">Quick actions</string>
     <string name="home_manage_apps">Manage locked apps</string>
 
     <!-- Habit types -->

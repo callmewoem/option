@@ -14,6 +14,7 @@ import com.habitsfirst.androidclone.data.repository.BlockAttemptRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
+import com.habitsfirst.androidclone.data.repository.LockoutRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
@@ -43,8 +44,9 @@ import javax.inject.Inject
  *
  * "Allowed to be open" now has more than one gate (see [evaluateLockState]): today's
  * gating habits, any active penalty lock, optionally [LimitedUnblockRepository]'s
- * post-completion window, the bedtime curfew, and a redeemed grace token that can
- * bypass all but the bedtime curfew.
+ * post-completion window, the bedtime curfew, a user-started [LockoutRepository]
+ * lockout, and a redeemed grace token that can bypass all but the bedtime curfew and a
+ * lockout.
  *
  * The same overlay technique also covers URL blocking: when a known browser is
  * foreground, [handleBrowserUrlChanged] reads its address bar (see
@@ -77,6 +79,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
     @Inject lateinit var lootboxRepository: LootboxRepository
 
     @Inject lateinit var limitedUnblockRepository: LimitedUnblockRepository
+
+    @Inject lateinit var lockoutRepository: LockoutRepository
 
     @Inject lateinit var urlBlockRepository: UrlBlockRepository
 
@@ -165,7 +169,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
                 LockState.Unlocked -> Unit
                 is LockState.Locked -> {
                     blockAttemptRepository.logAttempt(packageName)
-                    showAppBlockScreen(packageName, lockState.isBedtime, lockState.habitsCompleteButLocked)
+                    showAppBlockScreen(packageName, lockState.isBedtime, lockState.isLockout, lockState.habitsCompleteButLocked)
                 }
             }
         }
@@ -209,6 +213,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
                     block.listName,
                     lockState.isPermanent,
                     lockState.isBedtime,
+                    lockState.isLockout,
                     lockState.habitsCompleteButLocked,
                 )
             }
@@ -221,6 +226,15 @@ class AppBlockAccessibilityService : AccessibilityService() {
         data class Locked(
             val isBedtime: Boolean,
             val isPermanent: Boolean = false,
+            /**
+             * True while a user-started [LockoutRepository] lockout is running --
+             * checked right after bedtime and before everything else (habit gating, a
+             * penalty, a grace token), same hard-commitment strength as bedtime, since
+             * a self-imposed lockout that a grace token or a finished habit list can
+             * talk you out of isn't much of a lockout. See
+             * [com.habitsfirst.androidclone.ui.block.LockoutScreen].
+             */
+            val isLockout: Boolean = false,
             /**
              * True when this lock kicked in *despite* today's gating habits already
              * being complete -- an active penalty, or [LimitedUnblockRepository]'s
@@ -236,6 +250,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     private suspend fun evaluateLockState(): LockState {
         if (bedtimeRepository.isWithinBedtimeWindowNow()) return LockState.Locked(isBedtime = true)
+        if (lockoutRepository.isLockoutActiveNow()) return LockState.Locked(isBedtime = false, isLockout = true)
         if (lootboxRepository.isGraceUnlockActive()) return LockState.Unlocked
 
         if (!habitRepository.areAllHabitsCompletedForDate()) return LockState.Locked(isBedtime = false)
@@ -274,12 +289,18 @@ class AppBlockAccessibilityService : AccessibilityService() {
         return essential
     }
 
-    private fun showAppBlockScreen(blockedPackageName: String, isBedtime: Boolean, habitsCompleteButLocked: Boolean) {
+    private fun showAppBlockScreen(
+        blockedPackageName: String,
+        isBedtime: Boolean,
+        isLockout: Boolean,
+        habitsCompleteButLocked: Boolean,
+    ) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(BlockOverlayActivity.EXTRA_IS_URL_BLOCK, false)
             putExtra(BlockOverlayActivity.EXTRA_TARGET, blockedPackageName)
             putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
+            putExtra(BlockOverlayActivity.EXTRA_IS_LOCKOUT, isLockout)
             putExtra(BlockOverlayActivity.EXTRA_HABITS_COMPLETE_BUT_LOCKED, habitsCompleteButLocked)
         }
         startActivity(intent)
@@ -290,6 +311,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
         listName: String,
         isPermanent: Boolean,
         isBedtime: Boolean,
+        isLockout: Boolean,
         habitsCompleteButLocked: Boolean,
     ) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
@@ -299,6 +321,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
             putExtra(BlockOverlayActivity.EXTRA_LIST_NAME, listName)
             putExtra(BlockOverlayActivity.EXTRA_IS_PERMANENT, isPermanent)
             putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
+            putExtra(BlockOverlayActivity.EXTRA_IS_LOCKOUT, isLockout)
             putExtra(BlockOverlayActivity.EXTRA_HABITS_COMPLETE_BUT_LOCKED, habitsCompleteButLocked)
         }
         startActivity(intent)

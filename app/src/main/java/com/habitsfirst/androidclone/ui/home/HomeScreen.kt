@@ -19,26 +19,31 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,7 +54,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,6 +104,10 @@ fun HomeScreen(
     // stepped through in one sitting; onTourDismissed() is what actually persists that
     // it's done, so a process death mid-tour just restarts it rather than losing it.
     var tourStep by remember { mutableIntStateOf(0) }
+    // Home's floating quick-actions menu -- collapsed by default, expands upward into
+    // Add habit / Lockout / Manage blocked apps (see HomeQuickActionsFab).
+    var quickActionsExpanded by remember { mutableStateOf(false) }
+    var showLockoutSheet by remember { mutableStateOf(false) }
 
     // ViewModel.init only fires once for as long as this back-stack entry (and its
     // ViewModel) is retained, so it alone catches a cold start but misses the far more
@@ -139,11 +150,22 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddHabit,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text(stringResource(R.string.home_add_habit)) },
-                containerColor = FloatingActionButtonDefaults.containerColor,
+            HomeQuickActionsFab(
+                expanded = quickActionsExpanded,
+                onExpandedChange = { quickActionsExpanded = it },
+                lockoutActive = state.lockoutUntilEpochMillis > System.currentTimeMillis(),
+                onAddHabit = {
+                    quickActionsExpanded = false
+                    onAddHabit()
+                },
+                onLockout = {
+                    quickActionsExpanded = false
+                    showLockoutSheet = true
+                },
+                onManageApps = {
+                    quickActionsExpanded = false
+                    onManageApps()
+                },
             )
         },
     ) { padding ->
@@ -271,6 +293,96 @@ fun HomeScreen(
 
     wonReward?.let { reward ->
         LootboxRewardDialog(reward = reward, onDismiss = viewModel::onRewardDismissed)
+    }
+
+    if (showLockoutSheet) {
+        LockoutDialog(
+            lockoutUntilEpochMillis = state.lockoutUntilEpochMillis,
+            onStart = { minutes ->
+                viewModel.onStartLockout(minutes)
+                showLockoutSheet = false
+            },
+            onCancelLockout = {
+                viewModel.onCancelLockout()
+                showLockoutSheet = false
+            },
+            onDismiss = { showLockoutSheet = false },
+        )
+    }
+}
+
+/**
+ * Home's floating "hamburger": collapsed, a plain menu FAB; expanded, a small stack of
+ * labeled mini-FABs above it -- the app's other quick, high-value actions that don't
+ * deserve a permanent spot in the top bar or bottom nav. Picking one collapses the menu
+ * again (see each callback's call site in [HomeScreen]).
+ */
+@Composable
+private fun HomeQuickActionsFab(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    lockoutActive: Boolean,
+    onAddHabit: () -> Unit,
+    onLockout: () -> Unit,
+    onManageApps: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.End) {
+        if (expanded) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                QuickActionItem(
+                    label = "Manage blocked apps",
+                    icon = Icons.Filled.Apps,
+                    onClick = onManageApps,
+                )
+                QuickActionItem(
+                    label = if (lockoutActive) "Lockout active" else "Lockout",
+                    icon = Icons.Filled.Lock,
+                    onClick = onLockout,
+                    containerColor = if (lockoutActive) LockeColor.Oxide else FloatingActionButtonDefaults.containerColor,
+                    contentColor = if (lockoutActive) LockeColor.OnIron else contentColorFor(FloatingActionButtonDefaults.containerColor),
+                )
+                QuickActionItem(
+                    label = stringResource(R.string.home_add_habit),
+                    icon = Icons.Filled.Add,
+                    onClick = onAddHabit,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+        FloatingActionButton(onClick = { onExpandedChange(!expanded) }) {
+            Icon(
+                imageVector = if (expanded) Icons.Filled.Close else Icons.Filled.Menu,
+                contentDescription = stringResource(R.string.home_quick_actions),
+            )
+        }
+    }
+}
+
+/** One row of [HomeQuickActionsFab]'s expanded menu: a labeled chip beside a small round action button. */
+@Composable
+private fun QuickActionItem(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    containerColor: Color = FloatingActionButtonDefaults.containerColor,
+    contentColor: Color = contentColorFor(containerColor),
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shadowElevation = 2.dp,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        SmallFloatingActionButton(onClick = onClick, containerColor = containerColor, contentColor = contentColor) {
+            Icon(icon, contentDescription = label)
+        }
     }
 }
 
