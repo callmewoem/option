@@ -65,6 +65,16 @@ fun BlockScreen(
         return
     }
 
+    // Same "no buttons, pure countdown" treatment as bedtime, and for the same reason
+    // (see LockoutScreen's doc) -- checked before the auto-dismiss effect below too, so
+    // habits happening to be complete doesn't end a lockout early.
+    if (state.isLockout) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            LockoutScreen(lockoutUntilEpochMillis = state.lockoutUntilEpochMillis)
+        }
+        return
+    }
+
     // A permanent block never lifts, so it never auto-dismisses just because today's
     // habits happen to be done. Nor does a block that's holding despite habits being
     // complete (an active penalty, or limited unblocking's window running out) --

@@ -42,6 +42,7 @@ class PreferencesRepository @Inject constructor(
         val LAST_LOOTBOX_AWARDED_DATE = stringPreferencesKey("last_lootbox_awarded_date")
         val PENALTY_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("penalty_locked_until_epoch_millis")
         val GRACE_UNLOCK_UNTIL_EPOCH_MILLIS = longPreferencesKey("grace_unlock_until_epoch_millis")
+        val LOCKOUT_UNTIL_EPOCH_MILLIS = longPreferencesKey("lockout_until_epoch_millis")
         val GOLD_STAR_DATES = stringSetPreferencesKey("gold_star_dates")
         val BEDTIME_LOCK_ENABLED = booleanPreferencesKey("bedtime_lock_enabled")
         val BEDTIME_START = stringPreferencesKey("bedtime_start") // "HH:mm"
@@ -225,6 +226,13 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setGraceUnlockUntil(untilEpochMillis: Long) {
         dataStore.edit { it[Keys.GRACE_UNLOCK_UNTIL_EPOCH_MILLIS] = untilEpochMillis }
+    }
+
+    /** See [com.habitsfirst.androidclone.data.repository.LockoutRepository]. 0 = no active lockout. */
+    val lockoutUntilEpochMillis: Flow<Long> = dataStore.data.map { it[Keys.LOCKOUT_UNTIL_EPOCH_MILLIS] ?: 0L }
+
+    suspend fun setLockoutUntil(untilEpochMillis: Long) {
+        dataStore.edit { it[Keys.LOCKOUT_UNTIL_EPOCH_MILLIS] = untilEpochMillis }
     }
 
     /** Dates cosmetically starred by a GOLD_STAR lootbox reward -- purely decorative on the heatmap. */

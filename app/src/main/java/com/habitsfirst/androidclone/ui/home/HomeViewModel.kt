@@ -9,6 +9,7 @@ import com.habitsfirst.androidclone.data.repository.BlockAttemptRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.EaseInStatus
 import com.habitsfirst.androidclone.data.repository.HabitRepository
+import com.habitsfirst.androidclone.data.repository.LockoutRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
@@ -63,6 +64,8 @@ data class HomeUiState(
     val isRefreshingDataDrivenHabits: Boolean = false,
     /** How many times a blocked app/URL was actually covered by the block screen today -- an impulse-control signal (see [BlockAttemptRepository]), shown as a small chip only when non-zero. */
     val blockedOpenAttemptsToday: Int = 0,
+    /** 0 when no self-lockout is running; otherwise the instant it ends -- see [LockoutRepository]. */
+    val lockoutUntilEpochMillis: Long = 0L,
 ) {
     val completedCount: Int get() = gating.count { it.isCompleted }
     val totalCount: Int get() = gating.size
@@ -91,6 +94,7 @@ class HomeViewModel @Inject constructor(
     private val blockedAppRepository: BlockedAppRepository,
     private val blockAttemptRepository: BlockAttemptRepository,
     private val lootboxRepository: LootboxRepository,
+    private val lockoutRepository: LockoutRepository,
     private val penaltyRepository: PenaltyRepository,
     private val preferencesRepository: PreferencesRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
@@ -163,7 +167,8 @@ class HomeViewModel @Inject constructor(
         blockedAppRepository.observeBlockedApps(),
         streakRefreshTrigger,
         miscFlow,
-    ) { (gating, tracked, antihabits), blockedApps, _, misc ->
+        lockoutRepository.lockoutUntilEpochMillis,
+    ) { (gating, tracked, antihabits), blockedApps, _, misc, lockoutUntil ->
         val hasImageVerificationHabit =
             (gating + tracked + antihabits).any { it.habit.type == HabitType.PHOTO }
         HomeUiState(
@@ -180,6 +185,7 @@ class HomeViewModel @Inject constructor(
             showTour = misc.showTour,
             showPhotoVerificationPrompt = misc.photoVerificationPromptEligible && !hasImageVerificationHabit,
             isRefreshingDataDrivenHabits = misc.isRefreshingDataDrivenHabits,
+            lockoutUntilEpochMillis = lockoutUntil,
         )
     }
 
@@ -252,6 +258,16 @@ class HomeViewModel @Inject constructor(
     /** Called on both an explicit dismiss and on tapping through to set one up -- either way, no need to keep nudging. */
     fun onPhotoVerificationPromptDismissed() {
         viewModelScope.launch { preferencesRepository.setHasDismissedPhotoVerificationPrompt(true) }
+    }
+
+    /** Starts (or restarts) a self-lockout -- see [LockoutRepository]. Called from [LockoutDialog]. */
+    fun onStartLockout(minutes: Int) {
+        viewModelScope.launch { lockoutRepository.startLockout(minutes) }
+    }
+
+    /** Ends an active lockout early -- only reachable from here, Home itself; see [LockoutRepository]. */
+    fun onCancelLockout() {
+        viewModelScope.launch { lockoutRepository.cancelLockout() }
     }
 
     private suspend fun maybeAwardLootbox() {

@@ -14,6 +14,7 @@ import com.habitsfirst.androidclone.data.repository.BlockAttemptRepository
 import com.habitsfirst.androidclone.data.repository.BlockedAppRepository
 import com.habitsfirst.androidclone.data.repository.HabitRepository
 import com.habitsfirst.androidclone.data.repository.LimitedUnblockRepository
+import com.habitsfirst.androidclone.data.repository.LockoutRepository
 import com.habitsfirst.androidclone.data.repository.LootboxRepository
 import com.habitsfirst.androidclone.data.repository.PenaltyRepository
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
@@ -28,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -43,8 +45,12 @@ import javax.inject.Inject
  *
  * "Allowed to be open" now has more than one gate (see [evaluateLockState]): today's
  * gating habits, any active penalty lock, optionally [LimitedUnblockRepository]'s
- * post-completion window, the bedtime curfew, and a redeemed grace token that can
- * bypass all but the bedtime curfew.
+ * post-completion window, the bedtime curfew, a user-started [LockoutRepository]
+ * lockout, and a redeemed grace token that can bypass all but the bedtime curfew and a
+ * lockout. Right before that check runs, [refreshDataDrivenHabits] also kicks off the
+ * same app-usage/Health-Connect catch-up as opening or resuming Locke itself, so a
+ * data-driven gating habit that's actually already satisfied doesn't show as locked
+ * just because the last periodic sync happened to be stale.
  *
  * The same overlay technique also covers URL blocking: when a known browser is
  * foreground, [handleBrowserUrlChanged] reads its address bar (see
@@ -77,6 +83,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
     @Inject lateinit var lootboxRepository: LootboxRepository
 
     @Inject lateinit var limitedUnblockRepository: LimitedUnblockRepository
+
+    @Inject lateinit var lockoutRepository: LockoutRepository
 
     @Inject lateinit var urlBlockRepository: UrlBlockRepository
 
@@ -161,13 +169,34 @@ class AppBlockAccessibilityService : AccessibilityService() {
         if (!isTargetedByBlockMode) return
 
         serviceScope.launch {
+            // The user is about to find out whether this is locked -- catch up
+            // app-usage/Health-Connect progress right now too, same as opening or
+            // resuming Locke itself, so a data-driven gating habit that's actually
+            // already satisfied doesn't show as locked just because the last periodic
+            // sync happened to be stale. See [refreshDataDrivenHabits].
+            refreshDataDrivenHabits()
             when (val lockState = evaluateLockState()) {
                 LockState.Unlocked -> Unit
                 is LockState.Locked -> {
                     blockAttemptRepository.logAttempt(packageName)
-                    showAppBlockScreen(packageName, lockState.isBedtime, lockState.habitsCompleteButLocked)
+                    showAppBlockScreen(packageName, lockState.isBedtime, lockState.isLockout, lockState.habitsCompleteButLocked)
                 }
             }
+        }
+    }
+
+    /**
+     * Kicks off the same immediate app-usage/Health-Connect refresh as opening or
+     * resuming Locke itself (see
+     * [com.habitsfirst.androidclone.ui.home.HomeViewModel.refreshDataDrivenHabits]) --
+     * fire-and-forget, same as everywhere else this is triggered, so the check it's
+     * called ahead of still runs against whatever's cached right now, but the fresher
+     * numbers land in time for the next one.
+     */
+    private suspend fun refreshDataDrivenHabits() {
+        WorkScheduler.requestUsageRefreshNow(applicationContext)
+        if (preferencesRepository.isHealthConnectSyncEnabled.first()) {
+            WorkScheduler.requestHealthConnectRefreshNow(applicationContext)
         }
     }
 
@@ -189,6 +218,8 @@ class AppBlockAccessibilityService : AccessibilityService() {
             val lockState = if (block.blockMode == BlockMode.PERMANENT) {
                 LockState.Locked(isBedtime = false, isPermanent = true)
             } else {
+                // Same catch-up as the app-block path above -- see [refreshDataDrivenHabits].
+                refreshDataDrivenHabits()
                 evaluateLockState()
             }
             if (lockState is LockState.Locked) {
@@ -209,6 +240,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
                     block.listName,
                     lockState.isPermanent,
                     lockState.isBedtime,
+                    lockState.isLockout,
                     lockState.habitsCompleteButLocked,
                 )
             }
@@ -221,6 +253,15 @@ class AppBlockAccessibilityService : AccessibilityService() {
         data class Locked(
             val isBedtime: Boolean,
             val isPermanent: Boolean = false,
+            /**
+             * True while a user-started [LockoutRepository] lockout is running --
+             * checked right after bedtime and before everything else (habit gating, a
+             * penalty, a grace token), same hard-commitment strength as bedtime, since
+             * a self-imposed lockout that a grace token or a finished habit list can
+             * talk you out of isn't much of a lockout. See
+             * [com.habitsfirst.androidclone.ui.block.LockoutScreen].
+             */
+            val isLockout: Boolean = false,
             /**
              * True when this lock kicked in *despite* today's gating habits already
              * being complete -- an active penalty, or [LimitedUnblockRepository]'s
@@ -236,6 +277,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
 
     private suspend fun evaluateLockState(): LockState {
         if (bedtimeRepository.isWithinBedtimeWindowNow()) return LockState.Locked(isBedtime = true)
+        if (lockoutRepository.isLockoutActiveNow()) return LockState.Locked(isBedtime = false, isLockout = true)
         if (lootboxRepository.isGraceUnlockActive()) return LockState.Unlocked
 
         if (!habitRepository.areAllHabitsCompletedForDate()) return LockState.Locked(isBedtime = false)
@@ -274,12 +316,18 @@ class AppBlockAccessibilityService : AccessibilityService() {
         return essential
     }
 
-    private fun showAppBlockScreen(blockedPackageName: String, isBedtime: Boolean, habitsCompleteButLocked: Boolean) {
+    private fun showAppBlockScreen(
+        blockedPackageName: String,
+        isBedtime: Boolean,
+        isLockout: Boolean,
+        habitsCompleteButLocked: Boolean,
+    ) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(BlockOverlayActivity.EXTRA_IS_URL_BLOCK, false)
             putExtra(BlockOverlayActivity.EXTRA_TARGET, blockedPackageName)
             putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
+            putExtra(BlockOverlayActivity.EXTRA_IS_LOCKOUT, isLockout)
             putExtra(BlockOverlayActivity.EXTRA_HABITS_COMPLETE_BUT_LOCKED, habitsCompleteButLocked)
         }
         startActivity(intent)
@@ -290,6 +338,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
         listName: String,
         isPermanent: Boolean,
         isBedtime: Boolean,
+        isLockout: Boolean,
         habitsCompleteButLocked: Boolean,
     ) {
         val intent = Intent(this, BlockOverlayActivity::class.java).apply {
@@ -299,6 +348,7 @@ class AppBlockAccessibilityService : AccessibilityService() {
             putExtra(BlockOverlayActivity.EXTRA_LIST_NAME, listName)
             putExtra(BlockOverlayActivity.EXTRA_IS_PERMANENT, isPermanent)
             putExtra(BlockOverlayActivity.EXTRA_IS_BEDTIME, isBedtime)
+            putExtra(BlockOverlayActivity.EXTRA_IS_LOCKOUT, isLockout)
             putExtra(BlockOverlayActivity.EXTRA_HABITS_COMPLETE_BUT_LOCKED, habitsCompleteButLocked)
         }
         startActivity(intent)
