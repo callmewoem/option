@@ -169,14 +169,21 @@ private fun VerdictCard(approved: Boolean, reasoning: String) {
         containerColor = if (approved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
         borderColor = accent,
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
                 imageVector = if (approved) Icons.Filled.CheckCircle else Icons.Filled.WarningAmber,
                 contentDescription = null,
                 tint = accent,
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Column {
+            // weight(1f) is load-bearing: without it this Column is measured against the
+            // Row's full width (not the width actually left after the icon), so a long
+            // model-generated reasoning string wraps wider than it has room for and gets
+            // hard-clipped by the card's rounded corners on narrower phones.
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (approved) "Verified" else "Not verified",
                     style = MaterialTheme.typography.titleSmall,

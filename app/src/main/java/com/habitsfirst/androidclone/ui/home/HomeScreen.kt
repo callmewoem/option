@@ -357,6 +357,11 @@ private fun BlockedAttemptsChip(count: Int) {
             text = "Tried to open a locked app or site $count $timesWord today",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // fill = false keeps this a content-hugging pill on wide screens, but still
+            // bounds wrapping to what's actually left after the icon -- otherwise this
+            // sentence (which wraps to two lines on narrow phones) gets clipped by the
+            // pill's own background/clip on the right edge.
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }

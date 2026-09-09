@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -60,6 +62,11 @@ fun TimedHabitTimerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // Without this, the timer circle plus both buttons can run taller than
+                // the viewport on short or landscape screens and get cut off -- same
+                // fix as every other single-purpose full-screen composable here
+                // (ProofOfLifeScreen, OnboardingWelcomeScreen).
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,

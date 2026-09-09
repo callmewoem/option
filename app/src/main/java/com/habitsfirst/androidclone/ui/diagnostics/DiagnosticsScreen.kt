@@ -247,7 +247,14 @@ private fun SyncResultCard(result: AppUsageHabitSyncResult) {
                     contentDescription = null,
                     tint = if (result.writeError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 )
-                Text(result.habitName, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    result.habitName,
+                    style = MaterialTheme.typography.titleSmall,
+                    // Bounds wrapping to the space left after the icon rather than the
+                    // Row's full width, so a long habit name wraps instead of getting
+                    // clipped by the card's rounded corners.
+                    modifier = Modifier.weight(1f, fill = false),
+                )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text("package: ${result.packageName}", style = MaterialTheme.typography.bodySmall)

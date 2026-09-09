@@ -119,11 +119,16 @@ private fun OnboardingFeatureRow(icon: ImageVector, text: String) {
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
+        // weight(1f) bounds this to the space actually left after the icon chip --
+        // without it the Row measures the text against its own full width, so a long
+        // (or long-translated) string can wrap wider than what's left and run off the
+        // edge on narrow phones.
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Start,
+            modifier = Modifier.weight(1f),
         )
     }
 }
