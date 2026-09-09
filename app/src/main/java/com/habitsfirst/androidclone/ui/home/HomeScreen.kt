@@ -54,6 +54,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.habitsfirst.androidclone.R
@@ -95,6 +97,14 @@ fun HomeScreen(
     // stepped through in one sitting; onTourDismissed() is what actually persists that
     // it's done, so a process death mid-tour just restarts it rather than losing it.
     var tourStep by remember { mutableIntStateOf(0) }
+
+    // ViewModel.init only fires once for as long as this back-stack entry (and its
+    // ViewModel) is retained, so it alone catches a cold start but misses the far more
+    // common case of backgrounding Locke and reopening it later -- app-usage and
+    // Health-Connect-backed progress would otherwise sit stale until the next 15/30-min
+    // periodic tick. Re-running the same refresh on every resume (same pattern as
+    // Settings' permission/accountability refreshes) covers both.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshDataDrivenHabits() }
 
     // Everything actionable today, tagged by kind so HabitCard can render its accent --
     // this is the "do it all from Today" list; Stats/To-do are for review and plain tasks.
