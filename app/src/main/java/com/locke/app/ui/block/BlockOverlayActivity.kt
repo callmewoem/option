@@ -1,0 +1,81 @@
+package com.locke.app.ui.block
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.OnBackPressedCallback
+import com.locke.app.MainActivity
+import com.locke.app.ui.theme.LockeMode
+import com.locke.app.ui.theme.LockeTheme
+import dagger.hilt.android.AndroidEntryPoint
+
+/**
+ * Full-screen "this is locked" cover shown on top of a blocked app, or a browser
+ * showing a blocked site. Launched by
+ * [com.locke.app.service.AppBlockAccessibilityService] the instant the
+ * user switches into a locked app, or navigates to a blocked host, that isn't
+ * currently allowed to be open.
+ */
+@AndroidEntryPoint
+class BlockOverlayActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Block the hardware back button from simply revealing the locked app underneath.
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    goHome()
+                }
+            },
+        )
+
+        setContent {
+            LockeTheme(mode = LockeMode.Enforcement) {
+                BlockScreen(
+                    onTakeBreak = ::goHome,
+                    onOpenLocke = ::openLocke,
+                    onAllHabitsComplete = ::finish,
+                    onGraceRedeemed = ::finish,
+                )
+            }
+        }
+    }
+
+    private fun goHome() {
+        startActivity(
+            Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+        finish()
+    }
+
+    private fun openLocke() {
+        startActivity(
+            Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            },
+        )
+        finish()
+    }
+
+    companion object {
+        /** The blocked app's package name, or the blocked host -- see [EXTRA_IS_URL_BLOCK]. */
+        const val EXTRA_TARGET = "extra_target"
+        const val EXTRA_IS_URL_BLOCK = "extra_is_url_block"
+        /** URL block only: which list matched. */
+        const val EXTRA_LIST_NAME = "extra_list_name"
+        /** URL block only: true when the matching list is [com.locke.app.domain.model.BlockMode.PERMANENT]. */
+        const val EXTRA_IS_PERMANENT = "extra_is_permanent"
+        const val EXTRA_IS_BEDTIME = "extra_is_bedtime"
+        /** True while a user-started self-lockout is running -- see [com.locke.app.data.repository.LockoutRepository]. */
+        const val EXTRA_IS_LOCKOUT = "extra_is_lockout"
+        /** True when today's gating habits are already complete but this is locked anyway (an active penalty, or limited unblocking's window running out) -- see [com.locke.app.service.AppBlockAccessibilityService]. */
+        const val EXTRA_HABITS_COMPLETE_BUT_LOCKED = "extra_habits_complete_but_locked"
+    }
+}

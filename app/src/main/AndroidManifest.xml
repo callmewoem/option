@@ -26,14 +26,14 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:name=".HabitsFirstApp"
+        android:name=".LockeApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.HabitsFirst"
+        android:theme="@style/Theme.Locke"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="34">
 
@@ -41,7 +41,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.HabitsFirst">
+            android:theme="@style/Theme.Locke">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -54,7 +54,7 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:theme="@style/Theme.HabitsFirst.Block" />
+            android:theme="@style/Theme.Locke.Block" />
 
         <!--
           Health Connect's permission-grant flow refuses to grant anything at all unless
@@ -110,7 +110,7 @@
           Worker like UsageTrackingWorker (its constructor needs HabitRepository,
           EaseInRepository, AppUsageSyncer, PreferencesRepository, none of which the
           default factory can supply). That auto-init wins the race against
-          HabitsFirstApp's Configuration.Provider (which sets the correct
+          LockeApp's Configuration.Provider (which sets the correct
           HiltWorkerFactory) unless it's explicitly removed here, so every attempt to
           construct that worker, periodic or one-off, forever, fails before doWork()
           ever runs, with nothing but a generic WorkInfo.State.FAILED to show for it.

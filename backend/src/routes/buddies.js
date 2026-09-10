@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { requireDevice } = require('../auth');
 const { getEntitlement } = require('../services/entitlement');
+const config = require('../config');
 
 const router = express.Router();
 
@@ -18,11 +19,13 @@ function generateCode() {
   return code;
 }
 
-function requirePremium(req, res, next) {
-  if (!getEntitlement(req.deviceId).isPremium) {
-    return res.status(402).json({ error: 'Accountability buddies are a premium feature. Upgrade to use them.' });
-  }
-  next();
+function countBuddies(deviceId) {
+  return db.prepare('SELECT COUNT(*) AS count FROM buddy_links WHERE device_id = ?').get(deviceId).count;
+}
+
+/** Free tier gets config.freeTier.maxBuddies (1) real buddy connections -- enough to try the whole feature -- before Premium is required for more. */
+function hasRoomForAnotherBuddy(deviceId) {
+  return getEntitlement(deviceId).isPremium || countBuddies(deviceId) < config.freeTier.maxBuddies;
 }
 
 function loadSummary(deviceId) {
@@ -47,8 +50,13 @@ function toBuddyJson(buddyDeviceId, pairingCode) {
   };
 }
 
-/** Mints (or replaces) this device's own shareable pairing code. Premium only -- see requirePremium above. */
-router.post('/pairing-codes', requireDevice, requirePremium, (req, res) => {
+/**
+ * Mints (or replaces) this device's own shareable pairing code. Not gated on room for
+ * another buddy -- minting is free either way, and the room check that actually
+ * matters happens at redemption time below (on both sides of the pairing), since
+ * that's the moment a new buddy connection is actually created.
+ */
+router.post('/pairing-codes', requireDevice, (req, res) => {
   db.prepare('DELETE FROM pairing_codes WHERE device_id = ?').run(req.deviceId);
 
   let code;
@@ -68,8 +76,14 @@ router.post('/pairing-codes', requireDevice, requirePremium, (req, res) => {
   res.status(201).json({ code });
 });
 
-/** Redeems a buddy's pairing code -- pairing is mutual, both directions are linked in one transaction. */
-router.post('/buddies', requireDevice, requirePremium, (req, res) => {
+/**
+ * Redeems a buddy's pairing code -- pairing is mutual, both directions are linked in
+ * one transaction. Free tier: checked on *both* sides, since the new connection would
+ * push either one over their own cap -- whichever is unpaid and already at the limit
+ * is the one named in the error, so the redeemer knows whether it's their own limit
+ * or the other person's.
+ */
+router.post('/buddies', requireDevice, (req, res) => {
   const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
   if (!code) return res.status(400).json({ error: 'code is required.' });
 
@@ -77,6 +91,15 @@ router.post('/buddies', requireDevice, requirePremium, (req, res) => {
   if (!pairing) return res.status(404).json({ error: "That pairing code doesn't exist." });
   if (pairing.expires_at < Date.now()) return res.status(410).json({ error: 'That pairing code has expired.' });
   if (pairing.device_id === req.deviceId) return res.status(400).json({ error: "You can't add yourself as a buddy." });
+
+  if (!hasRoomForAnotherBuddy(req.deviceId)) {
+    return res.status(402).json({
+      error: `You've reached the free plan's ${config.freeTier.maxBuddies}-buddy limit. Upgrade to add more.`,
+    });
+  }
+  if (!hasRoomForAnotherBuddy(pairing.device_id)) {
+    return res.status(402).json({ error: 'That person has already reached their free plan buddy limit.' });
+  }
 
   const link = db.transaction(() => {
     const now = Date.now();
@@ -92,14 +115,18 @@ router.post('/buddies', requireDevice, requirePremium, (req, res) => {
   res.status(201).json(toBuddyJson(pairing.device_id, code));
 });
 
-/** Every paired buddy's latest known summary. Not premium-gated (read-only) -- a lapsed subscriber still sees who they'd paired with. */
+/** Every paired buddy's latest known summary. Not gated at all (read-only) -- a lapsed subscriber, or someone below the free cap, still sees who they'd paired with. */
 router.get('/buddies', requireDevice, (req, res) => {
   const rows = db.prepare('SELECT buddy_device_id, pairing_code FROM buddy_links WHERE device_id = ?').all(req.deviceId);
   res.json(rows.map((row) => toBuddyJson(row.buddy_device_id, row.pairing_code)));
 });
 
-/** Uploads this device's own current daily summary for its buddies to see. Premium only. */
-router.post('/daily-summary', requireDevice, requirePremium, (req, res) => {
+/**
+ * Uploads this device's own current daily summary for its buddies to see. Not gated
+ * on premium/room -- once a buddy connection exists (free or paid), sharing your own
+ * progress with it costs nothing extra and is the entire point of having one.
+ */
+router.post('/daily-summary', requireDevice, (req, res) => {
   const { date, habitsCompleted, totalHabits, currentStreak } = req.body || {};
   if (typeof date !== 'string' || !date) return res.status(400).json({ error: 'date is required.' });
 

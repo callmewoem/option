@@ -98,7 +98,7 @@ no equivalent of iOS's Screen Time / Shortcuts APIs the original relies on).
 13. Progress resets automatically at midnight because completion is stored keyed by
     calendar date, not as a flag that has to be cleared.
 
-### Photo verification (Premium)
+### Photo verification (3 free checks/month, unlimited on Premium)
 
 A *Photo* habit is gated on a proof photo instead of a manual honor-system toggle --
 when setting it up you write what a proof photo should show (e.g. "a made bed"),
@@ -110,25 +110,26 @@ example photo if any) to Locke's own backend (`backend/`, see its own README),
 which forwards it to the Claude Messages API using a server-held key and marks the
 habit done only if the model approves, showing its one-sentence reasoning either
 way. The Anthropic API key never ships inside the app -- it lives only in the
-backend process's environment. This is a **premium feature** (checked both
-client-side and, for defense in depth, server-side): every check costs real money
-against the backend's Anthropic usage. Photos are stored locally under the app's
-own storage (`data/verification/`, `util/ImageStore.kt`) and only ever leave the
-device as part of one verification request to Locke's own backend, never straight
-to a third party.
+backend process's environment. Every real device call costs money against the
+backend's Anthropic usage, so it's rate-limited on the free tier -- 3 checks free
+every month (resets monthly, not a one-time trial), unlimited on Premium -- checked
+both client-side and, for defense in depth, server-side. Photos are stored locally
+under the app's own storage (`data/verification/`, `util/ImageStore.kt`) and only
+ever leave the device as part of one verification request to Locke's own backend,
+never straight to a third party.
 
 The morning check-in above shares this exact capture/verify UI
 (`ui/components/PhotoVerificationCapture.kt`) and the same `ImageVerificationClient`
 -- its own screen (`ui/proofoflife/`) just supplies a fixed prompt instead of a
 habit's own rules, and confirms `ProofOfLifeRepository` instead of a habit on
-approval, and is gated behind Premium the same way. Its photos aren't kept once
-verified (`ImageStore.saveToCache`), since there's nothing to show again later --
-just today's yes/no.
+approval, and draws from the same monthly free-check allowance. Its photos aren't
+kept once verified (`ImageStore.saveToCache`), since there's nothing to show again
+later -- just today's yes/no.
 
 ## Project structure
 
 ```
-app/src/main/java/com/habitsfirst/androidclone/
+app/src/main/java/com/locke/app/
 ├── data/            Room entities/DAOs, repositories (habits, blocked apps,
 │                    penalties, bedtime, lootbox, todos), DataStore preferences,
 │                    billing/ (Play Billing + entitlement), remote/ (backend HTTP
@@ -190,7 +191,7 @@ code entered in Settings → *Theme* (`domain/model/ThemeRedeemCode.kt`).
 | Display over other apps (`SYSTEM_ALERT_WINDOW`) | Lets the lock screen actually cover the app underneath. |
 | Notifications | Habit reminders, streak nudges, and the morning todo reminder (optional, toggleable in Settings). |
 | Camera | Required for *photo verification* -- capture is camera-only, with no gallery-picker fallback, so a proof photo can't be swapped for an old one. |
-| Internet | Talks to Locke's own backend (`backend/`) -- photo verification (Premium), accountability buddies (Premium), and Google Play purchase verification. |
+| Internet | Talks to Locke's own backend (`backend/`) -- photo verification, accountability buddies, and Google Play purchase verification. |
 
 All three special permissions are requested with plain-language explanations
 during onboarding and can be revisited any time from Settings.
@@ -204,19 +205,30 @@ see its own README for running/deploying it) instead. There's no login -- each
 install registers itself once and authenticates as that one device
 (`data/remote/DeviceIdentityRepository.kt`).
 
-**Free vs. Premium** (`domain/model/PremiumFeature.kt`, enforced in
-`ui/habit/AddEditHabitViewModel.kt`, `data/verification/BackendImageVerificationClient.kt`,
-and server-side too, for defense in depth):
-- Free: up to `PreferencesRepository.MAX_FREE_GATING_HABITS` (3) gating habits at
-  once, everything else in the app.
-- Premium: unlimited gating habits, AI photo checking (photo-verification habits +
-  the morning check-in), and accountability buddies -- the two features that cost
-  real backend money per use.
+**Free vs. Premium** -- deliberately generous: the free tier is meant to be a
+complete, usable app on its own, not a crippled trial, so every limit below is sized
+to cover normal day-to-day use and only actually bite someone pushing well past it.
+Constants live in `PreferencesRepository`, enforced in
+`ui/habit/AddEditHabitViewModel.kt` and `data/verification/BackendImageVerificationClient.kt`
+client-side (for instant feedback) and mirrored server-side in `backend/src/routes/`
+(the actual enforcement, defense in depth against a modified client):
+- **Gating habits**: up to `MAX_FREE_GATING_HABITS` (5) at once for free -- most
+  people run 2-4, and onboarding itself only ever starts one to three.
+- **AI photo checking** (photo-verification habits + the morning check-in):
+  `FREE_VERIFICATIONS_PER_MONTH` (3) free checks *every* month, not a one-time
+  trial -- resets on the 1st, so the feature stays usable indefinitely on the free
+  tier, just capped. Only a check that actually gets a verdict back (approved or
+  rejected) spends one; a network/API failure doesn't.
+- **Accountability buddies**: `MAX_FREE_BUDDIES` (1) real buddy connection for free
+  -- enough to try pairing, sharing progress, and seeing theirs, end to end. Sharing
+  itself is never gated once a connection exists, free or paid.
+- Premium removes all three caps.
 
 The CTA to upgrade (`ui/paywall/`) shows up wherever a free-tier limit is actually
-hit (adding a 4th gate, trying to verify a photo, opening the Buddies section
-unsubscribed), from Settings' own "Premium" section at the top, and once at the end
-of onboarding (skippable -- the free tier is a complete app on its own).
+hit (the 6th gating habit, the 4th photo check this month, a 2nd buddy), from
+Settings' own "Premium" section at the top (which also shows the free tier's live
+usage -- "2 of 3 checks left this month"), and once at the end of onboarding
+(skippable -- the free tier is a complete app on its own).
 
 **Local development:** point the app at a locally running backend
 (`cd backend && npm install && npm start`) with a Gradle property:
@@ -251,7 +263,7 @@ installed (`compileSdk 35`, JDK 17). This repository ships its own Gradle wrappe
 
 `.github/workflows/android-build.yml` builds a **debug APK** on every push to `main`
 or a `claude/**` branch, and on every pull request into `main`. Grab the result
-from the run's **Artifacts** section (`habits-first-debug-apk`) -- no signing
+from the run's **Artifacts** section (`locke-debug-apk`) -- no signing
 config needed since it's a debug build. It's also the source of truth for build
 health -- see the note in [`CONTRIBUTING`-style guidance below](#release-signing)
 if you're setting this up somewhere that can't reach `dl.google.com`.
@@ -263,7 +275,7 @@ once a signing key is set up:
 
 1. Generate a keystore (or use one you already have):
    ```bash
-   keytool -genkeypair -v -keystore habitsfirst-release.jks -alias habitsfirst \
+   keytool -genkeypair -v -keystore locke-release.jks -alias locke \
      -keyalg RSA -keysize 2048 -validity 10950
    ```
 2. **Local builds:** copy `keystore.properties.example` to `keystore.properties`
@@ -271,14 +283,14 @@ once a signing key is set up:
 3. **CI:** add four repository secrets under Settings → Secrets and variables →
    Actions:
    - `RELEASE_KEYSTORE_BASE64` -- the keystore file, base64-encoded
-     (`base64 -w0 habitsfirst-release.jks`)
+     (`base64 -w0 locke-release.jks`)
    - `RELEASE_KEYSTORE_PASSWORD`
    - `RELEASE_KEY_ALIAS`
    - `RELEASE_KEY_PASSWORD`
 
    The workflow skips the release build/upload entirely (debug still runs) until
    these are set. Once they are, every run also uploads a
-   `habits-first-release-apk` artifact.
+   `locke-release-apk` artifact.
 
 **Keep the keystore and its passwords somewhere safe outside this repo** (a
 password manager, a secrets vault) -- losing it means you can never publish an
@@ -287,11 +299,14 @@ update to the same Play Store listing again, and it must never be committed
 
 ## Known follow-ups
 
-- The Kotlin package (`com.habitsfirst.androidclone`) still reflects the app's
-  original working name from before the rebrand to Locke -- cosmetic only
-  (`applicationId`, class names, DB/DataStore file names), but worth a deliberate
-  rename pass before a Play Store listing, since `applicationId` becomes
-  effectively permanent once published.
+- The app was renamed from its pre-Locke working name (`com.habitsfirst.androidclone`)
+  to `com.locke.app` -- `applicationId`, every Kotlin package/class, the Room database
+  file (`locke.db`), and the DataStore preferences file (`locke_prefs`) all moved
+  together. Since `applicationId` changed, this is a new app as far as Android is
+  concerned: a device with a debug build installed from before this rename needs that
+  old copy uninstalled first (`adb uninstall com.habitsfirst.androidclone.debug`) --
+  installing the new one alongside or over it isn't possible, and there's no data
+  migration between the two since none was ever published.
 - Room's `AppDatabase` now has a real `Migration` for every version step 1 through
   9 (see `data/local/migrations/Migrations.kt`), wired in by `di/AppModule.kt`
   instead of `fallbackToDestructiveMigration()`, so an update no longer risks

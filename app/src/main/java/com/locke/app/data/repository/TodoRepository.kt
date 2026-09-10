@@ -1,0 +1,90 @@
+package com.locke.app.data.repository
+
+import com.locke.app.data.local.dao.TodoCompletionTiming
+import com.locke.app.data.local.dao.TodoDao
+import com.locke.app.data.local.entity.TodoEntity
+import com.locke.app.data.local.entity.toDomain
+import com.locke.app.data.local.entity.toEntity
+import com.locke.app.domain.model.Todo
+import com.locke.app.util.DateProvider
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class TodoRepository @Inject constructor(
+    private val todoDao: TodoDao,
+) {
+    /**
+     * Todos due today or tomorrow -- the only two due dates a todo can have (see
+     * [Todo]). Re-derived as the calendar date actually changes, so "today" and
+     * "tomorrow" don't go stale for a screen (or ViewModel) left open across midnight
+     * -- see [DateProvider.currentDateFlow].
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeUpcoming(): Flow<List<Todo>> =
+        DateProvider.currentDateFlow().flatMapLatest { today ->
+            val tomorrow = DateProvider.toDateString(DateProvider.fromDateString(today).plusDays(1))
+            todoDao.observeForDates(today, tomorrow).map { rows -> rows.map { it.toDomain() } }
+        }
+
+    /**
+     * Todos still undone from before [today] -- what's left behind once a due date
+     * passes without [observeUpcoming]'s today/tomorrow window carrying them along.
+     * Surfaced on the app's next cold launch or resume on a later day (see
+     * [com.locke.app.AppViewModel.onAppResumed]) so the user can pick
+     * which ones to keep for today rather than having them silently disappear or
+     * silently reappear.
+     */
+    suspend fun getOverdueTodos(today: String = DateProvider.todayString()): List<Todo> =
+        todoDao.getOverdue(today).map { it.toDomain() }
+
+    /** Moves the given todos' due date to [today] -- how a chosen overdue todo "carries over". */
+    suspend fun carryOverToToday(todoIds: List<Long>, today: String = DateProvider.todayString()) {
+        if (todoIds.isEmpty()) return
+        todoDao.setDates(todoIds, today)
+    }
+
+    /** Adds a task due today, or tomorrow if [dueTomorrow] is set. */
+    suspend fun addTodo(title: String, dueTomorrow: Boolean = false) {
+        if (title.isBlank()) return
+        val date = if (dueTomorrow) DateProvider.tomorrowString() else DateProvider.todayString()
+        todoDao.upsert(TodoEntity(title = title.trim(), date = date))
+    }
+
+    suspend fun setDone(todo: Todo, done: Boolean) {
+        todoDao.setDone(todo.id, done, if (done) System.currentTimeMillis() else null)
+    }
+
+    suspend fun delete(todo: Todo) {
+        todoDao.delete(todo.toEntity())
+    }
+
+    suspend fun hasTodosForDate(date: String = DateProvider.todayString()): Boolean =
+        todoDao.getCountForDate(date) > 0
+
+    /**
+     * Average time from creation to completion, in minutes, for todos due in
+     * [startDate]..[endDate] that were actually completed -- null with no completed
+     * todos in range. A large value (or one that keeps climbing) suggests todos are
+     * sitting untouched rather than being acted on promptly.
+     */
+    suspend fun getAverageCompletionMinutes(startDate: String, endDate: String): Float? =
+        averageCompletionMinutes(todoDao.getCompletionTimingsInRange(startDate, endDate))
+
+    /** Every todo due in [startDate]..[endDate] inclusive, oldest first -- the data export's source for todos. */
+    suspend fun getTodosInRange(startDate: String, endDate: String): List<Todo> =
+        todoDao.getForDateRange(startDate, endDate).map { it.toDomain() }
+
+    companion object {
+        /** Pure so it's unit-testable without a DB -- see [getAverageCompletionMinutes]. */
+        fun averageCompletionMinutes(timings: List<TodoCompletionTiming>): Float? {
+            if (timings.isEmpty()) return null
+            val totalMinutes = timings.sumOf { (it.completedAtEpochMillis - it.createdAtEpochMillis).coerceAtLeast(0) / 60_000.0 }
+            return (totalMinutes / timings.size).toFloat()
+        }
+    }
+}

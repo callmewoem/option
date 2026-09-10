@@ -38,7 +38,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: habits-first-debug-apk
+          name: locke-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
@@ -73,7 +73,7 @@ jobs:
         if: steps.release_signing.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: habits-first-release-apk
+          name: locke-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14

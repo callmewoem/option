@@ -1,0 +1,113 @@
+package com.locke.app.data.repository
+
+import com.locke.app.util.DateProvider
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import java.time.Duration
+import java.time.LocalTime
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * A daily "prove you're actually up" check-in, gated the same way as a photo-verification
+ * habit -- but it isn't one, since it's not tied to any single [com.locke.app.domain.model.Habit]
+ * and its consequence is a [PenaltyRepository] penalty rather than a habit completion. The
+ * UI ([com.locke.app.ui.proofoflife.ProofOfLifeViewModel]) is a thin wrapper
+ * around the same [com.locke.app.data.verification.ImageVerificationClient]
+ * every photo-verification habit uses; this repository just tracks whether today's check-in
+ * happened and penalizes once if the window passes without one.
+ */
+@Singleton
+class ProofOfLifeRepository @Inject constructor(
+    private val preferencesRepository: PreferencesRepository,
+    private val penaltyRepository: PenaltyRepository,
+) {
+    val settings: Flow<PreferencesRepository.ProofOfLifeSettings> = preferencesRepository.proofOfLifeSettings
+
+    suspend fun setProofOfLife(enabled: Boolean, time: String, windowMinutes: Int) {
+        preferencesRepository.setProofOfLifeSettings(enabled, time, windowMinutes)
+    }
+
+    suspend fun isConfirmedToday(): Boolean =
+        preferencesRepository.proofOfLifeConfirmedDate.first() == DateProvider.todayString()
+
+    /** Re-derives "today" as the date actually changes -- see [DateProvider.currentDateFlow]. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val isConfirmedTodayFlow: Flow<Boolean> = DateProvider.currentDateFlow().flatMapLatest { today ->
+        preferencesRepository.proofOfLifeConfirmedDate.map { it == today }
+    }
+
+    suspend fun confirmToday() {
+        preferencesRepository.setProofOfLifeConfirmedDate(DateProvider.todayString())
+    }
+
+    /** Ticks once a minute so [isDueFlow] catches the clock crossing the configured time without needing a settings change or app restart. */
+    private val minuteTickFlow: Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(MINUTE_TICK_INTERVAL_MILLIS)
+        }
+    }
+
+    /**
+     * True once the configured check-in time has passed today and it's still unconfirmed --
+     * *not* just "enabled and unconfirmed", which would flag it due at any hour, including
+     * the middle of the night. Stays true for the rest of the day once past the target time
+     * (matching [checkAndPenalizeIfMissed]'s no-cutoff behavior), until confirmed or the date
+     * rolls over.
+     */
+    val isDueFlow: Flow<Boolean> = combine(settings, isConfirmedTodayFlow, minuteTickFlow) { s, confirmedToday, _ ->
+        val target = runCatching { LocalTime.parse(s.time) }.getOrDefault(LocalTime.of(8, 0))
+        s.enabled && !confirmedToday && !LocalTime.now().isBefore(target)
+    }
+
+    /**
+     * Called on the same ~15-minute cadence as the app's other periodic workers. Applies
+     * [PenaltyRepository]'s block-extension penalty once per day once [windowMinutes] have
+     * passed since the configured time without a confirmed check-in. Unlike the morning todo
+     * reminder, this deliberately has no upper cutoff -- a late-caught miss (say the device
+     * was asleep for hours) should still be felt, not silently skipped.
+     */
+    suspend fun checkAndPenalizeIfMissed() {
+        val settings = settings.first()
+        if (!settings.enabled) return
+
+        val today = DateProvider.todayString()
+        if (preferencesRepository.proofOfLifeConfirmedDate.first() == today) return
+        if (preferencesRepository.proofOfLifeLastPenalizedDate.first() == today) return
+
+        val target = runCatching { LocalTime.parse(settings.time) }.getOrDefault(LocalTime.of(8, 0))
+        val minutesPast = Duration.between(target, LocalTime.now()).toMinutes()
+        if (minutesPast < settings.windowMinutes) return
+
+        preferencesRepository.setProofOfLifeLastPenalizedDate(today)
+        penaltyRepository.extendBlock(PENALTY_MINUTES, reason = "missed morning check-in")
+    }
+
+    /**
+     * Ends the check-in window early at a stated cost (design spec §7): applies the
+     * same penalty [checkAndPenalizeIfMissed] would apply once the window actually
+     * ran out, right now instead of waiting for it. Also settles today's window (as if
+     * confirmed) -- the cost has already landed, so the lock has nothing left to gain
+     * by continuing to demand a photo for the rest of today. A no-op if today's
+     * check-in is already confirmed.
+     */
+    suspend fun takePenaltyNow() {
+        if (isConfirmedToday()) return
+        val today = DateProvider.todayString()
+        preferencesRepository.setProofOfLifeLastPenalizedDate(today)
+        penaltyRepository.extendBlock(PENALTY_MINUTES, reason = "took the morning check-in penalty early")
+        preferencesRepository.setProofOfLifeConfirmedDate(today)
+    }
+
+    companion object {
+        const val PENALTY_MINUTES = 30
+        private const val MINUTE_TICK_INTERVAL_MILLIS = 60_000L
+    }
+}

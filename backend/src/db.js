@@ -51,19 +51,36 @@ db.exec(`
 
   -- One row per device: its current entitlement, last set either by a client-
   -- reported purchase verified against the Play Developer API, or by an RTDN
-  -- webhook call keyed by purchase_token.
+  -- webhook call keyed by purchase_token. free_verification_month/_count track the
+  -- free tier's monthly photo-verification quota (config.freeTier.verificationsPerMonth,
+  -- see routes/verify.js) -- folded into this table rather than a separate one since
+  -- it's the same "one row per device" shape and always read/written alongside tier.
   CREATE TABLE IF NOT EXISTS entitlements (
     device_id TEXT PRIMARY KEY REFERENCES devices(id),
     tier TEXT NOT NULL DEFAULT 'NONE',
     expires_at INTEGER,
     purchase_token TEXT,
     product_id TEXT,
-    updated_at INTEGER NOT NULL
+    updated_at INTEGER NOT NULL,
+    free_verification_month TEXT,
+    free_verification_count INTEGER NOT NULL DEFAULT 0
   );
 
   -- Lets an RTDN webhook call (keyed only by purchaseToken/subscriptionId, no
   -- device id) find which device to update.
   CREATE INDEX IF NOT EXISTS idx_entitlements_purchase_token ON entitlements(purchase_token);
 `);
+
+// Additive migration for a database file created before the free_verification_*
+// columns existed above -- CREATE TABLE IF NOT EXISTS doesn't retrofit columns onto
+// an already-existing table. Safe to run every boot: each ALTER is skipped once its
+// column is already present.
+const entitlementColumns = new Set(db.prepare('PRAGMA table_info(entitlements)').all().map((row) => row.name));
+if (!entitlementColumns.has('free_verification_month')) {
+  db.exec('ALTER TABLE entitlements ADD COLUMN free_verification_month TEXT');
+}
+if (!entitlementColumns.has('free_verification_count')) {
+  db.exec('ALTER TABLE entitlements ADD COLUMN free_verification_count INTEGER NOT NULL DEFAULT 0');
+}
 
 module.exports = db;

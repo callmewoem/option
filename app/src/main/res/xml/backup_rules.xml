@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="database" path="habits_first.db" />
+        <exclude domain="database" path="locke.db" />
     </cloud-backup>
 </data-extraction-rules>

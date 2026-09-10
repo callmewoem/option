@@ -22,6 +22,15 @@ that one device id (`data/remote/DeviceIdentityRepository.kt` on the Android
 side calls this lazily and caches the token). Every other endpoint requires
 `Authorization: Bearer <token>`.
 
+The free tier isn't a trial -- `config.freeTier` (`src/config.js`) sizes it to
+be generously usable on its own: `verificationsPerMonth` (3, resets every
+calendar month) gates `/v1/verify-photo`, `maxBuddies` (1) gates `/v1/buddies`
+(checked on *both* sides of a pairing, since a new connection could push
+either device over its own cap). These numbers must match the Android app's
+own copies (`PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH` /
+`MAX_FREE_BUDDIES`) -- the client checks them too, for instant feedback with
+no round trip, but this server-side check is the actual enforcement.
+
 ## Running locally
 
 ```bash
@@ -76,11 +85,11 @@ Production checklist beyond `.env`:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | POST | `/v1/devices` | none | Registers a new device, returns `{deviceId, token}`. |
-| POST | `/v1/verify-photo` | device | `{habitName, description?, exampleImageBase64?, submittedImageBase64}` -> `{approved, reasoning}`. 402 if not premium. |
-| POST | `/v1/pairing-codes` | device | Mints this device's own pairing code. 402 if not premium. |
-| POST | `/v1/buddies` | device | `{code}` -> redeems a buddy's code, pairs mutually. 402 if not premium. |
+| POST | `/v1/verify-photo` | device | `{habitName, description?, exampleImageBase64?, submittedImageBase64}` -> `{approved, reasoning}`. 402 once premium and this month's free quota are both exhausted. |
+| POST | `/v1/pairing-codes` | device | Mints this device's own pairing code. Always available (minting is free; the cap is checked at redemption). |
+| POST | `/v1/buddies` | device | `{code}` -> redeems a buddy's code, pairs mutually. 402 if either side (redeemer or code owner) is non-premium and already at `maxBuddies`. |
 | GET | `/v1/buddies` | device | Lists paired buddies with their last-synced summary. Always available. |
-| POST | `/v1/daily-summary` | device | Uploads this device's today summary. 402 if not premium. |
+| POST | `/v1/daily-summary` | device | Uploads this device's today summary. Always available once a buddy connection exists. |
 | POST | `/v1/purchases/verify` | device | `{productId, purchaseToken}` -> verifies with Play, records entitlement. |
 | GET | `/v1/entitlement` | device | This device's current `{tier, isPremium, expiresAtEpochMillis}`. |
 | POST | `/v1/rtdn` | Pub/Sub push | Play's Real-time Developer Notifications webhook. |

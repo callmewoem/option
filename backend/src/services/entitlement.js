@@ -42,4 +42,36 @@ function findDeviceByPurchaseToken(purchaseToken) {
   return row?.device_id ?? null;
 }
 
-module.exports = { getEntitlement, setEntitlement, findDeviceByPurchaseToken };
+function usedFreeVerificationsThisMonth(deviceId, nowMonth) {
+  const row = db.prepare('SELECT free_verification_month, free_verification_count FROM entitlements WHERE device_id = ?').get(deviceId);
+  if (!row || row.free_verification_month !== nowMonth) return 0;
+  return row.free_verification_count;
+}
+
+/** How many of this free-tier device's monthly photo-verification checks are left. Meaningless for a premium device (unlimited) -- callers should check `getEntitlement(deviceId).isPremium` first. */
+function remainingFreeVerifications(deviceId, nowMonth, limit) {
+  return Math.max(0, limit - usedFreeVerificationsThisMonth(deviceId, nowMonth));
+}
+
+/**
+ * Spends one of this month's free verification checks if any are left. Node/
+ * better-sqlite3 calls are synchronous, so nothing else can run between the read and
+ * the write below within one process -- no explicit locking needed for this to be
+ * atomic. Returns whether it was spent.
+ */
+function consumeFreeVerification(deviceId, nowMonth, limit) {
+  const used = usedFreeVerificationsThisMonth(deviceId, nowMonth);
+  if (used >= limit) return false;
+  db.prepare(
+    'UPDATE entitlements SET free_verification_month = ?, free_verification_count = ?, updated_at = ? WHERE device_id = ?',
+  ).run(nowMonth, used + 1, Date.now(), deviceId);
+  return true;
+}
+
+module.exports = {
+  getEntitlement,
+  setEntitlement,
+  findDeviceByPurchaseToken,
+  remainingFreeVerifications,
+  consumeFreeVerification,
+};

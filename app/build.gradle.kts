@@ -41,11 +41,11 @@ val backendBaseUrl = (project.findProperty("BACKEND_BASE_URL") as String?)
     ?: "https://backend.locke.invalid/v1"
 
 android {
-    namespace = "com.habitsfirst.androidclone"
+    namespace = "com.locke.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.habitsfirst.androidclone"
+        applicationId = "com.locke.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -117,7 +117,7 @@ android {
 
 ksp {
     // Room schema export (AppDatabase's exportSchema = true): writes
-    // app/schemas/com.habitsfirst.androidclone.data.local.AppDatabase/<version>.json on
+    // app/schemas/com.locke.app.data.local.AppDatabase/<version>.json on
     // every build. That's the ground truth Migrations.kt's raw SQL is checked against --
     // regenerate it (just build) whenever an entity changes, and commit the new file
     // alongside the version bump and its Migration.
