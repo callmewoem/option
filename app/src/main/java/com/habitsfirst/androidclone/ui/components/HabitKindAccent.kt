@@ -4,9 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.habitsfirst.androidclone.domain.model.HabitKind
-import com.habitsfirst.androidclone.ui.theme.LocalLockeMode
+import com.habitsfirst.androidclone.ui.theme.LocalLockeSurfaceIsDark
 import com.habitsfirst.androidclone.ui.theme.LockeColor
-import com.habitsfirst.androidclone.ui.theme.LockeMode
 
 /**
  * The color signal that tells Gating/Tracked/Antihabit apart at a glance -- coded by
@@ -18,7 +17,7 @@ import com.habitsfirst.androidclone.ui.theme.LockeMode
 @Composable
 fun HabitKind.accentColor(): Color = when (this) {
     HabitKind.GATING -> MaterialTheme.colorScheme.primary
-    HabitKind.TRACKED -> if (LocalLockeMode.current == LockeMode.Enforcement) LockeColor.NeutralOnIron else LockeColor.NeutralOnBone
+    HabitKind.TRACKED -> if (LocalLockeSurfaceIsDark.current) LockeColor.NeutralOnIron else LockeColor.NeutralOnBone
     HabitKind.ANTIHABIT -> LockeColor.Oxide
 }
 

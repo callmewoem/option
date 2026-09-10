@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.PreferencesRepository
 import com.habitsfirst.androidclone.data.repository.TodoRepository
+import com.habitsfirst.androidclone.domain.model.ThemeMode
 import com.habitsfirst.androidclone.ui.todo.OverduePromptState
 import com.habitsfirst.androidclone.util.DateProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -18,8 +21,9 @@ import javax.inject.Inject
 /**
  * Root-level, [MainActivity]-scoped ViewModel (requested via `hiltViewModel()` outside
  * the nav graph, so it lives above any one screen) for state that's about the app being
- * opened, not about any particular tab. Right now that's just the "you didn't do these
- * yesterday" todo prompt -- see [onAppResumed].
+ * opened, not about any particular tab. Right now that's the "you didn't do these
+ * yesterday" todo prompt (see [onAppResumed]) and the user's [ThemeMode] preference, read
+ * here so [MainActivity] can apply it to the whole app-mode nav host in one place.
  */
 @HiltViewModel
 class AppViewModel @Inject constructor(
@@ -29,6 +33,9 @@ class AppViewModel @Inject constructor(
 
     private val _overduePrompt = MutableStateFlow<OverduePromptState?>(null)
     val overduePrompt: StateFlow<OverduePromptState?> = _overduePrompt.asStateFlow()
+
+    val themeMode: StateFlow<ThemeMode> = preferencesRepository.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.DEFAULT)
 
     /**
      * Call on every `ON_RESUME` (cold launch included). Compares today's date against

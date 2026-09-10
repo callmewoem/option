@@ -70,7 +70,8 @@ import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.BuddyConnectionStatus
 import com.habitsfirst.androidclone.domain.model.HabitKind
-import com.habitsfirst.androidclone.domain.model.ThemeVariant
+import com.habitsfirst.androidclone.domain.model.ThemeMode
+import com.habitsfirst.androidclone.ui.components.LockeCard
 import com.habitsfirst.androidclone.ui.components.LockeGhostButton
 import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.ui.components.icon
@@ -102,16 +103,8 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showSkipHabitDialog by remember { mutableStateOf(false) }
-    var themeCodeInput by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val themeCodeMessage by viewModel.themeCodeMessage.collectAsStateWithLifecycle()
-    LaunchedEffect(themeCodeMessage) {
-        themeCodeMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.onThemeCodeMessageShown()
-        }
-    }
     val accountabilityMessage by viewModel.accountabilityMessage.collectAsStateWithLifecycle()
     LaunchedEffect(accountabilityMessage) {
         accountabilityMessage?.let {
@@ -392,11 +385,12 @@ fun SettingsScreen(
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
-            item { SectionHeader("Cosmetics") }
+            item { SectionHeader("Appearance") }
             item {
                 Text(
-                    "The palette itself never changes. This shows what you've won from the daily " +
-                        "lootbox, or unlocked with a code below.",
+                    "Applies to everyday screens: Today, Stats, Settings, onboarding. Screens that lock, " +
+                        "block, or demand something (curfew, penalties, morning check-in) always stay dark, " +
+                        "regardless of this.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -404,49 +398,18 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ThemeVariant.entries.forEach { variant ->
-                        val unlocked = variant in state.unlockedThemeVariants
+                    ThemeMode.entries.forEach { mode ->
                         FilterChip(
-                            selected = unlocked,
-                            onClick = {},
-                            enabled = false,
-                            label = { Text(variant.displayName) },
-                            leadingIcon = if (!unlocked) {
-                                { Icon(Icons.Filled.Lock, contentDescription = "Not yet kept", modifier = Modifier.size(16.dp)) }
-                            } else {
-                                null
-                            },
+                            selected = state.themeMode == mode,
+                            onClick = { viewModel.onThemeModeChanged(mode) },
+                            label = { Text(mode.displayName) },
                         )
                     }
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = themeCodeInput,
-                        onValueChange = { themeCodeInput = it },
-                        label = { Text("Cosmetic code") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    LockePrimaryButton(
-                        text = "Redeem",
-                        onClick = {
-                            viewModel.onRedeemThemeCode(themeCodeInput)
-                            themeCodeInput = ""
-                        },
-                        enabled = themeCodeInput.isNotBlank(),
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                    )
-                }
-                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
             if (state.healthConnectAvailable) {

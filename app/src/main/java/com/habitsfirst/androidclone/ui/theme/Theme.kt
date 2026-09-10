@@ -1,6 +1,7 @@
 package com.habitsfirst.androidclone.ui.theme
 
 import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -13,6 +14,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.habitsfirst.androidclone.domain.model.ThemeMode
 
 /**
  * Locke's one bold move (design spec §3): every screen is either *navigating* (app
@@ -24,6 +26,17 @@ import androidx.core.view.WindowCompat
 enum class LockeMode { App, Enforcement }
 
 val LocalLockeMode = staticCompositionLocalOf { LockeMode.App }
+
+/**
+ * Whether the *currently active* surface is dark -- true for [LockeMode.Enforcement]
+ * always, and for [LockeMode.App] whenever the user's [ThemeMode] preference resolves
+ * to dark. Components that hand-pick a color instead of reading it off
+ * [MaterialTheme.colorScheme] (see e.g. `LockeControls.kt`'s `countdownColor`) should
+ * branch on this rather than on [LocalLockeMode] directly, since "which surface family
+ * am I drawing on" and "which design mode is this screen in" are no longer the same
+ * question once app mode itself can be dark.
+ */
+val LocalLockeSurfaceIsDark = staticCompositionLocalOf { false }
 
 /**
  * Builds a Material3 [androidx.compose.material3.ColorScheme] entirely from
@@ -79,6 +92,51 @@ private fun appColorScheme() = lightColorScheme(
     outlineVariant = LockeColor.BorderOnBone.copy(alpha = 0.08f),
 )
 
+/**
+ * [appColorScheme]'s dark counterpart -- same roles, same accent meanings, swapped onto
+ * [LockeColor.Slate]/[LockeColor.SlateIn] instead of [LockeColor.Bone]/[LockeColor.BoneIn].
+ * Used for [LockeMode.App] screens only, when the user's [ThemeMode] preference resolves
+ * to dark; [enforcementColorScheme] is separate and unaffected by that preference.
+ */
+private fun appDarkColorScheme() = darkColorScheme(
+    background = LockeColor.Slate,
+    onBackground = LockeColor.OnSlate,
+    surface = LockeColor.Slate,
+    onSurface = LockeColor.OnSlate,
+    surfaceVariant = LockeColor.SlateIn,
+    onSurfaceVariant = LockeColor.OnSlateMuted,
+    surfaceContainerLowest = LockeColor.Slate,
+    surfaceContainerLow = LockeColor.Slate,
+    surfaceContainer = LockeColor.SlateIn,
+    surfaceContainerHigh = lerp(LockeColor.SlateIn, LockeColor.Bone, 0.06f),
+    surfaceContainerHighest = lerp(LockeColor.SlateIn, LockeColor.Bone, 0.12f),
+    surfaceDim = LockeColor.Slate,
+    surfaceBright = LockeColor.SlateIn,
+    surfaceTint = Color.Transparent,
+    inverseSurface = LockeColor.Bone,
+    inverseOnSurface = LockeColor.Slate,
+    primary = LockeColor.VerdigrisLight,
+    onPrimary = LockeColor.Slate,
+    primaryContainer = lerp(LockeColor.SlateIn, LockeColor.Verdigris, 0.55f),
+    onPrimaryContainer = LockeColor.VerdigrisLight,
+    // See appColorScheme()'s comment -- kept neutral for the same reason: a default
+    // FilterChip/SegmentedButton selection is not a reward.
+    secondary = lerp(LockeColor.Slate, LockeColor.Bone, 0.55f),
+    onSecondary = LockeColor.Slate,
+    secondaryContainer = lerp(LockeColor.Slate, LockeColor.Bone, 0.14f),
+    onSecondaryContainer = lerp(LockeColor.Slate, LockeColor.Bone, 0.65f),
+    tertiary = lerp(LockeColor.Slate, LockeColor.Bone, 0.55f),
+    onTertiary = LockeColor.Slate,
+    tertiaryContainer = lerp(LockeColor.Slate, LockeColor.Bone, 0.14f),
+    onTertiaryContainer = lerp(LockeColor.Slate, LockeColor.Bone, 0.65f),
+    error = LockeColor.OxideLight,
+    onError = LockeColor.Slate,
+    errorContainer = lerp(LockeColor.SlateIn, LockeColor.Oxide, 0.5f),
+    onErrorContainer = LockeColor.OxideLight,
+    outline = LockeColor.BorderOnSlate,
+    outlineVariant = LockeColor.BorderOnSlate.copy(alpha = 0.08f),
+)
+
 private fun enforcementColorScheme() = darkColorScheme(
     background = LockeColor.Iron,
     onBackground = LockeColor.OnIron,
@@ -122,13 +180,26 @@ private fun enforcementColorScheme() = darkColorScheme(
  * Root theme for every screen. [mode] is the whole design language in one switch --
  * pass [LockeMode.Enforcement] for anything taking something away or demanding
  * something (the block cover, curfew, the morning lock, the penalty sheet, the
- * lootbox reveal) and leave it at the [LockeMode.App] default everywhere else. There is
- * deliberately no `darkTheme`/system-preference parameter: which mode a screen is in
- * is a design decision about what that screen *does*, not a user accessibility setting.
+ * lootbox reveal) and leave it at the [LockeMode.App] default everywhere else. Which
+ * *mode* a screen is in is a design decision about what that screen *does*, not a user
+ * preference, and [themeMode] can't change that -- but within [LockeMode.App] it picks
+ * between [appColorScheme] and its dark counterpart, [appDarkColorScheme]. Enforcement
+ * screens ignore [themeMode] entirely and always render dark.
  */
 @Composable
-fun LockeTheme(mode: LockeMode = LockeMode.App, content: @Composable () -> Unit) {
-    val colorScheme = if (mode == LockeMode.App) appColorScheme() else enforcementColorScheme()
+fun LockeTheme(mode: LockeMode = LockeMode.App, themeMode: ThemeMode = ThemeMode.DEFAULT, content: @Composable () -> Unit) {
+    val systemInDarkTheme = isSystemInDarkTheme()
+    val appModeIsDark = when (themeMode) {
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+        ThemeMode.System -> systemInDarkTheme
+    }
+    val surfaceIsDark = mode == LockeMode.Enforcement || appModeIsDark
+    val colorScheme = when {
+        mode == LockeMode.Enforcement -> enforcementColorScheme()
+        appModeIsDark -> appDarkColorScheme()
+        else -> appColorScheme()
+    }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -137,12 +208,15 @@ fun LockeTheme(mode: LockeMode = LockeMode.App, content: @Composable () -> Unit)
             window.statusBarColor = colorScheme.background.toArgb()
             window.navigationBarColor = colorScheme.background.toArgb()
             val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.isAppearanceLightStatusBars = mode == LockeMode.App
-            insetsController.isAppearanceLightNavigationBars = mode == LockeMode.App
+            insetsController.isAppearanceLightStatusBars = !surfaceIsDark
+            insetsController.isAppearanceLightNavigationBars = !surfaceIsDark
         }
     }
 
-    CompositionLocalProvider(LocalLockeMode provides mode) {
+    CompositionLocalProvider(
+        LocalLockeMode provides mode,
+        LocalLockeSurfaceIsDark provides surfaceIsDark,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = LockeTypography,

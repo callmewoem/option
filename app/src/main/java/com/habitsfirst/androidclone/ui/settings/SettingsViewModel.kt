@@ -14,6 +14,7 @@ import com.habitsfirst.androidclone.data.repository.ProofOfLifeRepository
 import com.habitsfirst.androidclone.domain.model.AccountabilityBuddy
 import com.habitsfirst.androidclone.domain.model.Habit
 import com.habitsfirst.androidclone.domain.model.ThemeCodeResult
+import com.habitsfirst.androidclone.domain.model.ThemeMode
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.habits.StatsRange
@@ -40,6 +41,7 @@ data class SettingsUiState(
     val habits: List<Habit> = emptyList(),
     val notificationsEnabled: Boolean = true,
     val anthropicApiKey: String? = null,
+    val themeMode: ThemeMode = ThemeMode.DEFAULT,
     val selectedThemeVariant: ThemeVariant = ThemeVariant.DEFAULT,
     val unlockedThemeVariants: Set<ThemeVariant> = setOf(ThemeVariant.DEFAULT),
     val graceTokenCount: Int = 0,
@@ -285,7 +287,8 @@ class SettingsViewModel @Inject constructor(
         baseUiState,
         accountabilitySettings,
         connectionKeys,
-    ) { base, accountability, connections ->
+        preferencesRepository.themeMode,
+    ) { base, accountability, connections, themeMode ->
         base.copy(
             accountabilityBaseUrl = accountability.baseUrl,
             myPairingCode = accountability.pairingCode,
@@ -293,6 +296,7 @@ class SettingsViewModel @Inject constructor(
             buddies = accountability.buddies,
             wakaTimeApiKey = connections.wakaTimeApiKey,
             githubToken = connections.githubToken,
+            themeMode = themeMode,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -310,6 +314,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onGithubTokenChanged(token: String) {
         viewModelScope.launch { preferencesRepository.setGithubToken(token) }
+    }
+
+    fun onThemeModeChanged(mode: ThemeMode) {
+        viewModelScope.launch { preferencesRepository.setThemeMode(mode) }
     }
 
     fun onThemeVariantSelected(variant: ThemeVariant) {
