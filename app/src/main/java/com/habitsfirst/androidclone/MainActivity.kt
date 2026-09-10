@@ -65,7 +65,8 @@ private fun LockeRoot() {
         )
     }
 
-    LockeTheme(mode = LockeMode.App) {
+    val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
+    LockeTheme(mode = LockeMode.App, themeMode = themeMode) {
         Surface(modifier = Modifier.fillMaxSize()) {
             HabitsFirstNavHost()
         }
