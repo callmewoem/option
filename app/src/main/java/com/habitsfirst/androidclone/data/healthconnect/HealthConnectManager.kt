@@ -7,6 +7,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Duration
@@ -75,15 +76,31 @@ class HealthConnectManager @Inject constructor(
      * read failed. Uses a trailing window rather than [todayRange] because a sleep session
      * that started before midnight would otherwise be mostly missed by a midnight-anchored
      * query.
+     *
+     * Deliberately reads raw [SleepSessionRecord]s and sums their durations itself rather
+     * than going through [HealthConnectClient.aggregate] the way [todaySteps] and
+     * [workoutMinutesToday] do -- `SleepSessionRecord.SLEEP_DURATION_TOTAL` aggregation is
+     * unreliable on the pinned alpha `health-connect-client` version and comes back empty
+     * even when sessions exist and permission is granted, which otherwise made a
+     * SLEEP_HOURS habit's progress look permanently stuck at zero.
      */
     suspend fun recentSleepHours(): Int {
         val client = client ?: return 0
         if (!hasPermissions()) return 0
         return runCatching {
-            val result = client.aggregate(
-                AggregateRequest(setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL), last24HoursRange()),
-            )
-            (result[SleepSessionRecord.SLEEP_DURATION_TOTAL] ?: Duration.ZERO).toHours().toInt()
+            val now = Instant.now()
+            val windowStart = now.minus(Duration.ofHours(24))
+            val sessions = client.readRecords(
+                ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.between(windowStart, now)),
+            ).records
+            val total = sessions.fold(Duration.ZERO) { acc, session ->
+                // Clip to the window in case a session starts before it -- readRecords
+                // returns any record that overlaps the filter, not just ones fully inside it.
+                val start = maxOf(session.startTime, windowStart)
+                val end = minOf(session.endTime, now)
+                if (end.isAfter(start)) acc.plus(Duration.between(start, end)) else acc
+            }
+            total.toHours().toInt()
         }.getOrDefault(0)
     }
 
@@ -92,9 +109,6 @@ class HealthConnectManager @Inject constructor(
         val startOfDay = LocalDate.now(zone).atStartOfDay(zone).toInstant()
         return TimeRangeFilter.between(startOfDay, Instant.now())
     }
-
-    private fun last24HoursRange(): TimeRangeFilter =
-        TimeRangeFilter.between(Instant.now().minus(Duration.ofHours(24)), Instant.now())
 
     companion object {
         /**

@@ -152,6 +152,17 @@ class HabitRepository @Inject constructor(
         habitDao.archive(habitId)
     }
 
+    /**
+     * Re-ranks every habit in [orderedIds] to match its position in the list -- the
+     * Settings habit list's up/down reorder buttons. Renumbers from scratch rather than
+     * swapping the two moved rows' existing [com.habitsfirst.androidclone.data.local.entity.HabitEntity.sortOrder]
+     * values, so it also self-heals any old rows still sharing the default
+     * (pre-reorder-feature) value of 0.
+     */
+    suspend fun reorderHabits(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, habitId -> habitDao.updateSortOrder(habitId, index) }
+    }
+
     /** Removes expired makeup habits (see [PenaltyRepository]). Safe to call often -- it's a no-op most days. */
     suspend fun archiveExpiredHabits(date: String = DateProvider.todayString()) {
         habitDao.archiveExpiredHabits(date)

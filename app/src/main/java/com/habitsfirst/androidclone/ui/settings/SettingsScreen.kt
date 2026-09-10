@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
@@ -331,7 +334,7 @@ fun SettingsScreen(
 
             // -- Easier to change ------------------------------------------------------
             item { SectionHeader(stringResource(R.string.settings_habits)) }
-            items(state.habits, key = { it.id }) { habit ->
+            itemsIndexed(state.habits, key = { _, habit -> habit.id }) { index, habit ->
                 ListItem(
                     headlineContent = { Text(habit.name) },
                     supportingContent = {
@@ -340,7 +343,23 @@ fun SettingsScreen(
                         Text("${habit.kind.label} · $target${schedule.orEmpty()}")
                     },
                     leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { viewModel.onMoveHabit(habit.id, up = true) },
+                                enabled = index > 0,
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                            }
+                            IconButton(
+                                onClick = { viewModel.onMoveHabit(habit.id, up = false) },
+                                enabled = index < state.habits.lastIndex,
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                            }
+                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onEditHabit(habit.id) },

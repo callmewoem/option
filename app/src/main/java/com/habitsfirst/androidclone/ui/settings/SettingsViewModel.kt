@@ -414,6 +414,22 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Moves [habitId] one spot earlier ([up] true) or later (false) in the habit list --
+     * the reorder arrows next to each row in Settings. A no-op at either end of the list.
+     */
+    fun onMoveHabit(habitId: Long, up: Boolean) {
+        viewModelScope.launch {
+            val ids = uiState.value.habits.map { it.id }.toMutableList()
+            val fromIndex = ids.indexOf(habitId)
+            if (fromIndex < 0) return@launch
+            val toIndex = if (up) fromIndex - 1 else fromIndex + 1
+            if (toIndex < 0 || toIndex >= ids.size) return@launch
+            ids[fromIndex] = ids[toIndex].also { ids[toIndex] = ids[fromIndex] }
+            habitRepository.reorderHabits(ids)
+        }
+    }
+
     /** Re-checks whether the Health Connect read permissions are actually granted -- call on screen resume, since a grant/revoke happens outside the app. */
     fun refreshHealthConnectPermissions() {
         viewModelScope.launch { _healthConnectPermissionsGranted.value = healthConnectManager.hasPermissions() }
