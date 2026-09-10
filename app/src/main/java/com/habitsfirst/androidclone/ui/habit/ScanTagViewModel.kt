@@ -79,7 +79,7 @@ class ScanTagViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(mismatch = false)
     }
 
-    /** "I did this -- mark it done anyway" (design spec §6.2), for a lost, damaged, or hard-to-read tag. */
+    /** "Mark done anyway" (design spec §6.2), for a lost, damaged, or hard-to-read tag. */
     fun onOverride() {
         viewModelScope.launch {
             habitRepository.setTallyHabitDone(habitId, true)

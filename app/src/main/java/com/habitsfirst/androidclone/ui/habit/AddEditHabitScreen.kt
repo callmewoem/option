@@ -289,7 +289,7 @@ fun AddEditHabitScreen(
             if (state.type == HabitType.WAKATIME_CODING_MINUTES) {
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(
-                    "Synced from your WakaTime account -- add your API key in Settings to turn this on.",
+                    "Synced from your WakaTime account. Add your API key in Settings to turn this on.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -550,7 +550,7 @@ private fun LocationSetupSection(
     LockeGhostButton(
         text = when {
             isCapturing -> "Finding your location…"
-            hasLocation -> "Location set -- update to here"
+            hasLocation -> "Update to here"
             else -> "Use my current location"
         },
         enabled = !locked && !isCapturing,
@@ -579,7 +579,7 @@ private fun LocationSetupSection(
     if (captureFailed) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Couldn't get a location -- make sure location services are on and try again.",
+            text = "Couldn't get a location. Make sure location services are on and try again.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )

@@ -49,8 +49,8 @@ fun TagSetupSection(payload: String) {
     Text("Set up your tag", style = MaterialTheme.typography.titleMedium)
     Spacer(modifier = Modifier.height(4.dp))
     Text(
-        "Print or display a QR code at the spot, write it to a spare NFC tag, or both -- " +
-            "either one confirms this habit later.",
+        "Print or display a QR code at the spot, write it to a spare NFC tag, or both. " +
+            "Either one confirms this habit later.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -76,7 +76,7 @@ fun TagSetupSection(payload: String) {
     writeResult?.let { success ->
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = if (success) "Tag written." else "Couldn't write to that tag -- try a different one.",
+            text = if (success) "Tag written." else "Couldn't write to that tag. Try a different one.",
             style = MaterialTheme.typography.bodySmall,
             color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
         )

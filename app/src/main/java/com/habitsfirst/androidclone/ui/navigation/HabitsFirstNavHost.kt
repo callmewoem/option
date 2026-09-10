@@ -49,10 +49,17 @@ fun HabitsFirstNavHost() {
         return
     }
 
-    val startDestination = if (splashState.onboardingComplete) Screen.Home.route else Screen.OnboardingWelcome.route
+    val startDestination = if (splashState.onboardingComplete) {
+        Screen.Home.route
+    } else {
+        Screen.OnboardingWelcome.createRoute(replay = false)
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
-        composable(Screen.OnboardingWelcome.route) {
+        composable(
+            route = Screen.OnboardingWelcome.route,
+            arguments = listOf(navArgument(Screen.ARG_REPLAY) { type = NavType.BoolType; defaultValue = false }),
+        ) {
             OnboardingWelcomeScreen(
                 onGetStarted = { navController.navigate(Screen.OnboardingUsageAccess.route) },
             )
@@ -99,8 +106,14 @@ fun HabitsFirstNavHost() {
             OnboardingCurfewCheckInScreen(
                 onBack = { navController.popBackStack() },
                 onFinish = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
+                    if (onboardingViewModel.isReplay) {
+                        // Just hand control back to wherever "Replay onboarding" was
+                        // launched from (Settings) -- nothing here was persisted.
+                        navController.popBackStack(Screen.OnboardingWelcome.route, inclusive = true)
+                    } else {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
+                        }
                     }
                 },
                 viewModel = onboardingViewModel,
@@ -150,6 +163,7 @@ fun HabitsFirstNavHost() {
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
                 onManageUrls = { navController.navigate(Screen.UrlBlockList.route) },
                 onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
+                onReplayOnboarding = { navController.navigate(Screen.OnboardingWelcome.createRoute(replay = true)) },
             )
         }
 

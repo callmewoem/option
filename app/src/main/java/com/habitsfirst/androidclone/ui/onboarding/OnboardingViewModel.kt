@@ -1,6 +1,7 @@
 package com.habitsfirst.androidclone.ui.onboarding
 
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitsfirst.androidclone.data.repository.BedtimeRepository
@@ -16,6 +17,7 @@ import com.habitsfirst.androidclone.domain.model.InstalledApp
 import com.habitsfirst.androidclone.domain.model.UrlBlockList
 import com.habitsfirst.androidclone.service.WorkScheduler
 import com.habitsfirst.androidclone.ui.habit.defaultTarget
+import com.habitsfirst.androidclone.ui.navigation.Screen
 import com.habitsfirst.androidclone.util.DateProvider
 import com.habitsfirst.androidclone.util.InstalledAppsProvider
 import com.habitsfirst.androidclone.util.PermissionUtils
@@ -119,7 +121,11 @@ class OnboardingViewModel @Inject constructor(
     private val proofOfLifeRepository: ProofOfLifeRepository,
     private val urlBlockRepository: UrlBlockRepository,
     @ApplicationContext private val appContext: Context,
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    /** True when Settings ("Replay onboarding") launched this run instead of first-run setup. */
+    val isReplay: Boolean = savedStateHandle.get<Boolean>(Screen.ARG_REPLAY) ?: false
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -202,8 +208,17 @@ class OnboardingViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(anthropicApiKey = key)
     }
 
+    /**
+     * A replay just needs to hand control back to Settings -- redoing first-run setup
+     * would duplicate habits already created and clobber bedtime/check-in/API-key
+     * settings the user may have changed since, so nothing here gets persisted.
+     */
     fun finishOnboarding() {
         if (_uiState.value.isFinishing) return
+        if (isReplay) {
+            _uiState.value = _uiState.value.copy(finished = true)
+            return
+        }
         _uiState.value = _uiState.value.copy(isFinishing = true)
         viewModelScope.launch {
             val state = _uiState.value

@@ -110,7 +110,7 @@ fun ScanTagScreen(
                         Column {
                             Text("Tap your tag", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Hold the back of your phone against it -- this screen is listening.",
+                                "Hold the back of your phone against it. This screen is listening.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -125,7 +125,7 @@ fun ScanTagScreen(
             QrScanSection(onImageCaptured = viewModel::onQrImageCaptured)
 
             Spacer(modifier = Modifier.height(24.dp))
-            LockeQuietButton(text = "I'm there -- mark it done anyway", onClick = viewModel::onOverride)
+            LockeQuietButton(text = "Mark done anyway", onClick = viewModel::onOverride)
         }
     }
 }

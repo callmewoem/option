@@ -6,7 +6,14 @@ import com.habitsfirst.androidclone.domain.model.HabitType
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
 
-    data object OnboardingWelcome : Screen("onboarding/welcome")
+    /**
+     * [replay] is true when this is a re-run from Settings ("Replay onboarding") rather
+     * than the real first-run flow -- read by [com.habitsfirst.androidclone.ui.onboarding.OnboardingViewModel]
+     * to skip persisting anything at the end instead of redoing initial setup.
+     */
+    data object OnboardingWelcome : Screen("onboarding/welcome?replay={replay}") {
+        fun createRoute(replay: Boolean = false) = "onboarding/welcome?replay=$replay"
+    }
     data object OnboardingUsageAccess : Screen("onboarding/usage_access")
     data object OnboardingPickApps : Screen("onboarding/pick_apps")
     data object OnboardingPickHabits : Screen("onboarding/pick_habits")
@@ -44,5 +51,6 @@ sealed class Screen(val route: String) {
         const val ARG_HABIT_ID = "habitId"
         const val ARG_KIND = "kind"
         const val ARG_TYPE = "type"
+        const val ARG_REPLAY = "replay"
     }
 }

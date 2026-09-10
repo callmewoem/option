@@ -42,6 +42,7 @@
     <string name="onboarding_permissions_whats_next_body">Antihabits (a time penalty for slipping) and the daily lootbox (grace tokens, skip tokens) both live in Settings. Curfew and the morning check-in are next, one screen over.</string>
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_finish">Start locking in</string>
+    <string name="onboarding_replay_done">Done</string>
 
     <!-- Permissions -->
     <string name="permission_usage_access_title">Usage Access</string>
@@ -101,6 +102,8 @@
     <string name="app_block_mode_whitelist_description">Lock every app except the ones you pick below. Those stay open.</string>
     <string name="settings_permissions">Permissions</string>
     <string name="settings_about">About</string>
+    <string name="settings_replay_onboarding">Replay onboarding</string>
+    <string name="settings_replay_onboarding_desc">Watch the setup screens again. Nothing you\'ve already set up changes.</string>
     <string name="settings_reset_streak_warning">Editing habits after today resets your current streak safeguard.</string>
 
     <!-- Add/Edit Habit -->

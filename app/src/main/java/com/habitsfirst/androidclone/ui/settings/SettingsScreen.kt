@@ -96,6 +96,7 @@ fun SettingsScreen(
     onManageApps: () -> Unit,
     onManageUrls: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onReplayOnboarding: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -506,7 +507,7 @@ fun SettingsScreen(
             item {
                 ConnectionKeyField(
                     title = "WakaTime",
-                    description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
+                    description = "Powers \"Code (WakaTime)\" habits: reads today's total coding time from " +
                         "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
                     label = "WakaTime API key",
                     placeholder = "waka_...",
@@ -517,7 +518,7 @@ fun SettingsScreen(
             item {
                 ConnectionKeyField(
                     title = "GitHub",
-                    description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
+                    description = "Optional for \"GitHub\" habits: without a token, only public activity is " +
                         "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
                         "needed for public activity) to raise that limit and count private contributions too.",
                     label = "GitHub personal access token",
@@ -554,6 +555,17 @@ fun SettingsScreen(
             }
 
             item { SectionHeader(stringResource(R.string.settings_about)) }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_replay_onboarding)) },
+                    supportingContent = { Text(stringResource(R.string.settings_replay_onboarding_desc)) },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onReplayOnboarding),
+                )
+                HorizontalDivider()
+            }
             item {
                 ListItem(
                     headlineContent = { Text("Diagnostics") },

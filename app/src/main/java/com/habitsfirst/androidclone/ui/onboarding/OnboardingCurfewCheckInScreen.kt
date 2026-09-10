@@ -64,7 +64,7 @@ fun OnboardingCurfewCheckInScreen(
         bottomBar = {
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
                 LockePrimaryButton(
-                    text = stringResource(R.string.onboarding_finish),
+                    text = stringResource(if (viewModel.isReplay) R.string.onboarding_replay_done else R.string.onboarding_finish),
                     onClick = { viewModel.finishOnboarding() },
                     enabled = !state.isFinishing,
                     modifier = Modifier.fillMaxWidth(),
