@@ -56,6 +56,10 @@ interface HabitDao {
     @Query("SELECT MAX(sortOrder) FROM habits")
     suspend fun getMaxSortOrder(): Int?
 
+    /** Re-ranks one habit -- see [com.habitsfirst.androidclone.data.repository.HabitRepository.reorderHabits], the Settings habit list's up/down reorder buttons. */
+    @Query("UPDATE habits SET sortOrder = :sortOrder WHERE id = :habitId")
+    suspend fun updateSortOrder(habitId: Long, sortOrder: Int)
+
     /** Whether the user has any active GATING habit at all, regardless of which days it's due -- see [com.habitsfirst.androidclone.data.repository.HabitRepository.isDateFullyComplete]. */
     @Query("SELECT COUNT(*) FROM habits WHERE isArchived = 0 AND kind = 'GATING'")
     suspend fun getActiveGatingHabitCount(): Int
