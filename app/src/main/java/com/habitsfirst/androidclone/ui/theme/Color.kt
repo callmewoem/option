@@ -14,9 +14,14 @@ import androidx.compose.ui.graphics.Color
  * - [Oxide]/[OxideLight] is *cost only* -- penalties, scarred days, antihabit slips.
  *   Never reused for generic "error" chrome that isn't actually a cost.
  *
- * There's no separate light/dark *theme* -- see [LockeMode]. [Iron]/[Iron2] are
- * enforcement-mode surfaces, [Bone]/[BoneIn] are app-mode surfaces, and [Concrete] is
- * the dead page color behind the app (status/nav bar scrim, never a content surface).
+ * [Iron]/[Iron2] are enforcement-mode surfaces -- always dark, never a user preference
+ * (see [LockeMode]). [Bone]/[BoneIn] are app-mode's light surfaces; [Slate]/[SlateIn]
+ * are app-mode's dark surfaces, picked instead of Bone/BoneIn when the user's
+ * [com.habitsfirst.androidclone.domain.model.ThemeMode] preference resolves to dark.
+ * [Slate] is deliberately its own near-black rather than a reuse of [Iron] -- app-mode
+ * dark is an ordinary appearance preference, not the enforcement palette's "taking
+ * something away" signal. [Concrete] is the dead page color behind the app (status/nav
+ * bar scrim, never a content surface).
  */
 object LockeColor {
     /** Enforcement-mode page surface: the block cover, curfew, morning lock, penalty sheet. */
@@ -30,6 +35,12 @@ object LockeColor {
 
     /** App-mode card surface, one step in from [Bone]. */
     val BoneIn = Color(0xFFE2E1D8)
+
+    /** App-mode page surface when the user's appearance preference resolves to dark. */
+    val Slate = Color(0xFF17191C)
+
+    /** App-mode card surface when dark, one step up from [Slate]. */
+    val SlateIn = Color(0xFF212327)
 
     /** The page itself, behind the app -- system bars only, never a content surface. */
     val Concrete = Color(0xFFD6D5CC)
@@ -58,6 +69,12 @@ object LockeColor {
     /** Muted text on [Bone]/[BoneIn] -- captions, secondary lines. */
     val OnBoneMuted = Iron.copy(alpha = 0.60f)
 
+    /** Text/icons on [Slate]/[SlateIn] -- full-strength bone, same as [OnIron]. */
+    val OnSlate = Bone
+
+    /** Muted text on [Slate]/[SlateIn] -- captions, secondary lines. */
+    val OnSlateMuted = Bone.copy(alpha = 0.64f)
+
     /** Reads on [Verdigris] or [Oxide] fills alike -- both are dark enough for bone text. */
     val OnVerdigris = Bone
     val OnOxide = Bone
@@ -65,15 +82,17 @@ object LockeColor {
     /** Brass is light enough that dark iron text reads better on it than bone would. */
     val OnBrass = Iron
 
-    /** Hairline inset borders -- app mode (on [Bone]/[BoneIn]) and enforcement mode (on [Iron]/[Iron2]). */
+    /** Hairline inset borders -- app mode light (on [Bone]/[BoneIn]), app mode dark (on [Slate]/[SlateIn]), and enforcement mode (on [Iron]/[Iron2]). */
     val BorderOnBone = Iron.copy(alpha = 0.14f)
+    val BorderOnSlate = Bone.copy(alpha = 0.16f)
     val BorderOnIron = Bone.copy(alpha = 0.16f)
 
     /** The permanent-list "no bypass" outline -- near-black, deliberately heavier than [BorderOnBone]. */
     val PermanentOutline = Iron.copy(alpha = 0.9f)
 
-    /** "Just tracked" chip -- consequence-neutral grey, on either surface. */
+    /** "Just tracked" chip -- consequence-neutral grey, on any surface. */
     val NeutralOnBone = Iron.copy(alpha = 0.5f)
+    val NeutralOnSlate = Bone.copy(alpha = 0.5f)
     val NeutralOnIron = Bone.copy(alpha = 0.5f)
 
     /** The scarred/broken heatmap cell -- always oxide, never reinterpreted (spec §4). */

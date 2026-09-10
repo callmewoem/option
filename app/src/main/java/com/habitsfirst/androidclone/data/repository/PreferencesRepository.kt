@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.habitsfirst.androidclone.domain.model.AppBlockMode
 import com.habitsfirst.androidclone.domain.model.SubscriptionTier
+import com.habitsfirst.androidclone.domain.model.ThemeMode
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -37,6 +38,7 @@ class PreferencesRepository @Inject constructor(
         val ANTHROPIC_API_KEY = stringPreferencesKey("anthropic_api_key")
         val WAKATIME_API_KEY = stringPreferencesKey("wakatime_api_key")
         val GITHUB_TOKEN = stringPreferencesKey("github_token")
+        val THEME_MODE = stringPreferencesKey("theme_mode") // ThemeMode.name
         val THEME_VARIANT = stringPreferencesKey("theme_variant")
         val UNLOCKED_THEME_VARIANTS = stringSetPreferencesKey("unlocked_theme_variants")
         val GRACE_TOKEN_COUNT = intPreferencesKey("grace_token_count")
@@ -161,6 +163,15 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit {
             if (token.isNullOrBlank()) it.remove(Keys.GITHUB_TOKEN) else it[Keys.GITHUB_TOKEN] = token.trim()
         }
+    }
+
+    // -- Appearance -------------------------------------------------------------------
+
+    /** Light/Dark/System for "app mode" screens -- see [ThemeMode]. Enforcement-mode screens are unaffected. */
+    val themeMode: Flow<ThemeMode> = dataStore.data.map { ThemeMode.fromId(it[Keys.THEME_MODE]) }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        dataStore.edit { it[Keys.THEME_MODE] = mode.name }
     }
 
     // -- Theme (lootbox-unlockable) --------------------------------------------------

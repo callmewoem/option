@@ -23,8 +23,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitsfirst.androidclone.ui.theme.LockeColor
-import com.habitsfirst.androidclone.ui.theme.LockeMode
-import com.habitsfirst.androidclone.ui.theme.LocalLockeMode
+import com.habitsfirst.androidclone.ui.theme.LocalLockeSurfaceIsDark
 import com.habitsfirst.androidclone.ui.theme.feltNumber
 
 /**
@@ -68,7 +67,7 @@ enum class ChipConsequence { Gates, Tracked, Abstinence, Permanent, Earned }
 
 @Composable
 private fun ChipConsequence.contentColor(): Color {
-    val onIron = LocalLockeMode.current == LockeMode.Enforcement
+    val onIron = LocalLockeSurfaceIsDark.current
     return when (this) {
         ChipConsequence.Gates -> MaterialTheme.colorScheme.primary
         ChipConsequence.Tracked -> if (onIron) LockeColor.NeutralOnIron else LockeColor.NeutralOnBone
@@ -190,7 +189,7 @@ fun BigNumber(
  */
 @Composable
 fun countdownColor(fractionElapsed: Float, isPastDeadline: Boolean): Color {
-    val onIron = LocalLockeMode.current == LockeMode.Enforcement
+    val onIron = LocalLockeSurfaceIsDark.current
     return when {
         isPastDeadline -> if (onIron) LockeColor.OxideLight else LockeColor.Oxide
         fractionElapsed >= 0.8f -> if (onIron) LockeColor.BrassLight else LockeColor.Brass
