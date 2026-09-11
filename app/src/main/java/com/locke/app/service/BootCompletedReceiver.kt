@@ -25,6 +25,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
         WorkScheduler.scheduleMorningTodoReminder(appContext)
         WorkScheduler.scheduleProofOfLifeCheck(appContext)
         WorkScheduler.scheduleBlocklistRefresh(appContext)
+        WorkScheduler.scheduleAnalyticsUpload(appContext)
 
         // Health Connect sync and the weekly digest are both opt-in (unlike the four
         // above), so only re-assert them if the user had actually turned them on before

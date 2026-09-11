@@ -96,6 +96,7 @@ fun SettingsScreen(
     onManageUrls: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenPaywall: (PremiumFeature?) -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -560,6 +561,28 @@ fun SettingsScreen(
                     onExportCsv = viewModel::onExportCsvClicked,
                     onExportJson = viewModel::onExportJsonClicked,
                 )
+            }
+
+            item { SectionHeader("Privacy") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Share anonymous usage analytics") },
+                    supportingContent = { Text("No photos, habit names, or anything else you type -- see the privacy policy for exactly what's sent.") },
+                    trailingContent = {
+                        Switch(checked = state.analyticsEnabled, onCheckedChange = viewModel::onAnalyticsEnabledChanged)
+                    },
+                )
+                HorizontalDivider()
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Privacy Policy") },
+                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenPrivacyPolicy),
+                )
+                HorizontalDivider()
             }
 
             item { SectionHeader(stringResource(R.string.settings_about)) }

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.locke.app.data.billing.EntitlementRepository
 import com.locke.app.data.healthconnect.HealthConnectManager
 import com.locke.app.data.repository.AccountabilityRepository
+import com.locke.app.data.repository.AnalyticsRepository
 import com.locke.app.data.repository.BedtimeRepository
 import com.locke.app.data.repository.HabitRepository
 import com.locke.app.data.repository.LimitedUnblockRepository
@@ -19,6 +20,7 @@ import com.locke.app.domain.model.ThemeCodeResult
 import com.locke.app.domain.model.ThemeVariant
 import com.locke.app.service.WorkScheduler
 import com.locke.app.ui.habits.StatsRange
+import com.locke.app.util.AnalyticsEvents
 import com.locke.app.util.DateProvider
 import com.locke.app.util.ExportedFile
 import com.locke.app.util.StatsExportUtil
@@ -78,6 +80,7 @@ data class SettingsUiState(
     val canAddBuddy: Boolean = true,
     val exportRange: StatsRange = StatsRange.TWELVE_WEEKS,
     val isExporting: Boolean = false,
+    val analyticsEnabled: Boolean = true,
 )
 
 /** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
@@ -143,6 +146,7 @@ class SettingsViewModel @Inject constructor(
     private val accountabilityRepository: AccountabilityRepository,
     private val entitlementRepository: EntitlementRepository,
     private val statsExportUtil: StatsExportUtil,
+    private val analyticsRepository: AnalyticsRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -277,7 +281,8 @@ class SettingsViewModel @Inject constructor(
         baseUiState,
         accountabilitySettings,
         entitlementRepository.entitlement,
-    ) { base, accountability, entitlement ->
+        preferencesRepository.isAnalyticsEnabled,
+    ) { base, accountability, entitlement, analyticsEnabled ->
         base.copy(
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
@@ -286,11 +291,25 @@ class SettingsViewModel @Inject constructor(
             isPremium = entitlement.isPremium,
             subscriptionTier = entitlement.tier,
             freeVerificationsRemaining = if (entitlement.isPremium) null else base.freeVerificationsRemaining,
+            analyticsEnabled = analyticsEnabled,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun onNotificationsToggled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setNotificationsEnabled(enabled) }
+    }
+
+    /** Logs the toggle itself before/after flipping it, so turning analytics back on comes with one honest data point about it having been off, and turning it off is the last thing this device ever reports until it's turned back on. */
+    fun onAnalyticsEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            if (enabled) {
+                analyticsRepository.setEnabled(true)
+                analyticsRepository.logEvent(AnalyticsEvents.ANALYTICS_OPT_OUT_CHANGED, mapOf("enabled" to true))
+            } else {
+                analyticsRepository.logEvent(AnalyticsEvents.ANALYTICS_OPT_OUT_CHANGED, mapOf("enabled" to false))
+                analyticsRepository.setEnabled(false)
+            }
+        }
     }
 
     fun onThemeVariantSelected(variant: ThemeVariant) {

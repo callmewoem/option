@@ -50,7 +50,10 @@ fun OnboardingPaywallScreen(
     // A completed purchase finishes onboarding the same as "Maybe later" -- there's
     // nothing else this step is waiting on once entitlement is confirmed.
     LaunchedEffect(paywallState.isPremium) {
-        if (paywallState.isPremium) onboardingViewModel.finishOnboarding()
+        if (paywallState.isPremium) {
+            paywallViewModel.onPremiumConfirmed()
+            onboardingViewModel.finishOnboarding()
+        }
     }
     LaunchedEffect(paywallState.errorMessage) {
         paywallState.errorMessage?.let { snackbarHostState.showSnackbar(it) }

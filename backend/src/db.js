@@ -69,6 +69,38 @@ db.exec(`
   -- Lets an RTDN webhook call (keyed only by purchaseToken/subscriptionId, no
   -- device id) find which device to update.
   CREATE INDEX IF NOT EXISTS idx_entitlements_purchase_token ON entitlements(purchase_token);
+
+  -- A/B test bucketing (see services/experiments.js): one row per (device, experiment),
+  -- written once the first time a device asks for its assignments and never touched
+  -- again -- deliberately persisted rather than recomputed on every request, so a
+  -- device's variant stays stable even if EXPERIMENTS' weights (or variant set) change
+  -- later. assigned_at is diagnostic only (when this device first saw the experiment).
+  CREATE TABLE IF NOT EXISTS experiment_assignments (
+    device_id TEXT NOT NULL REFERENCES devices(id),
+    experiment_key TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    assigned_at INTEGER NOT NULL,
+    PRIMARY KEY (device_id, experiment_key)
+  );
+
+  -- Analytics events batched up and POSTed by the Android client
+  -- (data/repository/AnalyticsRepository.kt) -- see routes/analytics.js. No PII by
+  -- construction: device_id is the same anonymous per-install id used everywhere else
+  -- in this database, name is a fixed event constant, and properties is a small JSON
+  -- blob the client controls (never a photo, a habit's name/text, or anything else
+  -- free-form the user typed). Purely an ingest table -- nothing here reads it back out
+  -- yet; a future analytics dashboard/export would query it directly.
+  CREATE TABLE IF NOT EXISTS analytics_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL REFERENCES devices(id),
+    name TEXT NOT NULL,
+    properties TEXT NOT NULL DEFAULT '{}',
+    client_timestamp INTEGER NOT NULL,
+    received_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_analytics_events_name ON analytics_events(name);
+  CREATE INDEX IF NOT EXISTS idx_analytics_events_device_id ON analytics_events(device_id);
 `);
 
 // Additive migration for a database file created before the free_verification_*

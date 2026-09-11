@@ -15,6 +15,16 @@ can't live on-device:
    Billing purchase against the real Play Developer API and stores the
    resulting entitlement, which the two endpoints above check before doing
    anything that costs money (verification) or is a paid feature (buddies).
+4. **A/B experiment assignment** (`GET /v1/experiments`) -- deterministically
+   buckets a device into a variant of each experiment defined in
+   `src/services/experiments.js` (pricing presentation, free-tier gating cap,
+   whether a given onboarding step is shown at all) and persists the
+   assignment so it stays stable even if an experiment's weights change later.
+5. **Analytics ingestion** (`POST /v1/analytics/events`) -- accepts batched,
+   non-identifying product-analytics events queued by the Android client
+   (`data/repository/AnalyticsRepository.kt`) and stores them in
+   `analytics_events`. No dashboard/export exists yet -- query the table
+   directly.
 
 No user accounts: each install registers itself once
 (`POST /v1/devices`, no auth) and gets back an opaque bearer token scoped to
@@ -93,7 +103,10 @@ Production checklist beyond `.env`:
 | POST | `/v1/purchases/verify` | device | `{productId, purchaseToken}` -> verifies with Play, records entitlement. |
 | GET | `/v1/entitlement` | device | This device's current `{tier, isPremium, expiresAtEpochMillis}`. |
 | POST | `/v1/rtdn` | Pub/Sub push | Play's Real-time Developer Notifications webhook. |
+| GET | `/v1/experiments` | device | This device's persisted `{key, variant, value}` for every experiment in `src/services/experiments.js`. |
+| POST | `/v1/analytics/events` | device | `{events: [{name, properties?, clientTimestampEpochMillis?}, ...]}` (max 200/request) -> 204. |
 | GET | `/healthz` | none | Liveness check. |
+| GET | `/privacy` | none | Plain-text privacy policy (`privacy-policy.md`, kept in sync with the root `PRIVACY_POLICY.md`) -- the public URL an app-store listing points at. |
 
 ## Known follow-ups
 
@@ -106,3 +119,11 @@ Production checklist beyond `.env`:
 - No structured logging/metrics/request tracing -- `console.log`/`console.warn`
   only, adequate for a service this size but worth swapping for something
   real (pino, OpenTelemetry) before it's under real load.
+- `analytics_events` has no dashboard, export, or retention/pruning job yet --
+  it's an ingest-only table today; add a scheduled cleanup before it grows
+  unbounded, and something to actually query it (even just scheduled SQL
+  reports) before it's useful day to day.
+- `POST /v1/analytics/events` has no per-device rate limiting -- a modified
+  client could flood the table. Low-risk today (no PII, cheap inserts), but
+  worth a simple per-device/per-minute cap before this is under real load,
+  same caveat as the pairing-code endpoint above.

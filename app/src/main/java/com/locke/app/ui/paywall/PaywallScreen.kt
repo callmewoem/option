@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.locke.app.R
+import com.locke.app.domain.model.PaywallPlanEmphasis
 import com.locke.app.domain.model.PremiumProduct
 import com.locke.app.domain.model.SubscriptionTier
 import com.locke.app.ui.components.LockeCard
@@ -64,7 +65,10 @@ fun PaywallScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.isPremium) {
-        if (state.isPremium) onPurchased()
+        if (state.isPremium) {
+            viewModel.onPremiumConfirmed()
+            onPurchased()
+        }
     }
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -116,7 +120,7 @@ fun PaywallContent(state: PaywallUiState, onPurchase: (productId: String) -> Uni
     Spacer(modifier = Modifier.height(20.dp))
 
     listOf(
-        "Unlimited gating habits -- free plan covers 5.",
+        "Unlimited gating habits -- free plan covers ${state.gatingHabitCap}.",
         "Unlimited AI photo checks -- free plan covers 3 a month.",
         "Unlimited accountability buddies -- free plan covers 1.",
     ).forEach { line ->
@@ -140,18 +144,27 @@ fun PaywallContent(state: PaywallUiState, onPurchase: (productId: String) -> Uni
             Text("Loading prices…", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
-        // Annual first -- the best-value option gets top billing, same principle as a
-        // storefront's default-selected plan.
-        state.products.sortedBy { it.tier != SubscriptionTier.ANNUAL }.forEach { product ->
-            ProductCard(product = product, enabled = !state.purchaseInFlight, onPurchase = { onPurchase(product.productId) })
+        // [com.locke.app.domain.model.ExperimentKeys.PAYWALL_PLAN_EMPHASIS]: the
+        // emphasized plan gets top billing and the "Best value" tag, same principle as
+        // a storefront's default-selected plan -- control emphasizes annual (was
+        // always the case before this experiment existed), the other variant tries
+        // leading with monthly instead.
+        val emphasizedTier = if (state.planEmphasis == PaywallPlanEmphasis.MONTHLY) SubscriptionTier.MONTHLY else SubscriptionTier.ANNUAL
+        state.products.sortedBy { it.tier != emphasizedTier }.forEach { product ->
+            ProductCard(
+                product = product,
+                isEmphasized = product.tier == emphasizedTier,
+                enabled = !state.purchaseInFlight,
+                onPurchase = { onPurchase(product.productId) },
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun ProductCard(product: PremiumProduct, enabled: Boolean, onPurchase: () -> Unit) {
-    val isBestValue = product.tier == SubscriptionTier.ANNUAL
+private fun ProductCard(product: PremiumProduct, isEmphasized: Boolean, enabled: Boolean, onPurchase: () -> Unit) {
+    val isBestValue = isEmphasized
     LockeCard(
         modifier = Modifier.fillMaxWidth(),
         containerColor = if (isBestValue) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,

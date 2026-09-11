@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +25,7 @@ import com.locke.app.ui.habit.ImageVerificationScreen
 import com.locke.app.ui.habit.TimedHabitTimerScreen
 import com.locke.app.ui.habits.HabitsScreen
 import com.locke.app.ui.home.HomeScreen
+import com.locke.app.ui.legal.PrivacyPolicyScreen
 import com.locke.app.ui.onboarding.OnboardingCurfewCheckInScreen
 import com.locke.app.ui.onboarding.OnboardingPaywallScreen
 import com.locke.app.ui.onboarding.OnboardingPermissionsScreen
@@ -98,9 +100,26 @@ fun LockeNavHost() {
         composable(Screen.OnboardingCurfewCheckIn.route) {
             val onboardingViewModel: OnboardingViewModel =
                 hiltViewModel(navController.getBackStackEntry(Screen.OnboardingWelcome.route))
+            val onboardingState by onboardingViewModel.uiState.collectAsStateWithLifecycle()
+            // ExperimentKeys.ONBOARDING_PAYWALL_STEP's "hidden" variant: finish onboarding
+            // straight from here instead of detouring through the Premium pitch step --
+            // still reachable later from Settings either way.
+            LaunchedEffect(onboardingState.finished) {
+                if (onboardingState.finished) {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.OnboardingWelcome.route) { inclusive = true }
+                    }
+                }
+            }
             OnboardingCurfewCheckInScreen(
                 onBack = { navController.popBackStack() },
-                onContinue = { navController.navigate(Screen.OnboardingPaywall.route) },
+                onContinue = {
+                    if (onboardingState.showPaywallStep) {
+                        navController.navigate(Screen.OnboardingPaywall.route)
+                    } else {
+                        onboardingViewModel.finishOnboarding()
+                    }
+                },
                 viewModel = onboardingViewModel,
             )
         }
@@ -161,11 +180,16 @@ fun LockeNavHost() {
                 onManageUrls = { navController.navigate(Screen.UrlBlockList.route) },
                 onOpenDiagnostics = { navController.navigate(Screen.Diagnostics.route) },
                 onOpenPaywall = { feature -> navController.navigate(Screen.Paywall.createRoute(feature)) },
+                onOpenPrivacyPolicy = { navController.navigate(Screen.PrivacyPolicy.route) },
             )
         }
 
         composable(Screen.Diagnostics.route) {
             DiagnosticsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.PrivacyPolicy.route) {
+            PrivacyPolicyScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

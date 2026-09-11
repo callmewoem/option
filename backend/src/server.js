@@ -1,6 +1,8 @@
 'use strict';
 
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const config = require('./config');
 require('./db'); // opens (and migrates) the database as a side effect of require
 
@@ -8,6 +10,8 @@ const devicesRouter = require('./routes/devices');
 const verifyRouter = require('./routes/verify');
 const buddiesRouter = require('./routes/buddies');
 const billingRouter = require('./routes/billing');
+const experimentsRouter = require('./routes/experiments');
+const analyticsRouter = require('./routes/analytics');
 const { isConfigured: isGooglePlayConfigured } = require('./services/googlePlay');
 
 const app = express();
@@ -15,11 +19,28 @@ app.use(express.json({ limit: '10mb' })); // photos are base64-encoded JSON stri
 
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 
+// App stores (Play Console's listing setup included) require a public Privacy Policy
+// URL, so it's served here rather than only shipping inside the app. `privacy-policy.md`
+// alongside this file is the backend's own copy -- kept in sync by hand with the root
+// `PRIVACY_POLICY.md` (repo-browsable) and the Android app's `assets/privacy_policy.md`
+// (bundled for offline viewing); see that root file's own note. No auth, no templating --
+// just the raw markdown, plain-text is a perfectly readable policy page and it means
+// one less thing (an HTML renderer) to keep working.
+const privacyPolicyPath = path.join(__dirname, '..', 'privacy-policy.md');
+app.get('/privacy', (req, res) => {
+  fs.readFile(privacyPolicyPath, 'utf8', (error, markdown) => {
+    if (error) return res.status(404).type('text/plain').send('Privacy policy not found.');
+    res.type('text/plain; charset=utf-8').send(markdown);
+  });
+});
+
 const v1 = express.Router();
 v1.use(devicesRouter);
 v1.use(verifyRouter);
 v1.use(buddiesRouter);
 v1.use(billingRouter);
+v1.use(experimentsRouter);
+v1.use(analyticsRouter);
 app.use('/v1', v1);
 
 // eslint-disable-next-line no-unused-vars

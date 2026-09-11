@@ -3,8 +3,10 @@ package com.locke.app.ui.onboarding
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.locke.app.data.repository.AnalyticsRepository
 import com.locke.app.data.repository.BedtimeRepository
 import com.locke.app.data.repository.BlockedAppRepository
+import com.locke.app.data.repository.ExperimentRepository
 import com.locke.app.data.repository.HabitRepository
 import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.data.repository.ProofOfLifeRepository
@@ -16,6 +18,7 @@ import com.locke.app.domain.model.InstalledApp
 import com.locke.app.domain.model.UrlBlockList
 import com.locke.app.service.WorkScheduler
 import com.locke.app.ui.habit.defaultTarget
+import com.locke.app.util.AnalyticsEvents
 import com.locke.app.util.DateProvider
 import com.locke.app.util.InstalledAppsProvider
 import com.locke.app.util.PermissionUtils
@@ -25,6 +28,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -79,6 +83,8 @@ data class OnboardingUiState(
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     val isFinishing: Boolean = false,
     val finished: Boolean = false,
+    /** [ExperimentRepository.isOnboardingPaywallStepShown] -- whether [Screen.OnboardingCurfewCheckIn][com.locke.app.ui.navigation.Screen.OnboardingCurfewCheckIn]'s "Continue" detours through the Premium pitch or finishes onboarding directly. True until the experiment assignment has loaded. */
+    val showPaywallStep: Boolean = true,
 ) {
     val canContinueFromApps: Boolean get() = true // blocking zero apps is a valid (if pointless) choice
     val canContinueFromHabits: Boolean get() = selectedTemplateOrder.isNotEmpty()
@@ -116,6 +122,8 @@ class OnboardingViewModel @Inject constructor(
     private val bedtimeRepository: BedtimeRepository,
     private val proofOfLifeRepository: ProofOfLifeRepository,
     private val urlBlockRepository: UrlBlockRepository,
+    private val experimentRepository: ExperimentRepository,
+    private val analyticsRepository: AnalyticsRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -133,6 +141,12 @@ class OnboardingViewModel @Inject constructor(
             urlBlockRepository.observeBlockLists().collect { lists ->
                 _uiState.value = _uiState.value.copy(premadeUrlLists = lists.filter { it.source.isPremade })
             }
+        }
+        viewModelScope.launch {
+            experimentRepository.refreshIfNeeded()
+            _uiState.value = _uiState.value.copy(
+                showPaywallStep = experimentRepository.isOnboardingPaywallStepShown.first(),
+            )
         }
         refreshUsageAccessState()
     }
@@ -233,6 +247,11 @@ class OnboardingViewModel @Inject constructor(
             WorkScheduler.scheduleMorningTodoReminder(appContext)
             WorkScheduler.scheduleProofOfLifeCheck(appContext)
             WorkScheduler.scheduleBlocklistRefresh(appContext)
+            WorkScheduler.scheduleAnalyticsUpload(appContext)
+            analyticsRepository.logEvent(
+                AnalyticsEvents.ONBOARDING_COMPLETED,
+                mapOf("gatingHabitCount" to (if (isRamp) 1 else templates.size), "rampLength" to templates.size),
+            )
             _uiState.value = _uiState.value.copy(isFinishing = false, finished = true)
         }
     }

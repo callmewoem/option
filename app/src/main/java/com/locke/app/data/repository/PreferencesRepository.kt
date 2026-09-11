@@ -13,6 +13,7 @@ import com.locke.app.domain.model.SubscriptionTier
 import com.locke.app.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 import java.time.DayOfWeek
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -81,6 +82,9 @@ class PreferencesRepository @Inject constructor(
         val LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = intPreferencesKey("limited_unblock_streak_bonus_minutes_per_day")
         val FREE_VERIFICATION_MONTH = stringPreferencesKey("free_verification_month") // "yyyy-MM"
         val FREE_VERIFICATION_COUNT = intPreferencesKey("free_verification_count")
+        val ANALYTICS_ENABLED = booleanPreferencesKey("analytics_enabled")
+        val CACHED_EXPERIMENT_ASSIGNMENTS = stringPreferencesKey("cached_experiment_assignments") // JSON: {key: value}
+        val EXPERIMENT_ASSIGNMENTS_FETCHED_AT_EPOCH_MILLIS = longPreferencesKey("experiment_assignments_fetched_at_epoch_millis")
     }
 
     val isOnboardingComplete: Flow<Boolean> =
@@ -624,6 +628,51 @@ class PreferencesRepository @Inject constructor(
             )
         }
     }
+
+    // -- Analytics & A/B experiments ----------------------------------------------------
+
+    /**
+     * Whether [com.locke.app.data.repository.AnalyticsRepository.logEvent] is allowed
+     * to queue anything at all -- on by default (see `PRIVACY_POLICY.md`'s "Analytics"
+     * section for exactly what that means and how to turn it off), user-controlled from
+     * Settings -> Privacy. Turning this off doesn't just stop *uploading* events, it
+     * stops *queuing* them in the first place -- see [AnalyticsRepository.logEvent].
+     */
+    val isAnalyticsEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.ANALYTICS_ENABLED] ?: true }
+
+    suspend fun setAnalyticsEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.ANALYTICS_ENABLED] = enabled }
+    }
+
+    /**
+     * This device's last-fetched A/B experiment assignments (`GET /v1/experiments`),
+     * cached here so [com.locke.app.data.repository.ExperimentRepository] has an
+     * instant, offline-safe answer for every call site rather than blocking on a
+     * network round trip. Keyed by [com.locke.app.domain.model.ExperimentAssignment.key],
+     * valued by its `value` (not `variant` -- callers act on the config payload, the
+     * variant id is only for analytics properties).
+     */
+    val cachedExperimentAssignments: Flow<Map<String, String>> = dataStore.data.map { prefs ->
+        val json = prefs[Keys.CACHED_EXPERIMENT_ASSIGNMENTS] ?: return@map emptyMap()
+        try {
+            val obj = JSONObject(json)
+            obj.keys().asSequence().associateWith { key -> obj.getString(key) }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    suspend fun setCachedExperimentAssignments(assignments: Map<String, String>) {
+        val json = JSONObject(assignments).toString()
+        dataStore.edit {
+            it[Keys.CACHED_EXPERIMENT_ASSIGNMENTS] = json
+            it[Keys.EXPERIMENT_ASSIGNMENTS_FETCHED_AT_EPOCH_MILLIS] = System.currentTimeMillis()
+        }
+    }
+
+    /** 0 if experiment assignments have never been successfully fetched. */
+    val experimentAssignmentsFetchedAtEpochMillis: Flow<Long> =
+        dataStore.data.map { it[Keys.EXPERIMENT_ASSIGNMENTS_FETCHED_AT_EPOCH_MILLIS] ?: 0L }
 
     companion object {
         /**

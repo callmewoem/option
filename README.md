@@ -250,6 +250,77 @@ Testing purchases end-to-end requires a signed build installed via a Play Consol
 internal testing track (Play Billing refuses to return real products for a
 debug-signed, sideloaded APK) with a license tester account.
 
+## Privacy policy
+
+`PRIVACY_POLICY.md` at the repo root is the canonical policy text -- what data
+Locke collects (short answer: almost nothing leaves the device; see that file
+for the specifics on photo verification, buddies, billing, analytics, and
+experiment assignment). It's duplicated in two places that need to work
+without depending on this repo being reachable:
+
+- `backend/privacy-policy.md`, served as plain text at the backend's own
+  `GET /privacy` -- the public URL an app-store listing (Play Console's
+  included) points at.
+- `app/src/main/assets/privacy_policy.md`, rendered in-app at Settings ->
+  Privacy -> "Privacy Policy" (`ui/legal/PrivacyPolicyScreen.kt`), so it works
+  with no connectivity.
+
+All three must say the same thing -- update all three together, same
+duplication-with-a-comment convention as the free-tier caps mirrored between
+the Android app and `backend/src/config.js` above.
+
+## Analytics & A/B experimentation
+
+Two small, related pieces of infrastructure, both opt-in-by-default and fully
+described in `PRIVACY_POLICY.md`:
+
+**Analytics** (`data/repository/AnalyticsRepository.kt`) -- call
+`analyticsRepository.logEvent(AnalyticsEvents.SOME_EVENT, mapOf(...))` from a
+ViewModel to log one of the fixed event names in `util/AnalyticsEvents.kt`
+(add a new constant there before using a new name). Events queue locally in
+Room (`analytics_events`, an outbox exactly like `AccountabilityRepository`'s
+daily-summary sync) and are uploaded in batches by the periodic
+`AnalyticsUploadWorker` to `POST /v1/analytics/events`. `logEvent` is a no-op
+-- nothing is even queued -- while Settings -> Privacy's "Share anonymous
+usage analytics" toggle
+(`PreferencesRepository.isAnalyticsEnabled`) is off. Never put a photo, a
+habit's name/text, or anything else free-typed into an event's properties --
+see `AnalyticsEvents.kt`'s own doc and the privacy policy's "Analytics"
+section for exactly what that promises.
+
+**A/B experiments** (`data/repository/ExperimentRepository.kt`) -- the
+backend defines what's actually running in
+`backend/src/services/experiments.js` (a plain list of
+`{key, variants: [{id, weight, value}]}`; add an experiment by pushing a new
+entry there, no app release required to change weights or a variant's
+`value` later). `GET /v1/experiments` deterministically buckets a device
+into one variant per experiment (`sha256(deviceId:experimentKey)`, persisted
+on first ask so it stays stable even if the weights change), which the
+Android app fetches once per launch (`ExperimentRepository.refreshIfNeeded`,
+called from `SplashViewModel` and `OnboardingViewModel`) and caches for every
+call site to read as an instant, offline-safe `Flow`. Three experiments ship
+today, one for each of pricing/gating/features:
+
+- `gating_habit_cap` -- overrides `PreferencesRepository.MAX_FREE_GATING_HABITS`
+  (see `ExperimentRepository.gatingHabitCap`, read by
+  `ui/habit/AddEditHabitViewModel.kt`'s free-tier check).
+- `paywall_plan_emphasis` -- which subscription plan the paywall sorts first
+  and highlights as "Best value" (`ExperimentRepository.paywallPlanEmphasis`,
+  read by `ui/paywall/PaywallScreen.kt`).
+- `onboarding_paywall_step` -- whether onboarding's own Premium pitch step is
+  shown at all, or skipped straight to Home (still reachable later from
+  Settings either way) -- a feature-level test, not just copy/pricing
+  (`ExperimentRepository.isOnboardingPaywallStepShown`, read in
+  `ui/navigation/LockeNavHost.kt`'s onboarding graph).
+
+A device that's never reached the backend (offline since install) simply
+reads every experiment as its control/default value -- see
+`ExperimentRepository`'s own doc for why that's the deliberate fallback
+instead of a locally randomized guess. `AnalyticsEvents.PAYWALL_SHOWN` and a
+few others log which variant a device saw, so experiment results can
+eventually be pulled out of `analytics_events` (there's no dashboard yet --
+see `backend/README.md`'s "Known follow-ups").
+
 ## Building
 
 Requires Android Studio (Koala or newer) or the command line with an Android SDK
@@ -337,3 +408,19 @@ update to the same Play Store listing again, and it must never be committed
   app's likely scale, not high-traffic production load -- see that README's own
   "Known follow-ups" for the specific swaps (a hosted SQL database, pairing-code
   rate limiting, structured logging) worth making before that matters.
+- This change (the privacy policy screen, `AnalyticsRepository`/
+  `ExperimentRepository`, and the `analytics_events` table added to `AppDatabase`
+  at v12) was developed without access to the Android SDK, so
+  `app/schemas/com.locke.app.data.local.AppDatabase/12.json` isn't checked in yet
+  -- the first real build (`./gradlew assembleDebug`, including CI) generates it
+  automatically per `room.schemaLocation`; commit it once it exists, the same way
+  every prior version's schema JSON got there. `MigrationsSqlTest` was extended
+  for `MIGRATION_11_12` and the raw SQL was hand-verified against real SQLite
+  outside Gradle, but the full Kotlin/Compose/Hilt build has not been compiled in
+  this pass -- review the new/changed files under `app/src/main/java/com/locke/app/`
+  (analytics/experiment plumbing, paywall/onboarding/settings/habit wiring) with
+  that in mind before merging.
+- No dashboard/export for `analytics_events` yet, and experiment definitions
+  (`backend/src/services/experiments.js`) have no admin UI -- both are edited
+  directly in code today. See `backend/README.md`'s "Known follow-ups" for the
+  specific gaps (retention/pruning, rate limiting).

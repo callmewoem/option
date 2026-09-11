@@ -6,6 +6,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.locke.app.data.billing.EntitlementRepository
+import com.locke.app.data.repository.AnalyticsRepository
+import com.locke.app.data.repository.ExperimentRepository
 import com.locke.app.data.repository.HabitRepository
 import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.domain.model.Habit
@@ -14,6 +16,7 @@ import com.locke.app.domain.model.HabitType
 import com.locke.app.domain.model.InstalledApp
 import com.locke.app.service.WorkScheduler
 import com.locke.app.ui.navigation.Screen
+import com.locke.app.util.AnalyticsEvents
 import com.locke.app.util.ImageStore
 import com.locke.app.util.InstalledAppsProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,6 +60,8 @@ data class AddEditHabitUiState(
     val savedSuccessfully: Boolean = false,
     /** True once [AddEditHabitViewModel.onSave] blocked a new gate past the free-tier cap -- [AddEditHabitScreen] shows a paywall CTA, not a plain error. */
     val requiresPremium: Boolean = false,
+    /** The cap that was actually hit when [requiresPremium] was last set -- [ExperimentRepository.gatingHabitCap], not always [PreferencesRepository.MAX_FREE_GATING_HABITS] -- so the dialog names the real number a variant sees. */
+    val gatingHabitCapAtLimit: Int = PreferencesRepository.MAX_FREE_GATING_HABITS,
 ) {
     val isValid: Boolean
         get() = name.isNotBlank() &&
@@ -82,6 +87,8 @@ class AddEditHabitViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val preferencesRepository: PreferencesRepository,
     private val entitlementRepository: EntitlementRepository,
+    private val experimentRepository: ExperimentRepository,
+    private val analyticsRepository: AnalyticsRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -231,8 +238,13 @@ class AddEditHabitViewModel @Inject constructor(
             // edited by this.
             if (state.isNew && state.kind == HabitKind.GATING) {
                 val gatingCount = habitRepository.observeHabitsByKind(HabitKind.GATING).first().size
-                if (gatingCount >= PreferencesRepository.MAX_FREE_GATING_HABITS && !entitlementRepository.isPremium()) {
-                    _uiState.value = _uiState.value.copy(isSaving = false, requiresPremium = true)
+                // ExperimentKeys.GATING_HABIT_CAP overrides the plain constant once assigned
+                // -- see ExperimentRepository's own doc on why this is safe to read blind
+                // (falls back to the constant offline/pre-assignment).
+                val cap = experimentRepository.gatingHabitCap.first()
+                if (gatingCount >= cap && !entitlementRepository.isPremium()) {
+                    analyticsRepository.logEvent(AnalyticsEvents.GATING_LIMIT_REACHED, mapOf("cap" to cap))
+                    _uiState.value = _uiState.value.copy(isSaving = false, requiresPremium = true, gatingHabitCapAtLimit = cap)
                     return@launch
                 }
             }

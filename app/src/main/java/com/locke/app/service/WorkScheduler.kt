@@ -110,4 +110,17 @@ object WorkScheduler {
             request,
         )
     }
+
+    /** Enqueues the periodic drain of the local analytics event queue to the backend. Runs unconditionally (like usage tracking) -- whether anything is actually queued is [AnalyticsUploadWorker]'s own concern, and [com.locke.app.data.repository.AnalyticsRepository.logEvent] already refuses to queue anything while analytics is turned off. */
+    fun scheduleAnalyticsUpload(context: Context) {
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        val request = PeriodicWorkRequestBuilder<AnalyticsUploadWorker>(30, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            AnalyticsUploadWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
 }

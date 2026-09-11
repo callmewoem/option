@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.locke.app.data.local.dao.AccountabilityBuddyDao
+import com.locke.app.data.local.dao.AnalyticsEventDao
 import com.locke.app.data.local.dao.BlockAttemptDao
 import com.locke.app.data.local.dao.BlockedAppDao
 import com.locke.app.data.local.dao.BlockedDomainDao
@@ -14,6 +15,7 @@ import com.locke.app.data.local.dao.PendingStatsSyncDao
 import com.locke.app.data.local.dao.StreakScarDao
 import com.locke.app.data.local.dao.TodoDao
 import com.locke.app.data.local.entity.AccountabilityBuddyEntity
+import com.locke.app.data.local.entity.AnalyticsEventEntity
 import com.locke.app.data.local.entity.BlockAttemptEntity
 import com.locke.app.data.local.entity.BlockedAppEntity
 import com.locke.app.data.local.entity.BlockedDomainEntity
@@ -36,6 +38,7 @@ import com.locke.app.data.local.entity.TodoEntity
         BlockAttemptEntity::class,
         AccountabilityBuddyEntity::class,
         PendingStatsSyncEntity::class,
+        AnalyticsEventEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
@@ -68,13 +71,17 @@ import com.locke.app.data.local.entity.TodoEntity
     // cache/outbox for the accountability-buddy backend scaffolding (see
     // data/repository/AccountabilityRepository.kt). No default backend exists yet. See
     // MIGRATION_10_11 in data/local/migrations/Migrations.kt.
+    // v12: added analytics_events -- the local outbox for
+    // data/repository/AnalyticsRepository.kt, uploaded in batches by
+    // service/AnalyticsUploadWorker.kt. See MIGRATION_11_12 in
+    // data/local/migrations/Migrations.kt.
     //
-    // Every step through 10->11 now has a real Migration in
+    // Every step through 11->12 now has a real Migration in
     // data/local/migrations/Migrations.kt, wired in by di/AppModule.kt's
     // provideDatabase(). exportSchema is on and app/schemas/ is checked in as the
     // ground truth those migrations are written and tested against -- see
     // Migrations.kt's file-level KDoc and MigrationsSqlTest before touching either.
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -89,6 +96,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun blockAttemptDao(): BlockAttemptDao
     abstract fun accountabilityBuddyDao(): AccountabilityBuddyDao
     abstract fun pendingStatsSyncDao(): PendingStatsSyncDao
+    abstract fun analyticsEventDao(): AnalyticsEventDao
 
     companion object {
         const val DATABASE_NAME = "locke.db"

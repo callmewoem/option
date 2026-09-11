@@ -56,7 +56,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.locke.app.R
-import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.domain.model.HabitKind
 import com.locke.app.domain.model.HabitType
 import com.locke.app.domain.model.toScheduleLabel
@@ -320,15 +319,15 @@ fun AddEditHabitScreen(
         )
     }
 
-    // Free tier caps new gates at PreferencesRepository.MAX_FREE_GATING_HABITS -- see
-    // AddEditHabitViewModel.onSave.
+    // Free tier caps new gates at ExperimentRepository.gatingHabitCap (defaults to
+    // PreferencesRepository.MAX_FREE_GATING_HABITS) -- see AddEditHabitViewModel.onSave.
     if (state.requiresPremium) {
         AlertDialog(
             onDismissRequest = viewModel::onRequiresPremiumShown,
             title = { Text("Free plan limit reached") },
             text = {
                 Text(
-                    "You've reached the free plan's ${PreferencesRepository.MAX_FREE_GATING_HABITS}-habit " +
+                    "You've reached the free plan's ${state.gatingHabitCapAtLimit}-habit " +
                         "limit on gating habits. Upgrade to Premium for unlimited habits.",
                 )
             },

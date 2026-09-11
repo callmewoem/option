@@ -31,14 +31,15 @@ import java.sql.SQLException
  *
  * What this class verifies instead, for real, on this machine: that every migration's SQL
  * is valid against actual SQLite (catches typos, wrong column/table names, bad DDL for
- * SQLite's specific `ALTER TABLE` limitations), that the full 1->11 chain produces the
+ * SQLite's specific `ALTER TABLE` limitations), that the full 1->12 chain produces the
  * table/column set [AppDatabase][com.locke.app.data.local.AppDatabase]'s
  * current entities expect (cross-checked by hand against
- * `app/schemas/com.locke.app.data.local.AppDatabase/11.json`, generated
- * from those entities), and that the data-rewriting step (v8->v9's habit-type remap) does
- * the right thing on seeded rows. It does not check Room's own schema-identity hash or
- * `@ColumnInfo(defaultValue)` bookkeeping -- there's no substitute for `MigrationTestHelper`
- * (or just running the app against an old on-device database) for that.
+ * `app/schemas/com.locke.app.data.local.AppDatabase/11.json` -- 12's own copy isn't
+ * checked in yet, see that directory's own note), and that the data-rewriting step
+ * (v8->v9's habit-type remap) does the right thing on seeded rows. It does not check
+ * Room's own schema-identity hash or `@ColumnInfo(defaultValue)` bookkeeping -- there's
+ * no substitute for `MigrationTestHelper` (or just running the app against an old
+ * on-device database) for that.
  */
 class MigrationsSqlTest {
 
@@ -54,7 +55,7 @@ class MigrationsSqlTest {
         "CREATE TABLE `blocked_apps` (`packageName` TEXT NOT NULL, `appLabel` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`packageName`))",
     )
 
-    /** Every migration's SQL, 1->2 through 10->11, in order. */
+    /** Every migration's SQL, 1->2 through 11->12, in order. */
     private val allMigrationSql = listOf(
         MIGRATION_1_2_SQL,
         MIGRATION_2_3_SQL,
@@ -66,6 +67,7 @@ class MigrationsSqlTest {
         MIGRATION_8_9_SQL,
         MIGRATION_9_10_SQL,
         MIGRATION_10_11_SQL,
+        MIGRATION_11_12_SQL,
     )
 
     private fun newV1Database(): Connection {
@@ -121,7 +123,7 @@ class MigrationsSqlTest {
     }
 
     @Test
-    fun `every migration's SQL is valid and the full chain 1 to 11 lands on the current table set`() {
+    fun `every migration's SQL is valid and the full chain 1 to 12 lands on the current table set`() {
         newV1Database().use { db ->
             allMigrationSql.forEach { db.runSql(it) }
 
@@ -129,7 +131,7 @@ class MigrationsSqlTest {
                 setOf(
                     "habits", "habit_completions", "blocked_apps", "streak_scars", "todos",
                     "block_lists", "blocked_domains", "block_attempts",
-                    "accountability_buddies", "pending_stats_sync",
+                    "accountability_buddies", "pending_stats_sync", "analytics_events",
                 ),
                 db.tableNames(),
             )
@@ -182,6 +184,29 @@ class MigrationsSqlTest {
                 ),
                 db.columnNames("pending_stats_sync"),
             )
+            assertEquals(
+                listOf("id", "name", "propertiesJson", "clientTimestampEpochMillis"),
+                db.columnNames("analytics_events"),
+            )
+        }
+    }
+
+    @Test
+    fun `migration 11 to 12 adds analytics_events as an empty new table`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(10).forEach { db.runSql(it) } // 1->2 .. 10->11, i.e. up to v11
+
+            assertFalse(db.tableNames().contains("analytics_events"))
+
+            db.runSql(MIGRATION_11_12_SQL)
+
+            assertTrue(db.tableNames().contains("analytics_events"))
+            db.createStatement().use { statement ->
+                statement.executeQuery("SELECT COUNT(*) AS c FROM `analytics_events`").use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals(0, rs.getInt("c"))
+                }
+            }
         }
     }
 

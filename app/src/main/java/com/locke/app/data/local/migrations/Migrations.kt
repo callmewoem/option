@@ -224,6 +224,21 @@ internal val MIGRATION_10_11_SQL: List<String> = listOf(
 val MIGRATION_10_11: Migration = sqlMigration(10, 11, MIGRATION_10_11_SQL)
 
 /**
+ * SQL for [MIGRATION_11_12]: added `analytics_events` -- the local outbox for
+ * `data/repository/AnalyticsRepository.kt` (queued analytics events waiting to be
+ * batched up and POSTed to the backend by `service/AnalyticsUploadWorker.kt`). Brand
+ * new, standalone table, no relationship to anything that existed before v12 -- a
+ * plain `CREATE TABLE`, no data migration or column changes needed. Checked against
+ * the build-generated `app/schemas/.../12.json`.
+ */
+internal val MIGRATION_11_12_SQL: List<String> = listOf(
+    "CREATE TABLE IF NOT EXISTS `analytics_events` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `propertiesJson` TEXT NOT NULL, `clientTimestampEpochMillis` INTEGER NOT NULL)",
+)
+
+/** v11 -> v12, see [MIGRATION_11_12_SQL]. */
+val MIGRATION_11_12: Migration = sqlMigration(11, 12, MIGRATION_11_12_SQL)
+
+/**
  * Every real migration this database has, in order, for
  * [com.locke.app.di.AppModule.provideDatabase] to install via
  * `addMigrations(*ALL_MIGRATIONS)`.
@@ -239,6 +254,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_8_9,
     MIGRATION_9_10,
     MIGRATION_10_11,
+    MIGRATION_11_12,
 )
 
 /** Builds a [Migration] that just runs [statements] in order via [SupportSQLiteDatabase.execSQL]. */
