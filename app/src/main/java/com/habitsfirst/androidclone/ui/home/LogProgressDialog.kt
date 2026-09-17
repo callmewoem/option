@@ -19,9 +19,11 @@ import com.habitsfirst.androidclone.domain.model.HabitProgress
 
 /**
  * Quick manual entry for Health-Connect-backed habits (steps, workout minutes, sleep
- * hours) that aren't auto-synced or don't have permission granted yet.
+ * hours). [HomeScreen] only opens this while Health Connect sync is off
+ * ([HomeUiState.healthConnectSyncEnabled] false) -- once sync is on, these track
+ * automatically and the next sync tick would just overwrite anything entered here.
  * [com.habitsfirst.androidclone.domain.model.HabitType.APP_USAGE_MINUTES] tracks
- * automatically with no manual correction, and
+ * automatically with no manual correction at all, and
  * [com.habitsfirst.androidclone.domain.model.HabitType.TIMED_MINUTES] habits use the
  * timer screen instead.
  */

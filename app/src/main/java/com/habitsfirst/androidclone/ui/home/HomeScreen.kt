@@ -84,6 +84,9 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
+/** Habit types [com.habitsfirst.androidclone.service.HealthConnectSyncWorker] can auto-sync -- manual entry for these is a fallback only, gated behind [HomeUiState.healthConnectSyncEnabled]. */
+private val HEALTH_CONNECT_HABIT_TYPES = setOf(HabitType.STEPS, HabitType.WORKOUT_MINUTES, HabitType.SLEEP_HOURS)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -273,6 +276,12 @@ fun HomeScreen(
                                 progress.habit.type == HabitType.TIMED_MINUTES -> onOpenHabit(progress.habit.id)
                                 // Tracked automatically -- no manual correction, tapping does nothing.
                                 progress.habit.type == HabitType.APP_USAGE_MINUTES -> {}
+                                // Health-Connect-backed habits are only manually editable as a
+                                // fallback while Health Connect isn't doing the tracking --
+                                // once sync is on, the next sync tick would just overwrite
+                                // anything typed in here, which looked like tracking being
+                                // broken rather than working as designed.
+                                progress.habit.type in HEALTH_CONNECT_HABIT_TYPES && state.healthConnectSyncEnabled -> {}
                                 else -> progressDialogTarget = progress
                             }
                         },

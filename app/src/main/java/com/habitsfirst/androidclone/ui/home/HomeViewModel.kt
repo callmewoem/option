@@ -62,6 +62,15 @@ data class HomeUiState(
     val showPhotoVerificationPrompt: Boolean = false,
     /** True while the app-usage/Health-Connect one-off refresh kicked off on app open/resume (or the manual refresh button) is still running. */
     val isRefreshingDataDrivenHabits: Boolean = false,
+    /**
+     * Whether Health Connect sync is turned on in Settings (permissions granted and the
+     * sync switch enabled). While true, STEPS/WORKOUT_MINUTES/SLEEP_HOURS habits are
+     * tracked automatically and tapping them does nothing -- manual correction would just
+     * get overwritten by the next sync and make tracking look broken. Manual entry only
+     * opens while this is false, same as [HabitType.APP_USAGE_MINUTES] always being
+     * tap-to-nothing.
+     */
+    val healthConnectSyncEnabled: Boolean = false,
     /** How many times a blocked app/URL was actually covered by the block screen today -- an impulse-control signal (see [BlockAttemptRepository]), shown as a small chip only when non-zero. */
     val blockedOpenAttemptsToday: Int = 0,
     /** 0 when no self-lockout is running; otherwise the instant it ends -- see [LockoutRepository]. */
@@ -79,13 +88,19 @@ private data class ProofOfLifeMisc(
     val windowMinutes: Int,
 )
 
-/** The ease-in ramp's streak length, proof-of-life due-ness/deadline, tour visibility, the photo-verification prompt's date/dismissal eligibility, and whether the data-driven-habit refresh is in flight -- grouped only to fit combine()'s 5-flow cap. */
+/** Whether the data-driven-habit refresh is in flight, paired with whether Health Connect sync is on -- grouped only to fit [HomeMiscState] back into combine()'s 5-flow cap. */
+private data class DataDrivenRefreshState(
+    val isRefreshing: Boolean,
+    val healthConnectSyncEnabled: Boolean,
+)
+
+/** The ease-in ramp's streak length, proof-of-life due-ness/deadline, tour visibility, the photo-verification prompt's date/dismissal eligibility, and the data-driven-refresh/Health-Connect-sync state -- grouped only to fit combine()'s 5-flow cap. */
 private data class HomeMiscState(
     val easeInStreakLength: Int,
     val proofOfLife: ProofOfLifeMisc,
     val showTour: Boolean,
     val photoVerificationPromptEligible: Boolean,
-    val isRefreshingDataDrivenHabits: Boolean,
+    val dataDrivenRefresh: DataDrivenRefreshState,
 )
 
 @HiltViewModel
@@ -120,6 +135,12 @@ class HomeViewModel @Inject constructor(
         (usageWork + healthConnectWork).any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING }
     }
 
+    private val dataDrivenRefreshFlow = combine(
+        isRefreshingFlow,
+        preferencesRepository.isHealthConnectSyncEnabled,
+        ::DataDrivenRefreshState,
+    )
+
     // Paired first since kotlinx.coroutines.flow.combine tops out at 5 flows.
     private val kindsFlow = combine(
         habitRepository.observeTodayProgressByKind(HabitKind.GATING),
@@ -149,14 +170,14 @@ class HomeViewModel @Inject constructor(
         proofOfLifeMiscFlow,
         preferencesRepository.hasSeenHomeTour,
         photoVerificationPromptFlow,
-        isRefreshingFlow,
-    ) { easeInStreakLength, proofOfLife, hasSeenTour, photoPromptEligible, isRefreshing ->
+        dataDrivenRefreshFlow,
+    ) { easeInStreakLength, proofOfLife, hasSeenTour, photoPromptEligible, dataDrivenRefresh ->
         HomeMiscState(
             easeInStreakLength,
             proofOfLife = proofOfLife,
             showTour = !hasSeenTour,
             photoVerificationPromptEligible = photoPromptEligible,
-            isRefreshingDataDrivenHabits = isRefreshing,
+            dataDrivenRefresh = dataDrivenRefresh,
         )
     }
 
@@ -184,7 +205,8 @@ class HomeViewModel @Inject constructor(
             proofOfLifeWindowMinutes = misc.proofOfLife.windowMinutes,
             showTour = misc.showTour,
             showPhotoVerificationPrompt = misc.photoVerificationPromptEligible && !hasImageVerificationHabit,
-            isRefreshingDataDrivenHabits = misc.isRefreshingDataDrivenHabits,
+            isRefreshingDataDrivenHabits = misc.dataDrivenRefresh.isRefreshing,
+            healthConnectSyncEnabled = misc.dataDrivenRefresh.healthConnectSyncEnabled,
             lockoutUntilEpochMillis = lockoutUntil,
         )
     }
