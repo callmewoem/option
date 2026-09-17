@@ -2,9 +2,9 @@ package com.habitsfirst.androidclone.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,26 +12,37 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExposedDropdownMenu
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,16 +60,19 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -87,9 +101,11 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * Index ordered hardest-to-change things first (design spec §9): hard mode and the
- * locks it freezes, then the block list, then curfew/check-in, then everything easier
- * to walk back -- habits, rewards, and account-level odds and ends last.
+ * Grouped into collapsible sections, ordered hardest-to-change things first (design spec
+ * §9): hard mode stays pinned open at top, then blocking, then curfew/check-in, then
+ * everything easier to walk back -- habits, rewards, and account-level odds and ends last.
+ * Every section but hard mode starts collapsed so the screen reads as a short table of
+ * contents instead of one long wall of controls.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -166,8 +182,7 @@ fun SettingsScreen(
                 bottom = padding.calculateBottomPadding() + 24.dp,
             ),
         ) {
-            // -- Hardest to change first ---------------------------------------------
-            item { SectionHeader("Hard mode") }
+            // -- Hardest to change first, always visible ------------------------------
             item {
                 var showEnableDialog by remember { mutableStateOf(false) }
                 var showPinDialog by remember { mutableStateOf(false) }
@@ -196,7 +211,7 @@ fun SettingsScreen(
                         )
                     },
                 )
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                HorizontalDivider()
 
                 if (showEnableDialog) {
                     HardModeEnableDialog(
@@ -220,354 +235,380 @@ fun SettingsScreen(
                 }
             }
 
-            item { SectionHeader(stringResource(R.string.settings_blocked_apps)) }
+            // -- Everything else, collapsed into tappable groups -----------------------
             item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_manage_apps)) },
-                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onManageApps),
-                )
-                HorizontalDivider()
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Blocked websites") },
-                    supportingContent = { Text("Premade porn/social lists, plus your own custom lists") },
-                    leadingContent = { Icon(Icons.Filled.Public, contentDescription = null) },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onManageUrls),
-                )
-                HorizontalDivider()
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Limited unblocking") },
-                    supportingContent = {
-                        Text(
-                            if (state.limitedUnblockEnabled) {
-                                "Once today's habits are done, blocked apps and sites stay open for " +
-                                    "${state.limitedUnblockWindowMinutes} minutes, then lock again."
-                            } else {
-                                "Off -- blocked apps and sites stay open the rest of the day once habits are done."
-                            },
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
-                    trailingContent = {
-                        Switch(
-                            checked = state.limitedUnblockEnabled,
-                            onCheckedChange = viewModel::onLimitedUnblockToggled,
-                        )
-                    },
-                )
-                if (state.limitedUnblockEnabled) {
-                    MinutesStepperRow(
-                        label = "Window length",
-                        value = state.limitedUnblockWindowMinutes,
-                        step = 5,
-                        range = PreferencesRepository.MIN_LIMITED_UNBLOCK_WINDOW_MINUTES..
-                            PreferencesRepository.MAX_LIMITED_UNBLOCK_WINDOW_MINUTES,
-                        onValueChange = viewModel::onLimitedUnblockWindowMinutesChanged,
+                ExpandableSection(
+                    title = stringResource(R.string.settings_blocked_apps),
+                    icon = Icons.Filled.Lock,
+                    summary = blockingSummary(state),
+                ) {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.home_manage_apps)) },
+                        trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onManageApps),
                     )
                     ListItem(
-                        headlineContent = { Text("Streak bonus") },
-                        supportingContent = { Text("Adds extra minutes to the window for every day of your current streak") },
-                        trailingContent = {
-                            Switch(
-                                checked = state.limitedUnblockStreakBonusEnabled,
-                                onCheckedChange = {
-                                    viewModel.onLimitedUnblockStreakBonusChanged(it, state.limitedUnblockStreakBonusMinutesPerDay)
+                        headlineContent = { Text("Blocked websites") },
+                        supportingContent = { Text("Premade porn/social lists, plus your own custom lists") },
+                        trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onManageUrls),
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    ListItem(
+                        headlineContent = { Text("Limited unblocking") },
+                        supportingContent = {
+                            Text(
+                                if (state.limitedUnblockEnabled) {
+                                    "Once today's habits are done, blocked apps and sites stay open for " +
+                                        "${state.limitedUnblockWindowMinutes} minutes, then lock again."
+                                } else {
+                                    "Off -- blocked apps and sites stay open the rest of the day once habits are done."
                                 },
                             )
                         },
+                        trailingContent = {
+                            Switch(
+                                checked = state.limitedUnblockEnabled,
+                                onCheckedChange = viewModel::onLimitedUnblockToggled,
+                            )
+                        },
                     )
-                    if (state.limitedUnblockStreakBonusEnabled) {
+                    if (state.limitedUnblockEnabled) {
                         MinutesStepperRow(
-                            label = "Bonus minutes per streak day",
-                            value = state.limitedUnblockStreakBonusMinutesPerDay,
-                            step = 1,
-                            range = PreferencesRepository.MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY..
-                                PreferencesRepository.MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
-                            onValueChange = {
-                                viewModel.onLimitedUnblockStreakBonusChanged(state.limitedUnblockStreakBonusEnabled, it)
+                            label = "Window length",
+                            value = state.limitedUnblockWindowMinutes,
+                            step = 5,
+                            range = PreferencesRepository.MIN_LIMITED_UNBLOCK_WINDOW_MINUTES..
+                                PreferencesRepository.MAX_LIMITED_UNBLOCK_WINDOW_MINUTES,
+                            onValueChange = viewModel::onLimitedUnblockWindowMinutesChanged,
+                        )
+                        ListItem(
+                            headlineContent = { Text("Streak bonus") },
+                            supportingContent = { Text("Adds extra minutes to the window for every day of your current streak") },
+                            trailingContent = {
+                                Switch(
+                                    checked = state.limitedUnblockStreakBonusEnabled,
+                                    onCheckedChange = {
+                                        viewModel.onLimitedUnblockStreakBonusChanged(it, state.limitedUnblockStreakBonusMinutesPerDay)
+                                    },
+                                )
                             },
                         )
-                    }
-                }
-                HorizontalDivider()
-            }
-
-            item { SectionHeader("Bedtime + check-in") }
-            item {
-                BedtimeAndReminderSection(
-                    bedtimeEnabled = state.bedtimeEnabled,
-                    bedtimeStart = state.bedtimeStart,
-                    bedtimeEnd = state.bedtimeEnd,
-                    onBedtimeChanged = viewModel::onBedtimeChanged,
-                    morningReminderEnabled = state.morningReminderEnabled,
-                    morningReminderTime = state.morningReminderTime,
-                    onMorningReminderChanged = viewModel::onMorningReminderChanged,
-                    proofOfLifeEnabled = state.proofOfLifeEnabled,
-                    proofOfLifeTime = state.proofOfLifeTime,
-                    proofOfLifeWindowMinutes = state.proofOfLifeWindowMinutes,
-                    onProofOfLifeChanged = viewModel::onProofOfLifeChanged,
-                    weeklyDigestEnabled = state.weeklyDigestEnabled,
-                    weeklyDigestDayOfWeek = state.weeklyDigestDayOfWeek,
-                    weeklyDigestTime = state.weeklyDigestTime,
-                    onWeeklyDigestChanged = viewModel::onWeeklyDigestChanged,
-                )
-            }
-
-            item { SectionHeader("Ease into it") }
-            item {
-                Text(
-                    "How many consistent days before onboarding's next habit unlocks",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    listOf(3, 5, 7).forEach { days ->
-                        FilterChip(
-                            selected = state.easeInStreakLength == days,
-                            onClick = { viewModel.onEaseInStreakLengthChanged(days) },
-                            label = { Text("$days days") },
-                        )
-                    }
-                }
-                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
-            }
-
-            // -- Easier to change ------------------------------------------------------
-            item { SectionHeader(stringResource(R.string.settings_habits)) }
-            itemsIndexed(state.habits, key = { _, habit -> habit.id }) { index, habit ->
-                ListItem(
-                    headlineContent = { Text(habit.name) },
-                    supportingContent = {
-                        val target = habit.displayTarget.ifBlank { "Custom check-in" }
-                        val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
-                        Text("${habit.kind.label} · $target${schedule.orEmpty()}")
-                    },
-                    leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
-                    trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { viewModel.onMoveHabit(habit.id, up = true) },
-                                enabled = index > 0,
-                            ) {
-                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
-                            }
-                            IconButton(
-                                onClick = { viewModel.onMoveHabit(habit.id, up = false) },
-                                enabled = index < state.habits.lastIndex,
-                            ) {
-                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
-                            }
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                        if (state.limitedUnblockStreakBonusEnabled) {
+                            MinutesStepperRow(
+                                label = "Bonus minutes per streak day",
+                                value = state.limitedUnblockStreakBonusMinutesPerDay,
+                                step = 1,
+                                range = PreferencesRepository.MIN_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY..
+                                    PreferencesRepository.MAX_LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY,
+                                onValueChange = {
+                                    viewModel.onLimitedUnblockStreakBonusChanged(state.limitedUnblockStreakBonusEnabled, it)
+                                },
+                            )
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onEditHabit(habit.id) },
-                )
-                HorizontalDivider()
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.home_add_habit)) },
-                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onAddHabit),
-                )
-                HorizontalDivider()
+                    }
+                }
             }
 
-            item { SectionHeader("Rewards") }
             item {
-                ListItem(
-                    headlineContent = { Text("Grace tokens") },
-                    supportingContent = { Text("1-minute unblock, redeemed from a lock screen") },
-                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = LockeColor.Brass) },
-                    trailingContent = { Text("${state.graceTokenCount}", style = MaterialTheme.typography.titleMedium, color = LockeColor.Brass) },
-                )
-                ListItem(
-                    headlineContent = { Text("Task-skip tokens") },
-                    supportingContent = { Text("Force-completes one gating habit for today") },
-                    leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = LockeColor.Brass) },
-                    trailingContent = { Text("${state.taskSkipTokenCount}", style = MaterialTheme.typography.titleMedium, color = LockeColor.Brass) },
-                )
-                if (state.taskSkipTokenCount > 0) {
-                    LockeGhostButton(
-                        text = "Skip a habit today",
-                        onClick = { showSkipHabitDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                ExpandableSection(
+                    title = "Bedtime + check-in",
+                    icon = Icons.Filled.Notifications,
+                    summary = reminderSummary(state),
+                ) {
+                    BedtimeAndReminderSection(
+                        bedtimeEnabled = state.bedtimeEnabled,
+                        bedtimeStart = state.bedtimeStart,
+                        bedtimeEnd = state.bedtimeEnd,
+                        onBedtimeChanged = viewModel::onBedtimeChanged,
+                        morningReminderEnabled = state.morningReminderEnabled,
+                        morningReminderTime = state.morningReminderTime,
+                        onMorningReminderChanged = viewModel::onMorningReminderChanged,
+                        proofOfLifeEnabled = state.proofOfLifeEnabled,
+                        proofOfLifeTime = state.proofOfLifeTime,
+                        proofOfLifeWindowMinutes = state.proofOfLifeWindowMinutes,
+                        onProofOfLifeChanged = viewModel::onProofOfLifeChanged,
+                        weeklyDigestEnabled = state.weeklyDigestEnabled,
+                        weeklyDigestDayOfWeek = state.weeklyDigestDayOfWeek,
+                        weeklyDigestTime = state.weeklyDigestTime,
+                        onWeeklyDigestChanged = viewModel::onWeeklyDigestChanged,
                     )
                 }
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
-            item { SectionHeader("Appearance") }
             item {
-                Text(
-                    "Applies to everyday screens -- Today, Stats, Settings, onboarding. Screens that lock, " +
-                        "block, or demand something (curfew, penalties, morning check-in) always stay dark, " +
-                        "regardless of this.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ExpandableSection(
+                    title = stringResource(R.string.settings_habits),
+                    icon = Icons.Filled.CheckCircle,
+                    summary = habitsSummary(state),
                 ) {
-                    ThemeMode.entries.forEach { mode ->
-                        FilterChip(
-                            selected = state.themeMode == mode,
-                            onClick = { viewModel.onThemeModeChanged(mode) },
-                            label = { Text(mode.displayName) },
+                    Text(
+                        "How many consistent days before onboarding's next habit unlocks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    DropdownSelector(
+                        label = "Ease-in days",
+                        selected = state.easeInStreakLength,
+                        options = listOf(3, 5, 7),
+                        optionLabel = { "$it days" },
+                        onSelected = viewModel::onEaseInStreakLengthChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    state.habits.forEachIndexed { index, habit ->
+                        key(habit.id) {
+                            ListItem(
+                                headlineContent = { Text(habit.name) },
+                                supportingContent = {
+                                    val target = habit.displayTarget.ifBlank { "Custom check-in" }
+                                    val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
+                                    Text("${habit.kind.label} · $target${schedule.orEmpty()}")
+                                },
+                                leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
+                                trailingContent = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = { viewModel.onMoveHabit(habit.id, up = true) },
+                                            enabled = index > 0,
+                                        ) {
+                                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.onMoveHabit(habit.id, up = false) },
+                                            enabled = index < state.habits.lastIndex,
+                                        ) {
+                                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                                        }
+                                        Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onEditHabit(habit.id) },
+                            )
+                        }
+                    }
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.home_add_habit)) },
+                        leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onAddHabit),
+                    )
+                }
+            }
+
+            item {
+                ExpandableSection(
+                    title = "Rewards",
+                    icon = Icons.Filled.Redeem,
+                    summary = rewardsSummary(state),
+                ) {
+                    ListItem(
+                        headlineContent = { Text("Grace tokens") },
+                        supportingContent = { Text("1-minute unblock, redeemed from a lock screen") },
+                        leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = LockeColor.Brass) },
+                        trailingContent = { Text("${state.graceTokenCount}", style = MaterialTheme.typography.titleMedium, color = LockeColor.Brass) },
+                    )
+                    ListItem(
+                        headlineContent = { Text("Task-skip tokens") },
+                        supportingContent = { Text("Force-completes one gating habit for today") },
+                        leadingContent = { Icon(Icons.Filled.Redeem, contentDescription = null, tint = LockeColor.Brass) },
+                        trailingContent = { Text("${state.taskSkipTokenCount}", style = MaterialTheme.typography.titleMedium, color = LockeColor.Brass) },
+                    )
+                    if (state.taskSkipTokenCount > 0) {
+                        LockeGhostButton(
+                            text = "Skip a habit today",
+                            onClick = { showSkipHabitDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
                         )
                     }
                 }
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
+            item {
+                ExpandableSection(
+                    title = "Appearance",
+                    icon = Icons.Filled.Palette,
+                    summary = state.themeMode.displayName,
+                ) {
+                    Text(
+                        "Applies to everyday screens -- Today, Stats, Settings, onboarding. Screens that lock, " +
+                            "block, or demand something (curfew, penalties, morning check-in) always stay dark, " +
+                            "regardless of this.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    DropdownSelector(
+                        label = "Theme",
+                        selected = state.themeMode,
+                        options = ThemeMode.entries,
+                        optionLabel = { it.displayName },
+                        onSelected = viewModel::onThemeModeChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
             }
 
             if (state.healthConnectAvailable) {
-                item { SectionHeader("Health Connect") }
                 item {
-                    HealthConnectSection(
-                        permissionsGranted = state.healthConnectPermissionsGranted,
-                        syncEnabled = state.healthConnectSyncEnabled,
-                        onRequestPermissions = { healthConnectPermissionLauncher.launch(HealthConnectManager.PERMISSIONS) },
-                        onSyncToggled = viewModel::onHealthConnectSyncToggled,
+                    ExpandableSection(
+                        title = "Health Connect",
+                        icon = Icons.Filled.MonitorHeart,
+                        summary = healthConnectSummary(state),
+                    ) {
+                        HealthConnectSection(
+                            permissionsGranted = state.healthConnectPermissionsGranted,
+                            syncEnabled = state.healthConnectSyncEnabled,
+                            onRequestPermissions = { healthConnectPermissionLauncher.launch(HealthConnectManager.PERMISSIONS) },
+                            onSyncToggled = viewModel::onHealthConnectSyncToggled,
+                        )
+                    }
+                }
+            }
+
+            item {
+                ExpandableSection(
+                    title = stringResource(R.string.settings_permissions),
+                    icon = Icons.Filled.Security,
+                    summary = permissionsSummary(hasUsageAccess, hasAccessibility, hasOverlay, state.notificationsEnabled),
+                ) {
+                    PermissionRow(
+                        title = stringResource(R.string.permission_usage_access_title),
+                        granted = hasUsageAccess,
+                        onClick = { context.startActivity(PermissionUtils.usageAccessSettingsIntent(context)) },
+                    )
+                    PermissionRow(
+                        title = stringResource(R.string.permission_accessibility_title),
+                        granted = hasAccessibility,
+                        onClick = { context.startActivity(PermissionUtils.accessibilitySettingsIntent()) },
+                    )
+                    PermissionRow(
+                        title = stringResource(R.string.permission_overlay_title),
+                        granted = hasOverlay,
+                        onClick = { context.startActivity(PermissionUtils.overlaySettingsIntent(context)) },
+                    )
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.permission_notifications_title)) },
+                        trailingContent = {
+                            Switch(
+                                checked = state.notificationsEnabled,
+                                onCheckedChange = viewModel::onNotificationsToggled,
+                            )
+                        },
                     )
                 }
             }
 
-            item { SectionHeader(stringResource(R.string.settings_permissions)) }
             item {
-                PermissionRow(
-                    title = stringResource(R.string.permission_usage_access_title),
-                    granted = hasUsageAccess,
-                    onClick = { context.startActivity(PermissionUtils.usageAccessSettingsIntent(context)) },
-                )
-            }
-            item {
-                PermissionRow(
-                    title = stringResource(R.string.permission_accessibility_title),
-                    granted = hasAccessibility,
-                    onClick = { context.startActivity(PermissionUtils.accessibilitySettingsIntent()) },
-                )
-            }
-            item {
-                PermissionRow(
-                    title = stringResource(R.string.permission_overlay_title),
-                    granted = hasOverlay,
-                    onClick = { context.startActivity(PermissionUtils.overlaySettingsIntent(context)) },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.permission_notifications_title)) },
-                    trailingContent = {
-                        Switch(
-                            checked = state.notificationsEnabled,
-                            onCheckedChange = viewModel::onNotificationsToggled,
-                        )
-                    },
-                )
+                ExpandableSection(
+                    title = "Photo checking",
+                    icon = Icons.Filled.CameraAlt,
+                    summary = if (state.anthropicApiKey.isNullOrBlank()) "Not set" else "Key set",
+                ) {
+                    ApiKeyField(
+                        apiKey = state.anthropicApiKey,
+                        onApiKeyChanged = viewModel::onAnthropicApiKeyChanged,
+                    )
+                }
             }
 
-            item { SectionHeader("Photo checking") }
             item {
-                ApiKeyField(
-                    apiKey = state.anthropicApiKey,
-                    onApiKeyChanged = viewModel::onAnthropicApiKeyChanged,
-                )
+                ExpandableSection(
+                    title = "Connections",
+                    icon = Icons.Filled.Link,
+                    summary = connectionsSummary(state),
+                ) {
+                    ConnectionKeyField(
+                        title = "WakaTime",
+                        description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
+                            "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
+                        label = "WakaTime API key",
+                        placeholder = "waka_...",
+                        value = state.wakaTimeApiKey,
+                        onValueChanged = viewModel::onWakaTimeApiKeyChanged,
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    ConnectionKeyField(
+                        title = "GitHub",
+                        description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
+                            "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
+                            "needed for public activity) to raise that limit and count private contributions too.",
+                        label = "GitHub personal access token",
+                        placeholder = "ghp_...",
+                        value = state.githubToken,
+                        onValueChanged = viewModel::onGithubTokenChanged,
+                    )
+                }
             }
 
-            item { SectionHeader("Connections") }
             item {
-                ConnectionKeyField(
-                    title = "WakaTime",
-                    description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
-                        "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
-                    label = "WakaTime API key",
-                    placeholder = "waka_...",
-                    value = state.wakaTimeApiKey,
-                    onValueChanged = viewModel::onWakaTimeApiKeyChanged,
-                )
-            }
-            item {
-                ConnectionKeyField(
-                    title = "GitHub",
-                    description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
-                        "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
-                        "needed for public activity) to raise that limit and count private contributions too.",
-                    label = "GitHub personal access token",
-                    placeholder = "ghp_...",
-                    value = state.githubToken,
-                    onValueChanged = viewModel::onGithubTokenChanged,
-                )
-                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                ExpandableSection(
+                    title = "Buddies",
+                    icon = Icons.Filled.People,
+                    summary = buddiesSummary(state),
+                ) {
+                    AccountabilitySection(
+                        baseUrl = state.accountabilityBaseUrl,
+                        onBaseUrlChanged = viewModel::onAccountabilityBaseUrlChanged,
+                        pairingCode = state.myPairingCode,
+                        onRegenerateCode = viewModel::onRegeneratePairingCode,
+                        onAddBuddy = viewModel::onAddBuddy,
+                        buddies = state.buddies,
+                        shareStatsEnabled = state.shareDailyStatsEnabled,
+                        onShareStatsToggled = viewModel::onShareDailyStatsToggled,
+                    )
+                }
             }
 
-            item { SectionHeader("Buddies") }
             item {
-                AccountabilitySection(
-                    baseUrl = state.accountabilityBaseUrl,
-                    onBaseUrlChanged = viewModel::onAccountabilityBaseUrlChanged,
-                    pairingCode = state.myPairingCode,
-                    onRegenerateCode = viewModel::onRegeneratePairingCode,
-                    onAddBuddy = viewModel::onAddBuddy,
-                    buddies = state.buddies,
-                    shareStatsEnabled = state.shareDailyStatsEnabled,
-                    onShareStatsToggled = viewModel::onShareDailyStatsToggled,
-                )
+                ExpandableSection(
+                    title = "Export my data",
+                    icon = Icons.Filled.Download,
+                    summary = state.exportRange.label,
+                ) {
+                    DataExportSection(
+                        selectedRange = state.exportRange,
+                        isExporting = state.isExporting,
+                        onRangeSelected = viewModel::onExportRangeSelected,
+                        onExportCsv = viewModel::onExportCsvClicked,
+                        onExportJson = viewModel::onExportJsonClicked,
+                    )
+                }
             }
 
-            item { SectionHeader("Export my data") }
             item {
-                DataExportSection(
-                    selectedRange = state.exportRange,
-                    isExporting = state.isExporting,
-                    onRangeSelected = viewModel::onExportRangeSelected,
-                    onExportCsv = viewModel::onExportCsvClicked,
-                    onExportJson = viewModel::onExportJsonClicked,
-                )
-            }
-
-            item { SectionHeader(stringResource(R.string.settings_about)) }
-            item {
-                ListItem(
-                    headlineContent = { Text("Diagnostics") },
-                    supportingContent = { Text("Plain-language status and a fix button for every tracking failure") },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onOpenDiagnostics),
-                )
-                HorizontalDivider()
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Version") },
-                    supportingContent = { Text(BuildConfig.VERSION_NAME) },
-                )
+                ExpandableSection(
+                    title = stringResource(R.string.settings_about),
+                    icon = Icons.Filled.Info,
+                    summary = "v${BuildConfig.VERSION_NAME}",
+                ) {
+                    ListItem(
+                        headlineContent = { Text("Diagnostics") },
+                        supportingContent = { Text("Plain-language status and a fix button for every tracking failure") },
+                        trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenDiagnostics),
+                    )
+                    ListItem(
+                        headlineContent = { Text("Version") },
+                        supportingContent = { Text(BuildConfig.VERSION_NAME) },
+                    )
+                }
             }
         }
     }
@@ -597,6 +638,144 @@ fun SettingsScreen(
             },
         )
     }
+}
+
+/**
+ * A collapsible settings group: one tappable header line (icon, title, a live one-line
+ * summary of its current state, and a chevron) that expands to reveal its controls.
+ * Collapsed by default -- see [SettingsScreen] -- so the settings list reads as a short,
+ * scannable table of contents instead of every control being on screen at once.
+ */
+@Composable
+private fun ExpandableSection(
+    title: String,
+    icon: ImageVector,
+    summary: String? = null,
+    initiallyExpanded: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
+    Column {
+        ListItem(
+            headlineContent = { Text(title) },
+            supportingContent = summary?.let {
+                { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            },
+            leadingContent = { Icon(icon, contentDescription = null) },
+            trailingContent = {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+        )
+        if (expanded) {
+            Column(content = content)
+        }
+        HorizontalDivider()
+    }
+}
+
+/**
+ * A single-choice dropdown -- collapsed it reads "Label: current value", tapping opens a
+ * menu of [options]. Used in place of a row of filter chips wherever a setting only ever
+ * has one value active at a time, so the choice takes one line instead of a whole row.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> DropdownSelector(
+    label: String,
+    selected: T,
+    options: List<T>,
+    optionLabel: (T) -> String,
+    onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = optionLabel(selected),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(optionLabel(option)) },
+                    onClick = {
+                        onSelected(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** "$granted/$total granted" for the collapsed Permissions header. */
+private fun permissionsSummary(usage: Boolean, accessibility: Boolean, overlay: Boolean, notifications: Boolean): String {
+    val granted = listOf(usage, accessibility, overlay, notifications).count { it }
+    return "$granted/4 granted"
+}
+
+/** What's currently locking things down, for the collapsed Blocking header. */
+private fun blockingSummary(state: SettingsUiState): String =
+    if (state.limitedUnblockEnabled) {
+        "Limited unblocking -- ${state.limitedUnblockWindowMinutes} min window"
+    } else {
+        "Apps and websites"
+    }
+
+/** Which of bedtime/check-in/reminder/digest are on, for the collapsed header. */
+private fun reminderSummary(state: SettingsUiState): String {
+    val parts = buildList {
+        if (state.bedtimeEnabled) add("Bedtime ${state.bedtimeStart}–${state.bedtimeEnd}")
+        if (state.proofOfLifeEnabled) add("Check-in ${state.proofOfLifeTime}")
+        if (state.morningReminderEnabled) add("Reminder ${state.morningReminderTime}")
+        if (state.weeklyDigestEnabled) {
+            add("Digest ${state.weeklyDigestDayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())}")
+        }
+    }
+    return if (parts.isEmpty()) "All off" else parts.joinToString(" · ")
+}
+
+private fun habitsSummary(state: SettingsUiState): String {
+    val count = state.habits.size
+    return "$count ${if (count == 1) "habit" else "habits"} · eases in over ${state.easeInStreakLength} days"
+}
+
+private fun rewardsSummary(state: SettingsUiState): String =
+    "${state.graceTokenCount} grace · ${state.taskSkipTokenCount} skip"
+
+private fun healthConnectSummary(state: SettingsUiState): String = when {
+    state.healthConnectSyncEnabled -> "Syncing"
+    state.healthConnectPermissionsGranted -> "Permission granted"
+    else -> "Not connected"
+}
+
+private fun connectionsSummary(state: SettingsUiState): String {
+    val connected = buildList {
+        if (!state.wakaTimeApiKey.isNullOrBlank()) add("WakaTime")
+        if (!state.githubToken.isNullOrBlank()) add("GitHub")
+    }
+    return if (connected.isEmpty()) "None connected" else connected.joinToString(", ")
+}
+
+private fun buddiesSummary(state: SettingsUiState): String {
+    val count = state.buddies.size
+    return if (count == 0) "Not paired yet" else "$count ${if (count == 1) "buddy" else "buddies"}"
 }
 
 @Composable
@@ -658,7 +837,7 @@ private fun BedtimeAndReminderSection(
     }
     HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
 
-    SectionHeader("Morning check-in")
+    SubHeader("Morning check-in")
     Text(
         "A daily photo proving you're up -- miss the window and apps stay locked " +
             "${ProofOfLifeRepository.PENALTY_MINUTES} minutes longer.",
@@ -686,30 +865,20 @@ private fun BedtimeAndReminderSection(
             singleLine = true,
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "Window before the penalty lands",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Row(
+        DropdownSelector(
+            label = "Window before the penalty lands",
+            selected = proofOfLifeWindowMinutes,
+            options = listOf(15, 30, 60),
+            optionLabel = { "$it min" },
+            onSelected = { onProofOfLifeChanged(proofOfLifeEnabled, checkInTime, it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf(15, 30, 60).forEach { minutes ->
-                FilterChip(
-                    selected = proofOfLifeWindowMinutes == minutes,
-                    onClick = { onProofOfLifeChanged(proofOfLifeEnabled, checkInTime, minutes) },
-                    label = { Text("$minutes min") },
-                )
-            }
-        }
+        )
     }
     HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
 
-    SectionHeader("Daily todos")
+    SubHeader("Daily todos")
     ListItem(
         headlineContent = { Text("Morning reminder") },
         supportingContent = { Text("Notifies you to fill in today's one-off tasks") },
@@ -733,7 +902,7 @@ private fun BedtimeAndReminderSection(
     }
     HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
 
-    SectionHeader("Weekly digest")
+    SubHeader("Weekly digest")
     ListItem(
         headlineContent = { Text("Weekly recap") },
         supportingContent = { Text("A once-a-week nudge, e.g. \"5/7 days complete, best streak 4 days\"") },
@@ -745,21 +914,16 @@ private fun BedtimeAndReminderSection(
         },
     )
     if (weeklyDigestEnabled) {
-        Row(
+        DropdownSelector(
+            label = "Day of week",
+            selected = weeklyDigestDayOfWeek,
+            options = DayOfWeek.values().toList(),
+            optionLabel = { it.getDisplayName(TextStyle.FULL, Locale.getDefault()) },
+            onSelected = { onWeeklyDigestChanged(weeklyDigestEnabled, it, digestTime) },
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            DayOfWeek.values().forEach { day ->
-                FilterChip(
-                    selected = day == weeklyDigestDayOfWeek,
-                    onClick = { onWeeklyDigestChanged(weeklyDigestEnabled, day, digestTime) },
-                    label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) },
-                )
-            }
-        }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        )
         OutlinedTextField(
             value = digestTime,
             onValueChange = { digestTime = it; onWeeklyDigestChanged(weeklyDigestEnabled, weeklyDigestDayOfWeek, it) },
@@ -853,15 +1017,16 @@ private fun MinutesStepperRow(label: String, value: Int, step: Int, range: IntRa
     }
 }
 
+/** A small label for a sub-group inside an already-expanded [ExpandableSection]. */
 @Composable
-private fun SectionHeader(text: String) {
+private fun SubHeader(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
@@ -1110,7 +1275,6 @@ private fun HealthConnectSection(
             Switch(checked = syncEnabled, onCheckedChange = onSyncToggled, enabled = permissionsGranted)
         },
     )
-    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 }
 
 /**
@@ -1131,21 +1295,16 @@ private fun DataExportSection(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp),
     )
-    Row(
+    DropdownSelector(
+        label = "Range",
+        selected = selectedRange,
+        options = StatsRange.entries,
+        optionLabel = { it.label },
+        onSelected = onRangeSelected,
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        StatsRange.entries.forEach { range ->
-            FilterChip(
-                selected = selectedRange == range,
-                onClick = { onRangeSelected(range) },
-                label = { Text(range.label) },
-            )
-        }
-    }
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1155,7 +1314,6 @@ private fun DataExportSection(
         LockeGhostButton(text = "Export as CSV", onClick = onExportCsv, enabled = !isExporting, modifier = Modifier.weight(1f))
         LockeGhostButton(text = "Export as JSON", onClick = onExportJson, enabled = !isExporting, modifier = Modifier.weight(1f))
     }
-    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
 }
 
 @Composable
