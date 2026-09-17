@@ -169,39 +169,55 @@ fun SettingsScreen(
             // -- Hardest to change first ---------------------------------------------
             item { SectionHeader("Hard mode") }
             item {
-                val cooldownDaysLeft = daysUntil(state.hardModeToggleLockedUntilEpochMillis)
-                val toggleLocked = cooldownDaysLeft > 0
+                var showEnableDialog by remember { mutableStateOf(false) }
+                var showPinDialog by remember { mutableStateOf(false) }
+                val pinResult by viewModel.hardModePinResult.collectAsStateWithLifecycle()
+
+                val reEnableCooldownDays = daysUntil(state.hardModeToggleLockedUntilEpochMillis)
+                val reEnableLocked = !state.hardModeEnabled && reEnableCooldownDays > 0
+                val friendLock = state.hardModeFriendLock
+                val friendLockActive = state.hardModeEnabled && friendLock.isActive()
+
                 ListItem(
                     headlineContent = { Text("Hard mode") },
-                    supportingContent = {
-                        Text(
-                            buildString {
-                                append(
-                                    if (state.hardModeEnabled) {
-                                        "Gates and blocked apps can only be added, never removed."
-                                    } else {
-                                        "Locks in your gates and blocked apps. Grants 5 grace tokens."
-                                    },
-                                )
-                                if (toggleLocked) {
-                                    append(
-                                        " Can't be toggled again for $cooldownDaysLeft more " +
-                                            if (cooldownDaysLeft == 1) "day." else "days.",
-                                    )
-                                }
-                            },
-                        )
-                    },
+                    supportingContent = { Text(hardModeSupportingText(state.hardModeEnabled, reEnableCooldownDays, friendLock)) },
                     leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null) },
                     trailingContent = {
                         Switch(
                             checked = state.hardModeEnabled,
-                            onCheckedChange = viewModel::onHardModeToggled,
-                            enabled = !toggleLocked,
+                            onCheckedChange = { turningOn ->
+                                when {
+                                    turningOn -> showEnableDialog = true
+                                    friendLockActive && friendLock.pinSet -> showPinDialog = true
+                                    else -> viewModel.onHardModeDisableRequested()
+                                }
+                            },
+                            enabled = if (state.hardModeEnabled) !friendLockActive || friendLock.pinSet else !reEnableLocked,
                         )
                     },
                 )
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+
+                if (showEnableDialog) {
+                    HardModeEnableDialog(
+                        onConfirm = { lockDurationDays, pin ->
+                            viewModel.onHardModeEnableRequested(lockDurationDays, pin)
+                            showEnableDialog = false
+                        },
+                        onDismiss = { showEnableDialog = false },
+                    )
+                }
+                if (showPinDialog) {
+                    HardModePinUnlockDialog(
+                        friendLock = friendLock,
+                        pinResult = pinResult,
+                        onSubmit = viewModel::onHardModePinSubmitted,
+                        onDismiss = {
+                            showPinDialog = false
+                            viewModel.onHardModePinResultShown()
+                        },
+                    )
+                }
             }
 
             item { SectionHeader(stringResource(R.string.settings_blocked_apps)) }
@@ -756,14 +772,56 @@ private fun BedtimeAndReminderSection(
     }
 }
 
-/** Whole days remaining until [untilEpochMillis], rounded up so "a few hours left" still reads as 1, not 0. 0 once it's passed. */
-private fun daysUntil(untilEpochMillis: Long): Int {
+/**
+ * Whole days remaining until [untilEpochMillis], rounded up so "a few hours left" still reads as 1, not 0. 0
+ * once it's passed, and also for [Long.MAX_VALUE] (a permanent hard-mode friend-lock never counts down to a
+ * day figure -- callers check [PreferencesRepository.HardModeFriendLock.isPermanent] separately for that case).
+ */
+fun daysUntil(untilEpochMillis: Long): Int {
+    if (untilEpochMillis == Long.MAX_VALUE) return 0
     val millisLeft = untilEpochMillis - System.currentTimeMillis()
     if (millisLeft <= 0) return 0
     return ((millisLeft + MILLIS_PER_DAY - 1) / MILLIS_PER_DAY).toInt()
 }
 
-private const val MILLIS_PER_DAY = 24 * 60 * 60 * 1000L
+const val MILLIS_PER_DAY = 24 * 60 * 60 * 1000L
+
+/**
+ * Hard mode's supporting line: off, plus a re-enable cooldown if one's pending; or on, plus however its
+ * friend-lock reads -- permanent, counting down, counting down with a PIN escape hatch, or already lapsed.
+ */
+private fun hardModeSupportingText(
+    enabled: Boolean,
+    reEnableCooldownDays: Int,
+    friendLock: PreferencesRepository.HardModeFriendLock,
+): String = buildString {
+    if (!enabled) {
+        append("Locks in your gates and blocked apps. Grants 5 grace tokens.")
+        if (reEnableCooldownDays > 0) {
+            append(
+                " Can't be turned on again for $reEnableCooldownDays more " +
+                    if (reEnableCooldownDays == 1) "day." else "days.",
+            )
+        }
+        return@buildString
+    }
+    append("Gates and blocked apps can only be added, never removed.")
+    when {
+        friendLock.isPermanent -> append(
+            if (friendLock.pinSet) {
+                " Locked with no time limit -- only your friend's PIN turns it off."
+            } else {
+                " Locked with no time limit."
+            },
+        )
+        friendLock.isActive() -> {
+            val daysLeft = daysUntil(friendLock.lockedUntilEpochMillis)
+            append(" Locked for $daysLeft more ${if (daysLeft == 1) "day" else "days"}")
+            append(if (friendLock.pinSet) ", or unlock early with the PIN." else ".")
+        }
+        else -> append(" The lock has run out -- can be turned off now.")
+    }
+}
 
 /** A "Label  [-] N min [+]" row for a minutes value stepped by [step] and clamped to [range]. */
 @Composable
