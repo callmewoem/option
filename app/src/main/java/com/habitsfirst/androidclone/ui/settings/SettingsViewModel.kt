@@ -59,6 +59,8 @@ data class SettingsUiState(
     val weeklyDigestTime: String = "18:00",
     val hardModeEnabled: Boolean = false,
     val hardModeToggleLockedUntilEpochMillis: Long = 0L,
+    val hardModeFriendLock: PreferencesRepository.HardModeFriendLock =
+        PreferencesRepository.HardModeFriendLock(0L, pinSet = false, pinAttemptsLockedUntilEpochMillis = 0L),
     val limitedUnblockEnabled: Boolean = false,
     val limitedUnblockWindowMinutes: Int = PreferencesRepository.DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES,
     val limitedUnblockStreakBonusEnabled: Boolean = false,
@@ -109,10 +111,11 @@ private data class ReminderSettings(
     val weeklyDigest: PreferencesRepository.WeeklyDigestSettings,
 )
 
-/** Hard mode's on/off state paired with its toggle-cooldown expiry -- split out only to keep [extraSettings] within combine()'s 5-flow cap. */
+/** Hard mode's on/off state, its toggle-cooldown expiry, and its friend-lock -- split out only to keep [extraSettings] within combine()'s 5-flow cap. */
 private data class HardModeState(
     val enabled: Boolean,
     val toggleLockedUntilEpochMillis: Long,
+    val friendLock: PreferencesRepository.HardModeFriendLock,
 )
 
 /** Hard mode and limited unblocking (including its window customization) -- the blocking-behavior toggles -- grouped only to keep [extraSettings] within combine()'s 5-flow cap. */
@@ -201,6 +204,7 @@ class SettingsViewModel @Inject constructor(
     private val hardModeState = combine(
         preferencesRepository.isHardModeEnabled,
         preferencesRepository.hardModeToggleLockedUntilEpochMillis,
+        preferencesRepository.hardModeFriendLock,
         ::HardModeState,
     )
 
@@ -270,6 +274,7 @@ class SettingsViewModel @Inject constructor(
             weeklyDigestTime = rs.weeklyDigest.time,
             hardModeEnabled = extra.blocking.hardMode.enabled,
             hardModeToggleLockedUntilEpochMillis = extra.blocking.hardMode.toggleLockedUntilEpochMillis,
+            hardModeFriendLock = extra.blocking.hardMode.friendLock,
             limitedUnblockEnabled = extra.blocking.limitedUnblockEnabled,
             limitedUnblockWindowMinutes = extra.blocking.limitedUnblockWindow.windowMinutes,
             limitedUnblockStreakBonusEnabled = extra.blocking.limitedUnblockWindow.streakBonusEnabled,
@@ -379,12 +384,36 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Enabling grants a batch of grace tokens to ease into it; either direction is a no-op while the previous
-     * toggle's cooldown is still active (see [PreferencesRepository.setHardModeEnabled]). The switch itself is
-     * disabled in [SettingsScreen] during the cooldown, so this is normally unreachable then anyway.
+     * Turns hard mode on with the friend-lock the user just configured: [lockDurationDays] days (or no time
+     * limit at all if null), optionally guarded by [pin] so whoever holds it can let the user back in early.
+     * Grants a batch of grace tokens to ease into it. A no-op while the previous toggle's cooldown is still
+     * active (see [PreferencesRepository.setHardModeEnabled]) -- the switch is disabled in [SettingsScreen] then,
+     * so this is normally unreachable in that state anyway.
      */
-    fun onHardModeToggled(enabled: Boolean) {
-        viewModelScope.launch { preferencesRepository.setHardModeEnabled(enabled) }
+    fun onHardModeEnableRequested(lockDurationDays: Int?, pin: String?) {
+        viewModelScope.launch { preferencesRepository.setHardModeEnabled(true, lockDurationDays, pin) }
+    }
+
+    /**
+     * Turns hard mode off directly, without a PIN -- only succeeds once its friend-lock has already lapsed on
+     * its own (see [PreferencesRepository.setHardModeEnabled]); [SettingsScreen] doesn't offer this path at all
+     * while the lock is still active with a PIN set, routing to [onHardModePinSubmitted] instead.
+     */
+    fun onHardModeDisableRequested() {
+        viewModelScope.launch { preferencesRepository.setHardModeEnabled(false) }
+    }
+
+    /** One-shot feedback for the last hard-mode PIN guess; cleared by [onHardModePinResultShown] once shown. */
+    private val _hardModePinResult = MutableStateFlow<PreferencesRepository.HardModePinResult?>(null)
+    val hardModePinResult: StateFlow<PreferencesRepository.HardModePinResult?> = _hardModePinResult.asStateFlow()
+
+    /** A correct guess turns hard mode off immediately, bypassing however much of the friend-lock is left. */
+    fun onHardModePinSubmitted(pin: String) {
+        viewModelScope.launch { _hardModePinResult.value = preferencesRepository.unlockHardModeWithPin(pin) }
+    }
+
+    fun onHardModePinResultShown() {
+        _hardModePinResult.value = null
     }
 
     /** Once habits are done, blocked apps and sites re-lock after the configured window instead of staying open the rest of the day. */

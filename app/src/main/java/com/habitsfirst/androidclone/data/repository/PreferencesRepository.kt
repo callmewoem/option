@@ -14,6 +14,8 @@ import com.habitsfirst.androidclone.domain.model.ThemeMode
 import com.habitsfirst.androidclone.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.time.DayOfWeek
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -61,6 +63,11 @@ class PreferencesRepository @Inject constructor(
         val LIMITED_UNBLOCK_WINDOW_STARTED_AT_EPOCH_MILLIS = longPreferencesKey("limited_unblock_window_started_at_epoch_millis")
         val HARD_MODE_ENABLED = booleanPreferencesKey("hard_mode_enabled")
         val HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("hard_mode_toggle_locked_until_epoch_millis")
+        val HARD_MODE_FRIEND_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("hard_mode_friend_locked_until_epoch_millis")
+        val HARD_MODE_PIN_SALT = stringPreferencesKey("hard_mode_pin_salt")
+        val HARD_MODE_PIN_HASH = stringPreferencesKey("hard_mode_pin_hash")
+        val HARD_MODE_PIN_FAILED_ATTEMPTS = intPreferencesKey("hard_mode_pin_failed_attempts")
+        val HARD_MODE_PIN_ATTEMPTS_LOCKED_UNTIL_EPOCH_MILLIS = longPreferencesKey("hard_mode_pin_attempts_locked_until_epoch_millis")
         val EASE_IN_STREAK_LENGTH = intPreferencesKey("ease_in_streak_length")
         val PROOF_OF_LIFE_ENABLED = booleanPreferencesKey("proof_of_life_enabled")
         val PROOF_OF_LIFE_TIME = stringPreferencesKey("proof_of_life_time") // "HH:mm"
@@ -381,32 +388,184 @@ class PreferencesRepository @Inject constructor(
         dataStore.data.map { it[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L }
 
     /**
+     * The friend-lock chosen when hard mode was last turned on: [lockedUntilEpochMillis] is 0 once hard mode is
+     * off, [Long.MAX_VALUE] for a lock with no time limit (see [isPermanent]), or an instant it self-expires at.
+     * [pinSet] is whether a PIN can also end it early (see [unlockHardModeWithPin]); [pinAttemptsLockedUntilEpochMillis]
+     * is the cooldown from too many wrong guesses, 0 when none is pending.
+     */
+    data class HardModeFriendLock(
+        val lockedUntilEpochMillis: Long,
+        val pinSet: Boolean,
+        val pinAttemptsLockedUntilEpochMillis: Long,
+    ) {
+        val isPermanent: Boolean get() = lockedUntilEpochMillis == Long.MAX_VALUE
+
+        fun isActive(nowEpochMillis: Long = System.currentTimeMillis()): Boolean = lockedUntilEpochMillis > nowEpochMillis
+    }
+
+    val hardModeFriendLock: Flow<HardModeFriendLock> = dataStore.data.map { prefs ->
+        HardModeFriendLock(
+            lockedUntilEpochMillis = prefs[Keys.HARD_MODE_FRIEND_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L,
+            pinSet = prefs[Keys.HARD_MODE_PIN_HASH] != null,
+            pinAttemptsLockedUntilEpochMillis = prefs[Keys.HARD_MODE_PIN_ATTEMPTS_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L,
+        )
+    }
+
+    /**
      * Turning hard mode on grants a one-time batch of grace tokens to ease into it; turning it back off doesn't
      * claw them back. Either direction starts a [HARD_MODE_TOGGLE_COOLDOWN_DAYS]-day cooldown before it can be
      * toggled again -- otherwise hard mode's restrictions could just be switched off whenever they bite, and
      * switching back on would even re-farm the entry grace tokens.
      *
-     * Returns true if the toggle took effect, false if it was rejected because the cooldown from the last toggle
-     * hasn't expired yet.
+     * Turning it on also arms a friend-lock: [lockDurationDays] days from now, or forever if null (see
+     * [HardModeFriendLock.isPermanent]) -- either way it can't be turned back off until that instant, unless
+     * [pin] is set, in which case whoever holds it can end the lock early with [unlockHardModeWithPin]. A
+     * permanent lock with no pin would have no way out at all, so that combination is rejected. [pin] and
+     * [lockDurationDays] are ignored when [enabled] is false; turning hard mode off this way (as opposed to
+     * [unlockHardModeWithPin]) only succeeds once the friend-lock itself has already lapsed.
+     *
+     * Returns true if the toggle took effect, false if it was rejected because the toggle cooldown or the
+     * friend-lock from the last time hasn't expired yet.
      */
-    suspend fun setHardModeEnabled(enabled: Boolean, nowEpochMillis: Long = System.currentTimeMillis()): Boolean {
+    suspend fun setHardModeEnabled(
+        enabled: Boolean,
+        lockDurationDays: Int? = HARD_MODE_TOGGLE_COOLDOWN_DAYS,
+        pin: String? = null,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (enabled) {
+            require(lockDurationDays == null || lockDurationDays > 0) {
+                "lockDurationDays must be positive, or null for a lock with no time limit"
+            }
+            require(lockDurationDays != null || !pin.isNullOrBlank()) {
+                "a lock with no time limit needs a PIN -- otherwise hard mode could never be turned back off"
+            }
+            pin?.let {
+                require(it.length in HARD_MODE_PIN_MIN_LENGTH..HARD_MODE_PIN_MAX_LENGTH && it.all(Char::isDigit)) {
+                    "pin must be $HARD_MODE_PIN_MIN_LENGTH-$HARD_MODE_PIN_MAX_LENGTH digits"
+                }
+            }
+        }
+
         var applied = false
         dataStore.edit { prefs ->
             val wasEnabled = prefs[Keys.HARD_MODE_ENABLED] ?: false
             if (enabled == wasEnabled) return@edit
-            val lockedUntil = prefs[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L
-            if (nowEpochMillis < lockedUntil) return@edit
+            val toggleLockedUntil = prefs[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L
+            if (nowEpochMillis < toggleLockedUntil) return@edit
+            if (!enabled) {
+                val friendLockedUntil = prefs[Keys.HARD_MODE_FRIEND_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L
+                if (nowEpochMillis < friendLockedUntil) return@edit
+            }
 
             prefs[Keys.HARD_MODE_ENABLED] = enabled
             prefs[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] =
-                nowEpochMillis + HARD_MODE_TOGGLE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000L
+                nowEpochMillis + HARD_MODE_TOGGLE_COOLDOWN_DAYS * DAY_MILLIS
             if (enabled) {
                 prefs[Keys.GRACE_TOKEN_COUNT] = (prefs[Keys.GRACE_TOKEN_COUNT] ?: 0) + HARD_MODE_ENTRY_GRACE_TOKENS
+                prefs[Keys.HARD_MODE_FRIEND_LOCKED_UNTIL_EPOCH_MILLIS] =
+                    if (lockDurationDays == null) Long.MAX_VALUE else nowEpochMillis + lockDurationDays * DAY_MILLIS
+                if (pin.isNullOrBlank()) {
+                    prefs.remove(Keys.HARD_MODE_PIN_SALT)
+                    prefs.remove(Keys.HARD_MODE_PIN_HASH)
+                } else {
+                    val (salt, hash) = hashPin(pin)
+                    prefs[Keys.HARD_MODE_PIN_SALT] = salt
+                    prefs[Keys.HARD_MODE_PIN_HASH] = hash
+                }
+            } else {
+                prefs[Keys.HARD_MODE_FRIEND_LOCKED_UNTIL_EPOCH_MILLIS] = 0L
+                prefs.remove(Keys.HARD_MODE_PIN_SALT)
+                prefs.remove(Keys.HARD_MODE_PIN_HASH)
             }
+            prefs[Keys.HARD_MODE_PIN_FAILED_ATTEMPTS] = 0
+            prefs.remove(Keys.HARD_MODE_PIN_ATTEMPTS_LOCKED_UNTIL_EPOCH_MILLIS)
             applied = true
         }
         return applied
     }
+
+    /** What [unlockHardModeWithPin] did with a guess. */
+    sealed interface HardModePinResult {
+        /** The PIN matched -- hard mode is now off and the friend-lock cleared. */
+        data object Unlocked : HardModePinResult
+
+        /** No PIN was ever set for the current friend-lock, so there's nothing to check against. */
+        data object NoPinSet : HardModePinResult
+
+        /** Wrong PIN; [attemptsRemaining] guesses left before a cooldown kicks in. */
+        data class WrongPin(val attemptsRemaining: Int) : HardModePinResult
+
+        /** Too many wrong guesses in a row -- locked out of trying again until [retryAtEpochMillis]. */
+        data class TooManyAttempts(val retryAtEpochMillis: Long) : HardModePinResult
+    }
+
+    /**
+     * Checks [pin] against the PIN set when hard mode's current friend-lock was armed. A match turns hard mode
+     * off immediately, regardless of how much of [HardModeFriendLock.lockedUntilEpochMillis] is left -- this is
+     * the whole point of setting a PIN: the friend holding it can let the user back in early. A wrong guess
+     * costs one of [HARD_MODE_PIN_ATTEMPTS_PER_ROUND] attempts; running out starts a cooldown that grows every
+     * time it's hit again (see [HARD_MODE_PIN_COOLDOWNS_MINUTES]), so a 4-digit PIN can't just be brute-forced
+     * on-device by the person it's meant to be keeping out.
+     */
+    suspend fun unlockHardModeWithPin(pin: String, nowEpochMillis: Long = System.currentTimeMillis()): HardModePinResult {
+        var result: HardModePinResult = HardModePinResult.NoPinSet
+        dataStore.edit { prefs ->
+            val salt = prefs[Keys.HARD_MODE_PIN_SALT]
+            val hash = prefs[Keys.HARD_MODE_PIN_HASH]
+            if (salt == null || hash == null) {
+                result = HardModePinResult.NoPinSet
+                return@edit
+            }
+
+            val attemptsLockedUntil = prefs[Keys.HARD_MODE_PIN_ATTEMPTS_LOCKED_UNTIL_EPOCH_MILLIS] ?: 0L
+            if (nowEpochMillis < attemptsLockedUntil) {
+                result = HardModePinResult.TooManyAttempts(attemptsLockedUntil)
+                return@edit
+            }
+
+            if (pinMatches(pin, salt, hash)) {
+                prefs[Keys.HARD_MODE_ENABLED] = false
+                prefs[Keys.HARD_MODE_FRIEND_LOCKED_UNTIL_EPOCH_MILLIS] = 0L
+                prefs[Keys.HARD_MODE_TOGGLE_LOCKED_UNTIL_EPOCH_MILLIS] = nowEpochMillis + HARD_MODE_TOGGLE_COOLDOWN_DAYS * DAY_MILLIS
+                prefs.remove(Keys.HARD_MODE_PIN_SALT)
+                prefs.remove(Keys.HARD_MODE_PIN_HASH)
+                prefs[Keys.HARD_MODE_PIN_FAILED_ATTEMPTS] = 0
+                prefs.remove(Keys.HARD_MODE_PIN_ATTEMPTS_LOCKED_UNTIL_EPOCH_MILLIS)
+                result = HardModePinResult.Unlocked
+            } else {
+                val failed = (prefs[Keys.HARD_MODE_PIN_FAILED_ATTEMPTS] ?: 0) + 1
+                prefs[Keys.HARD_MODE_PIN_FAILED_ATTEMPTS] = failed
+                val remainingInRound = HARD_MODE_PIN_ATTEMPTS_PER_ROUND - (failed - 1) % HARD_MODE_PIN_ATTEMPTS_PER_ROUND - 1
+                if (remainingInRound <= 0) {
+                    val round = failed / HARD_MODE_PIN_ATTEMPTS_PER_ROUND - 1
+                    val cooldownMinutes = HARD_MODE_PIN_COOLDOWNS_MINUTES.getOrElse(round) { HARD_MODE_PIN_COOLDOWNS_MINUTES.last() }
+                    val lockedUntil = nowEpochMillis + cooldownMinutes * 60_000L
+                    prefs[Keys.HARD_MODE_PIN_ATTEMPTS_LOCKED_UNTIL_EPOCH_MILLIS] = lockedUntil
+                    result = HardModePinResult.TooManyAttempts(lockedUntil)
+                } else {
+                    result = HardModePinResult.WrongPin(remainingInRound)
+                }
+            }
+        }
+        return result
+    }
+
+    private fun hashPin(pin: String): Pair<String, String> {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        return salt.toHex() to sha256(salt + pin.toByteArray(Charsets.UTF_8)).toHex()
+    }
+
+    private fun pinMatches(pin: String, saltHex: String, expectedHashHex: String): Boolean {
+        val candidateHashHex = sha256(saltHex.hexToBytes() + pin.toByteArray(Charsets.UTF_8)).toHex()
+        return MessageDigest.isEqual(candidateHashHex.toByteArray(Charsets.UTF_8), expectedHashHex.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
+
+    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+    private fun String.hexToBytes(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     // -- Onboarding "ease into it" ramp ------------------------------------------------
 
@@ -624,6 +783,18 @@ class PreferencesRepository @Inject constructor(
     companion object {
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
         const val HARD_MODE_TOGGLE_COOLDOWN_DAYS = 7
+
+        /** Presets offered on the "turn on hard mode" sheet, alongside a no-time-limit option. */
+        val HARD_MODE_LOCK_DURATION_PRESETS_DAYS = listOf(7, 14, 30, 90)
+        const val HARD_MODE_PIN_MIN_LENGTH = 4
+        const val HARD_MODE_PIN_MAX_LENGTH = 10
+
+        /** Wrong PIN guesses allowed before a cooldown starts. */
+        const val HARD_MODE_PIN_ATTEMPTS_PER_ROUND = 5
+
+        /** Cooldown length once a round of wrong guesses runs out, growing each time it happens again; caps at the last entry. */
+        val HARD_MODE_PIN_COOLDOWNS_MINUTES = listOf(5, 15, 60, 240, 1_440)
+        private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5
         const val DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES = 30
         const val DEFAULT_LIMITED_UNBLOCK_WINDOW_MINUTES = 60
