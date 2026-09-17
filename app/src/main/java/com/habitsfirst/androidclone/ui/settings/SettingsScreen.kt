@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -707,14 +706,8 @@ private fun <T> DropdownSelector(
                     contentDescription = null,
                 )
             },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        // OutlinedTextField consumes its own touch/focus, so a transparent click
-        // target on top -- not a click listener on the field itself -- is what
-        // actually opens the menu.
-        Box(
             modifier = Modifier
-                .matchParentSize()
+                .fillMaxWidth()
                 .clickable { expanded = true },
         )
         DropdownMenu(
