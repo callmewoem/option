@@ -84,7 +84,32 @@ fun TodoScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (state.todos.isEmpty()) {
+                item {
+                    Text(
+                        "Nothing on the list.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                }
+            } else {
+                items(state.todos, key = { it.id }) { todo ->
+                    TodoRow(
+                        todo = todo,
+                        onToggle = { viewModel.onToggleDone(todo) },
+                        onDelete = { viewModel.onDelete(todo) },
+                    )
+                }
+            }
+
+            // Adding a new todo is the least-used action on this screen once a few are
+            // already listed -- keeping it below the list instead of pinned above it means
+            // the list itself doesn't reflow downward every time this screen opens.
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = newTodoText,
@@ -115,26 +140,6 @@ fun TodoScreen(
                         selected = newTodoDueTomorrow,
                         onClick = { newTodoDueTomorrow = true },
                         label = { Text("Tomorrow") },
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            if (state.todos.isEmpty()) {
-                item {
-                    Text(
-                        "Nothing on the list.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 16.dp),
-                    )
-                }
-            } else {
-                items(state.todos, key = { it.id }) { todo ->
-                    TodoRow(
-                        todo = todo,
-                        onToggle = { viewModel.onToggleDone(todo) },
-                        onDelete = { viewModel.onDelete(todo) },
                     )
                 }
             }

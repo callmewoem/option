@@ -31,11 +31,11 @@ import java.sql.SQLException
  *
  * What this class verifies instead, for real, on this machine: that every migration's SQL
  * is valid against actual SQLite (catches typos, wrong column/table names, bad DDL for
- * SQLite's specific `ALTER TABLE` limitations), that the full 1->12 chain produces the
+ * SQLite's specific `ALTER TABLE` limitations), that the full 1->13 chain produces the
  * table/column set [AppDatabase][com.locke.app.data.local.AppDatabase]'s
  * current entities expect (cross-checked by hand against
- * `app/schemas/com.locke.app.data.local.AppDatabase/11.json` -- 12's own copy isn't
- * checked in yet, see that directory's own note), and that the data-rewriting step
+ * `app/schemas/com.locke.app.data.local.AppDatabase/11.json` -- 12's and 13's own copies
+ * aren't checked in yet, see that directory's own note), and that the data-rewriting step
  * (v8->v9's habit-type remap) does the right thing on seeded rows. It does not check
  * Room's own schema-identity hash or `@ColumnInfo(defaultValue)` bookkeeping -- there's
  * no substitute for `MigrationTestHelper` (or just running the app against an old
@@ -55,7 +55,7 @@ class MigrationsSqlTest {
         "CREATE TABLE `blocked_apps` (`packageName` TEXT NOT NULL, `appLabel` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`packageName`))",
     )
 
-    /** Every migration's SQL, 1->2 through 11->12, in order. */
+    /** Every migration's SQL, 1->2 through 12->13, in order. */
     private val allMigrationSql = listOf(
         MIGRATION_1_2_SQL,
         MIGRATION_2_3_SQL,
@@ -68,6 +68,7 @@ class MigrationsSqlTest {
         MIGRATION_9_10_SQL,
         MIGRATION_10_11_SQL,
         MIGRATION_11_12_SQL,
+        MIGRATION_12_13_SQL,
     )
 
     private fun newV1Database(): Connection {
@@ -123,7 +124,7 @@ class MigrationsSqlTest {
     }
 
     @Test
-    fun `every migration's SQL is valid and the full chain 1 to 12 lands on the current table set`() {
+    fun `every migration's SQL is valid and the full chain 1 to 13 lands on the current table set`() {
         newV1Database().use { db ->
             allMigrationSql.forEach { db.runSql(it) }
 
@@ -145,7 +146,8 @@ class MigrationsSqlTest {
                     "id", "name", "type", "targetValue", "targetPackageName", "targetAppLabel",
                     "sortOrder", "createdAtEpochMillis", "isArchived", "verificationPrompt",
                     "verificationExampleImagePath", "kind", "expiresAfterDate", "easeInOrder",
-                    "scheduledDaysMask",
+                    "scheduledDaysMask", "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                    "targetLocationLabel", "targetGithubUsername", "tagPayload",
                 ),
                 db.columnNames("habits"),
             )
@@ -205,6 +207,45 @@ class MigrationsSqlTest {
                 statement.executeQuery("SELECT COUNT(*) AS c FROM `analytics_events`").use { rs ->
                     assertTrue(rs.next())
                     assertEquals(0, rs.getInt("c"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `migration 12 to 13 adds the location, github, and tag columns as nullable with no backfill`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(11).forEach { db.runSql(it) } // 1->2 .. 11->12, i.e. up to v12
+
+            db.runSql(
+                listOf(
+                    "INSERT INTO `habits` (`name`, `type`, `targetValue`, `targetPackageName`, `targetAppLabel`, `sortOrder`, `createdAtEpochMillis`, `isArchived`) " +
+                        "VALUES ('Read', 'TALLY', 0, NULL, NULL, 0, 0, 0)",
+                ),
+            )
+
+            db.runSql(MIGRATION_12_13_SQL)
+
+            assertEquals(
+                listOf(
+                    "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                    "targetLocationLabel", "targetGithubUsername", "tagPayload",
+                ).sorted(),
+                db.columnNames("habits").filter {
+                    it in setOf(
+                        "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                        "targetLocationLabel", "targetGithubUsername", "tagPayload",
+                    )
+                }.sorted(),
+            )
+            db.createStatement().use { statement ->
+                statement.executeQuery(
+                    "SELECT `targetLatitude`, `targetGithubUsername`, `tagPayload` FROM `habits` WHERE `name` = 'Read'",
+                ).use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals(null, rs.getObject("targetLatitude"))
+                    assertEquals(null, rs.getObject("targetGithubUsername"))
+                    assertEquals(null, rs.getObject("tagPayload"))
                 }
             }
         }

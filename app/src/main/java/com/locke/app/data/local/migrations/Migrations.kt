@@ -6,7 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Real, hand-written [Migration]s covering every version transition
  * [AppDatabase][com.locke.app.data.local.AppDatabase] has ever been through,
- * 1 through 11 -- see the version-history comment above `@Database` there for the
+ * 1 through 13 -- see the version-history comment above `@Database` there for the
  * user-facing story of each step; this file is the literal DDL/DML for it.
  *
  * Each `MIGRATION_x_y` is backed by a `MIGRATION_x_y_SQL` statement list so the exact same
@@ -239,6 +239,28 @@ internal val MIGRATION_11_12_SQL: List<String> = listOf(
 val MIGRATION_11_12: Migration = sqlMigration(11, 12, MIGRATION_11_12_SQL)
 
 /**
+ * SQL for [MIGRATION_12_13]: added six nullable `habits` columns for four new habit
+ * "connections" -- [com.locke.app.domain.model.HabitType.VISIT_LOCATION]'s
+ * saved target (`targetLatitude`/`targetLongitude`/`targetRadiusMeters`/`targetLocationLabel`),
+ * [com.locke.app.domain.model.HabitType.GITHUB_CONTRIBUTION]'s saved
+ * username (`targetGithubUsername`), and
+ * [com.locke.app.domain.model.HabitType.TAG_SCAN]'s NFC/QR payload
+ * (`tagPayload`). All six are nullable with no backfill needed for existing rows, same
+ * shape as [MIGRATION_1_2_SQL]'s four verification columns above.
+ */
+internal val MIGRATION_12_13_SQL: List<String> = listOf(
+    "ALTER TABLE `habits` ADD COLUMN `targetLatitude` REAL",
+    "ALTER TABLE `habits` ADD COLUMN `targetLongitude` REAL",
+    "ALTER TABLE `habits` ADD COLUMN `targetRadiusMeters` INTEGER",
+    "ALTER TABLE `habits` ADD COLUMN `targetLocationLabel` TEXT",
+    "ALTER TABLE `habits` ADD COLUMN `targetGithubUsername` TEXT",
+    "ALTER TABLE `habits` ADD COLUMN `tagPayload` TEXT",
+)
+
+/** v12 -> v13, see [MIGRATION_12_13_SQL]. */
+val MIGRATION_12_13: Migration = sqlMigration(12, 13, MIGRATION_12_13_SQL)
+
+/**
  * Every real migration this database has, in order, for
  * [com.locke.app.di.AppModule.provideDatabase] to install via
  * `addMigrations(*ALL_MIGRATIONS)`.
@@ -255,6 +277,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_9_10,
     MIGRATION_10_11,
     MIGRATION_11_12,
+    MIGRATION_12_13,
 )
 
 /** Builds a [Migration] that just runs [statements] in order via [SupportSQLiteDatabase.execSQL]. */

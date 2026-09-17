@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Redeem
@@ -69,7 +72,9 @@ import com.locke.app.domain.model.BuddyConnectionStatus
 import com.locke.app.domain.model.HabitKind
 import com.locke.app.domain.model.PremiumFeature
 import com.locke.app.domain.model.SubscriptionTier
+import com.locke.app.domain.model.ThemeMode
 import com.locke.app.domain.model.ThemeVariant
+import com.locke.app.ui.components.LockeCard
 import com.locke.app.ui.components.LockeGhostButton
 import com.locke.app.ui.components.LockePrimaryButton
 import com.locke.app.ui.components.icon
@@ -102,16 +107,8 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showSkipHabitDialog by remember { mutableStateOf(false) }
-    var themeCodeInput by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val themeCodeMessage by viewModel.themeCodeMessage.collectAsStateWithLifecycle()
-    LaunchedEffect(themeCodeMessage) {
-        themeCodeMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.onThemeCodeMessageShown()
-        }
-    }
     val accountabilityMessage by viewModel.accountabilityMessage.collectAsStateWithLifecycle()
     LaunchedEffect(accountabilityMessage) {
         accountabilityMessage?.let {
@@ -351,7 +348,7 @@ fun SettingsScreen(
 
             // -- Easier to change ------------------------------------------------------
             item { SectionHeader(stringResource(R.string.settings_habits)) }
-            items(state.habits, key = { it.id }) { habit ->
+            itemsIndexed(state.habits, key = { _, habit -> habit.id }) { index, habit ->
                 ListItem(
                     headlineContent = { Text(habit.name) },
                     supportingContent = {
@@ -360,7 +357,23 @@ fun SettingsScreen(
                         Text("${habit.kind.label} · $target${schedule.orEmpty()}")
                     },
                     leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
-                    trailingContent = { Icon(Icons.Filled.ChevronRight, contentDescription = null) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { viewModel.onMoveHabit(habit.id, up = true) },
+                                enabled = index > 0,
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                            }
+                            IconButton(
+                                onClick = { viewModel.onMoveHabit(habit.id, up = false) },
+                                enabled = index < state.habits.lastIndex,
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                            }
+                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onEditHabit(habit.id) },
@@ -404,11 +417,12 @@ fun SettingsScreen(
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
-            item { SectionHeader("Cosmetics") }
+            item { SectionHeader("Appearance") }
             item {
                 Text(
-                    "Kept, not worn -- the palette itself never changes. A collected record of what's been " +
-                        "won from the daily lootbox, or unlocked instantly with a code below.",
+                    "Applies to everyday screens -- Today, Stats, Settings, onboarding. Screens that lock, " +
+                        "block, or demand something (curfew, penalties, morning check-in) always stay dark, " +
+                        "regardless of this.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -416,49 +430,18 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ThemeVariant.entries.forEach { variant ->
-                        val unlocked = variant in state.unlockedThemeVariants
+                    ThemeMode.entries.forEach { mode ->
                         FilterChip(
-                            selected = unlocked,
-                            onClick = {},
-                            enabled = false,
-                            label = { Text(variant.displayName) },
-                            leadingIcon = if (!unlocked) {
-                                { Icon(Icons.Filled.Lock, contentDescription = "Not yet kept", modifier = Modifier.size(16.dp)) }
-                            } else {
-                                null
-                            },
+                            selected = state.themeMode == mode,
+                            onClick = { viewModel.onThemeModeChanged(mode) },
+                            label = { Text(mode.displayName) },
                         )
                     }
                 }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = themeCodeInput,
-                        onValueChange = { themeCodeInput = it },
-                        label = { Text("Cosmetic code") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    LockePrimaryButton(
-                        text = "Redeem",
-                        onClick = {
-                            viewModel.onRedeemThemeCode(themeCodeInput)
-                            themeCodeInput = ""
-                        },
-                        enabled = themeCodeInput.isNotBlank(),
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                    )
-                }
-                HorizontalDivider(modifier = Modifier.padding(top = 12.dp))
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
             if (state.healthConnectAvailable) {
@@ -535,6 +518,32 @@ fun SettingsScreen(
                         LockeGhostButton(text = "Upgrade to Premium", onClick = { onOpenPaywall(PremiumFeature.PHOTO_VERIFICATION) })
                     }
                 }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
+
+            item { SectionHeader("Connections") }
+            item {
+                ConnectionKeyField(
+                    title = "WakaTime",
+                    description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
+                        "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
+                    label = "WakaTime API key",
+                    placeholder = "waka_...",
+                    value = state.wakaTimeApiKey,
+                    onValueChanged = viewModel::onWakaTimeApiKeyChanged,
+                )
+            }
+            item {
+                ConnectionKeyField(
+                    title = "GitHub",
+                    description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
+                        "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
+                        "needed for public activity) to raise that limit and count private contributions too.",
+                    label = "GitHub personal access token",
+                    placeholder = "ghp_...",
+                    value = state.githubToken,
+                    onValueChanged = viewModel::onGithubTokenChanged,
+                )
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
             }
 
@@ -875,6 +884,48 @@ private fun PremiumSection(isPremium: Boolean, tier: SubscriptionTier, onUpgrade
         trailingContent = { if (!isPremium) LockeGhostButton(text = "Upgrade", onClick = onUpgrade) },
     )
     HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+}
+
+/**
+ * A "paste your own key" row for one third-party connection (WakaTime, GitHub) -- just
+ * the key itself and a username/timestamp, no photo/content ever leaves the device for
+ * either of these (unlike photo verification, which goes through Locke's own backend).
+ */
+@Composable
+private fun ConnectionKeyField(
+    title: String,
+    description: String,
+    label: String,
+    placeholder: String,
+    value: String?,
+    onValueChanged: (String) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value.orEmpty()) }
+    var visible by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleSmall)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it; onValueChanged(it) },
+            label = { Text(label) },
+            placeholder = { Text(placeholder) },
+            singleLine = true,
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { visible = !visible }) {
+                    Icon(
+                        imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = if (visible) "Hide key" else "Show key",
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /**

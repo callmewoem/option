@@ -22,6 +22,7 @@ import com.locke.app.ui.apppicker.AppPickerScreen
 import com.locke.app.ui.diagnostics.DiagnosticsScreen
 import com.locke.app.ui.habit.AddEditHabitScreen
 import com.locke.app.ui.habit.ImageVerificationScreen
+import com.locke.app.ui.habit.ScanTagScreen
 import com.locke.app.ui.habit.TimedHabitTimerScreen
 import com.locke.app.ui.habits.HabitsScreen
 import com.locke.app.ui.home.HomeScreen
@@ -143,6 +144,7 @@ fun LockeNavHost() {
                 onAddHabit = { navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING)) },
                 onOpenHabit = { habitId -> navController.navigate(Screen.TimedHabitTimer.createRoute(habitId)) },
                 onVerifyHabit = { habitId -> navController.navigate(Screen.VerifyHabit.createRoute(habitId)) },
+                onScanTag = { habitId -> navController.navigate(Screen.ScanTag.createRoute(habitId)) },
                 onCheckIn = { navController.navigate(Screen.ProofOfLife.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onManageApps = { navController.navigate(Screen.AppPicker.route) },
@@ -239,6 +241,12 @@ fun LockeNavHost() {
                 onDone = { navController.popBackStack() },
                 onUpgrade = { navController.navigate(Screen.Paywall.createRoute(PremiumFeature.PHOTO_VERIFICATION)) },
             )
+        }
+        composable(
+            route = Screen.ScanTag.route,
+            arguments = listOf(navArgument(Screen.ARG_HABIT_ID) { type = NavType.StringType }),
+        ) {
+            ScanTagScreen(onDone = { navController.popBackStack() })
         }
         composable(Screen.ProofOfLife.route) {
             ProofOfLifeScreen(

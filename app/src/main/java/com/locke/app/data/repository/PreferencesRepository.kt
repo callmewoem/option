@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.locke.app.domain.model.AppBlockMode
 import com.locke.app.domain.model.SubscriptionTier
+import com.locke.app.domain.model.ThemeMode
 import com.locke.app.domain.model.ThemeVariant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -35,6 +36,12 @@ class PreferencesRepository @Inject constructor(
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val CACHED_STREAK = intPreferencesKey("cached_streak")
         val CACHED_STREAK_DATE = stringPreferencesKey("cached_streak_date")
+        // NOTE: no client-side ANTHROPIC_API_KEY here -- superseded by the backend
+        // (see BackendImageVerificationClient.kt): the key lives server-side in
+        // ANTHROPIC_API_KEY on the backend process's own environment, never in the app.
+        val WAKATIME_API_KEY = stringPreferencesKey("wakatime_api_key")
+        val GITHUB_TOKEN = stringPreferencesKey("github_token")
+        val THEME_MODE = stringPreferencesKey("theme_mode") // ThemeMode.name
         val THEME_VARIANT = stringPreferencesKey("theme_variant")
         val UNLOCKED_THEME_VARIANTS = stringSetPreferencesKey("unlocked_theme_variants")
         val GRACE_TOKEN_COUNT = intPreferencesKey("grace_token_count")
@@ -133,6 +140,38 @@ class PreferencesRepository @Inject constructor(
             it[Keys.CACHED_STREAK] = days
             it[Keys.CACHED_STREAK_DATE] = forDate
         }
+    }
+
+    /** The user's own WakaTime API key, used to sync [com.locke.app.domain.model.HabitType.WAKATIME_CODING_MINUTES] habits. */
+    val wakaTimeApiKey: Flow<String?> = dataStore.data.map { it[Keys.WAKATIME_API_KEY] }
+
+    suspend fun setWakaTimeApiKey(key: String?) {
+        dataStore.edit {
+            if (key.isNullOrBlank()) it.remove(Keys.WAKATIME_API_KEY) else it[Keys.WAKATIME_API_KEY] = key.trim()
+        }
+    }
+
+    /**
+     * The user's own GitHub personal access token (optional -- a
+     * [com.locke.app.domain.model.HabitType.GITHUB_CONTRIBUTION] habit
+     * still works without one, checking only public activity at GitHub's unauthenticated
+     * rate limit). Setting one raises that limit and lets private contributions count too.
+     */
+    val githubToken: Flow<String?> = dataStore.data.map { it[Keys.GITHUB_TOKEN] }
+
+    suspend fun setGithubToken(token: String?) {
+        dataStore.edit {
+            if (token.isNullOrBlank()) it.remove(Keys.GITHUB_TOKEN) else it[Keys.GITHUB_TOKEN] = token.trim()
+        }
+    }
+
+    // -- Appearance -------------------------------------------------------------------
+
+    /** Light/Dark/System for "app mode" screens -- see [ThemeMode]. Enforcement-mode screens are unaffected. */
+    val themeMode: Flow<ThemeMode> = dataStore.data.map { ThemeMode.fromId(it[Keys.THEME_MODE]) }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        dataStore.edit { it[Keys.THEME_MODE] = mode.name }
     }
 
     // -- Theme (lootbox-unlockable) --------------------------------------------------

@@ -98,6 +98,36 @@ object WorkScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(WeeklyDigestWorker.UNIQUE_PERIODIC_NAME)
     }
 
+    /** Enqueues the periodic check of [LocationSyncWorker] -- called (KEEP policy, so idempotent) whenever a VISIT_LOCATION habit is saved, mirroring [scheduleUsageTracking]. */
+    fun scheduleLocationSync(context: Context) {
+        val request = PeriodicWorkRequestBuilder<LocationSyncWorker>(30, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            LocationSyncWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    /** Enqueues the periodic check of [GithubSyncWorker] -- called (KEEP policy) whenever a GITHUB_CONTRIBUTION habit is saved. */
+    fun scheduleGithubSync(context: Context) {
+        val request = PeriodicWorkRequestBuilder<GithubSyncWorker>(30, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            GithubSyncWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    /** Enqueues the periodic sync of [WakaTimeSyncWorker] -- called (KEEP policy) whenever a WAKATIME_CODING_MINUTES habit is saved. */
+    fun scheduleWakaTimeSync(context: Context) {
+        val request = PeriodicWorkRequestBuilder<WakaTimeSyncWorker>(30, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WakaTimeSyncWorker.UNIQUE_PERIODIC_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
     /** Enqueues the periodic re-sync of the premade URL blocklists from their upstream source. */
     fun scheduleBlocklistRefresh(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()

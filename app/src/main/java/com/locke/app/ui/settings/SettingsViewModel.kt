@@ -17,6 +17,7 @@ import com.locke.app.domain.model.AccountabilityBuddy
 import com.locke.app.domain.model.Habit
 import com.locke.app.domain.model.SubscriptionTier
 import com.locke.app.domain.model.ThemeCodeResult
+import com.locke.app.domain.model.ThemeMode
 import com.locke.app.domain.model.ThemeVariant
 import com.locke.app.service.WorkScheduler
 import com.locke.app.ui.habits.StatsRange
@@ -47,6 +48,7 @@ data class SettingsUiState(
     val subscriptionTier: SubscriptionTier = SubscriptionTier.NONE,
     /** Null once premium (unlimited). Otherwise how many of this month's free AI photo checks are left. */
     val freeVerificationsRemaining: Int? = null,
+    val themeMode: ThemeMode = ThemeMode.DEFAULT,
     val selectedThemeVariant: ThemeVariant = ThemeVariant.DEFAULT,
     val unlockedThemeVariants: Set<ThemeVariant> = setOf(ThemeVariant.DEFAULT),
     val graceTokenCount: Int = 0,
@@ -73,6 +75,8 @@ data class SettingsUiState(
     val healthConnectAvailable: Boolean = false,
     val healthConnectPermissionsGranted: Boolean = false,
     val healthConnectSyncEnabled: Boolean = false,
+    val wakaTimeApiKey: String? = null,
+    val githubToken: String? = null,
     val myPairingCode: String? = null,
     val shareDailyStatsEnabled: Boolean = false,
     val buddies: List<AccountabilityBuddy> = emptyList(),
@@ -82,6 +86,14 @@ data class SettingsUiState(
     val isExporting: Boolean = false,
     val analyticsEnabled: Boolean = true,
 )
+
+/**
+ * The user's own WakaTime/GitHub keys for
+ * [com.locke.app.domain.model.HabitType.WAKATIME_CODING_MINUTES]/
+ * [com.locke.app.domain.model.HabitType.GITHUB_CONTRIBUTION] habits --
+ * grouped only to keep the final combine() within its 5-flow cap.
+ */
+private data class ConnectionKeys(val wakaTimeApiKey: String?, val githubToken: String?)
 
 /** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
 private data class AccountabilitySettings(
@@ -219,6 +231,12 @@ class SettingsViewModel @Inject constructor(
         ::ExtraSettings,
     )
 
+    private val connectionKeys = combine(
+        preferencesRepository.wakaTimeApiKey,
+        preferencesRepository.githubToken,
+        ::ConnectionKeys,
+    )
+
     private val accountabilitySettings = combine(
         accountabilityRepository.myPairingCode,
         accountabilityRepository.shareStatsEnabled,
@@ -281,8 +299,11 @@ class SettingsViewModel @Inject constructor(
         baseUiState,
         accountabilitySettings,
         entitlementRepository.entitlement,
-        preferencesRepository.isAnalyticsEnabled,
-    ) { base, accountability, entitlement, analyticsEnabled ->
+        connectionKeys,
+        // combine()'s typed overloads top out at 5 flows -- analyticsEnabled/themeMode
+        // are paired up in a nested combine() rather than growing this one past its cap.
+        combine(preferencesRepository.isAnalyticsEnabled, preferencesRepository.themeMode, ::Pair),
+    ) { base, accountability, entitlement, connections, analyticsAndTheme ->
         base.copy(
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
@@ -291,7 +312,10 @@ class SettingsViewModel @Inject constructor(
             isPremium = entitlement.isPremium,
             subscriptionTier = entitlement.tier,
             freeVerificationsRemaining = if (entitlement.isPremium) null else base.freeVerificationsRemaining,
-            analyticsEnabled = analyticsEnabled,
+            analyticsEnabled = analyticsAndTheme.first,
+            wakaTimeApiKey = connections.wakaTimeApiKey,
+            githubToken = connections.githubToken,
+            themeMode = analyticsAndTheme.second,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -310,6 +334,18 @@ class SettingsViewModel @Inject constructor(
                 analyticsRepository.setEnabled(false)
             }
         }
+    }
+
+    fun onWakaTimeApiKeyChanged(key: String) {
+        viewModelScope.launch { preferencesRepository.setWakaTimeApiKey(key) }
+    }
+
+    fun onGithubTokenChanged(token: String) {
+        viewModelScope.launch { preferencesRepository.setGithubToken(token) }
+    }
+
+    fun onThemeModeChanged(mode: ThemeMode) {
+        viewModelScope.launch { preferencesRepository.setThemeMode(mode) }
     }
 
     fun onThemeVariantSelected(variant: ThemeVariant) {
@@ -403,6 +439,22 @@ class SettingsViewModel @Inject constructor(
             if (lootboxRepository.consumeTaskSkipToken()) {
                 habitRepository.setProgress(habitId, targetValue, targetValue)
             }
+        }
+    }
+
+    /**
+     * Moves [habitId] one spot earlier ([up] true) or later (false) in the habit list --
+     * the reorder arrows next to each row in Settings. A no-op at either end of the list.
+     */
+    fun onMoveHabit(habitId: Long, up: Boolean) {
+        viewModelScope.launch {
+            val ids = uiState.value.habits.map { it.id }.toMutableList()
+            val fromIndex = ids.indexOf(habitId)
+            if (fromIndex < 0) return@launch
+            val toIndex = if (up) fromIndex - 1 else fromIndex + 1
+            if (toIndex < 0 || toIndex >= ids.size) return@launch
+            ids[fromIndex] = ids[toIndex].also { ids[toIndex] = ids[fromIndex] }
+            habitRepository.reorderHabits(ids)
         }
     }
 

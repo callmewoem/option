@@ -152,6 +152,17 @@ class HabitRepository @Inject constructor(
         habitDao.archive(habitId)
     }
 
+    /**
+     * Re-ranks every habit in [orderedIds] to match its position in the list -- the
+     * Settings habit list's up/down reorder buttons. Renumbers from scratch rather than
+     * swapping the two moved rows' existing [com.locke.app.data.local.entity.HabitEntity.sortOrder]
+     * values, so it also self-heals any old rows still sharing the default
+     * (pre-reorder-feature) value of 0.
+     */
+    suspend fun reorderHabits(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, habitId -> habitDao.updateSortOrder(habitId, index) }
+    }
+
     /** Removes expired makeup habits (see [PenaltyRepository]). Safe to call often -- it's a no-op most days. */
     suspend fun archiveExpiredHabits(date: String = DateProvider.todayString()) {
         habitDao.archiveExpiredHabits(date)
@@ -186,6 +197,21 @@ class HabitRepository @Inject constructor(
 
     suspend fun setTallyHabitDone(habitId: Long, done: Boolean, date: String = DateProvider.todayString()) {
         setProgress(habitId, if (done) 1 else 0, target = 1, date = date)
+    }
+
+    /**
+     * Marks a habit done for today if it isn't already -- for presence-style background
+     * checks ([com.locke.app.service.LocationSyncWorker],
+     * [com.locke.app.service.GithubSyncWorker]) that can only ever detect a
+     * positive signal (you were there / you did contribute), never a negative one.
+     * Deliberately never un-marks: unlike [HealthConnectSyncWorker][com.locke.app.service.HealthConnectSyncWorker]'s
+     * absolute overwrite, a "no signal this tick" reading here must not clobber an
+     * earlier detection or a manual tap back to incomplete.
+     */
+    suspend fun markDoneIfDetected(habitId: Long, date: String = DateProvider.todayString()) {
+        val existing = completionDao.getCompletion(habitId, date)
+        if (existing?.isCompleted == true) return
+        setProgress(habitId, 1, target = 1, date = date)
     }
 
     /** Records a vision-model verdict on a submitted proof photo for a [HabitType.PHOTO] habit. */
@@ -239,6 +265,24 @@ class HabitRepository @Inject constructor(
         habitDao.getActiveHabitsOnce()
             .map { it.toDomain() }
             .filter { it.type in HEALTH_CONNECT_HABIT_TYPES }
+
+    /** Active [HabitType.VISIT_LOCATION] habits that actually have a target saved, for [com.locke.app.service.LocationSyncWorker]. */
+    suspend fun getVisitLocationHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.VISIT_LOCATION && it.hasTargetLocation }
+
+    /** Active [HabitType.GITHUB_CONTRIBUTION] habits that have a username saved, for [com.locke.app.service.GithubSyncWorker]. */
+    suspend fun getGithubHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.GITHUB_CONTRIBUTION && !it.targetGithubUsername.isNullOrBlank() }
+
+    /** Active [HabitType.WAKATIME_CODING_MINUTES] habits, for [com.locke.app.service.WakaTimeSyncWorker]. */
+    suspend fun getWakaTimeHabitsOnce(): List<Habit> =
+        habitDao.getActiveHabitsOnce()
+            .map { it.toDomain() }
+            .filter { it.type == HabitType.WAKATIME_CODING_MINUTES }
 
     suspend fun getProgressOnce(habitId: Long, date: String = DateProvider.todayString()): Int =
         completionDao.getCompletion(habitId, date)?.currentValue ?: 0
