@@ -1,6 +1,6 @@
 package com.locke.app.di
 
-import com.locke.app.data.verification.BackendImageVerificationClient
+import com.locke.app.data.verification.DevModeImageVerificationClient
 import com.locke.app.data.verification.ImageVerificationClient
 import dagger.Binds
 import dagger.Module
@@ -29,5 +29,5 @@ object NetworkModule {
 abstract class VerificationModule {
 
     @Binds
-    abstract fun bindImageVerificationClient(impl: BackendImageVerificationClient): ImageVerificationClient
+    abstract fun bindImageVerificationClient(impl: DevModeImageVerificationClient): ImageVerificationClient
 }

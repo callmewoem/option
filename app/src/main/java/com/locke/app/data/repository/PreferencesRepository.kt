@@ -88,6 +88,7 @@ class PreferencesRepository @Inject constructor(
         val LIMITED_UNBLOCK_STREAK_BONUS_ENABLED = booleanPreferencesKey("limited_unblock_streak_bonus_enabled")
         val LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = intPreferencesKey("limited_unblock_streak_bonus_minutes_per_day")
         val ANALYTICS_ENABLED = booleanPreferencesKey("analytics_enabled")
+        val DEVELOPER_MODE_ENABLED = booleanPreferencesKey("developer_mode_enabled")
         val CACHED_EXPERIMENT_ASSIGNMENTS = stringPreferencesKey("cached_experiment_assignments") // JSON: {key: value}
         val EXPERIMENT_ASSIGNMENTS_FETCHED_AT_EPOCH_MILLIS = longPreferencesKey("experiment_assignments_fetched_at_epoch_millis")
     }
@@ -639,6 +640,23 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setAnalyticsEnabled(enabled: Boolean) {
         dataStore.edit { it[Keys.ANALYTICS_ENABLED] = enabled }
+    }
+
+    /**
+     * Developer Mode -- only ever *acted on* in debug builds (see
+     * [com.locke.app.data.billing.DevModeEntitlementRepository] and
+     * [com.locke.app.data.verification.DevModeImageVerificationClient], both of which
+     * also re-check `BuildConfig.DEBUG` themselves rather than trusting this flag alone)
+     * and only ever *shown* in Settings behind the same check
+     * (`SettingsScreen.kt`'s Developer section). Flipping it on treats this device as
+     * always premium and routes AI photo checks to a local stub instead of Locke's real
+     * backend, so a debug build can be exercised end to end with no purchase and no
+     * running backend.
+     */
+    val isDeveloperModeEnabled: Flow<Boolean> = dataStore.data.map { it[Keys.DEVELOPER_MODE_ENABLED] ?: false }
+
+    suspend fun setDeveloperModeEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.DEVELOPER_MODE_ENABLED] = enabled }
     }
 
     /**

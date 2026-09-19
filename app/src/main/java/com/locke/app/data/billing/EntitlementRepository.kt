@@ -7,10 +7,11 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * The seam every premium-gated call site goes through -- never query Play Billing (or
- * anything else) directly, so that swapping [PlayBillingEntitlementRepository] (bound in
- * `di/BillingModule.kt`) for a different implementation requires zero changes at the call
- * sites. [StubEntitlementRepository] is the simplest correct implementation (local-only,
- * unverified) -- useful as a reference and in tests.
+ * anything else) directly, so that swapping the bound implementation (`di/BillingModule.kt`
+ * binds [DevModeEntitlementRepository], a thin developer-mode wrapper around the real
+ * [PlayBillingEntitlementRepository]) for a different implementation requires zero changes
+ * at the call sites. [StubEntitlementRepository] is the simplest correct implementation
+ * (local-only, unverified) -- useful as a reference and in tests.
  */
 interface EntitlementRepository {
     /** The user's current entitlement state. See [Entitlement.isPremium] for the field to actually check. */

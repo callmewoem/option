@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
@@ -682,6 +683,29 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .clickable(onClick = onOpenPrivacyPolicy),
                     )
+                }
+            }
+
+            if (BuildConfig.DEBUG) {
+                item {
+                    ExpandableSection(
+                        title = "Developer",
+                        icon = Icons.Filled.BugReport,
+                        summary = if (state.developerModeEnabled) "Developer mode on" else "Developer mode off",
+                    ) {
+                        ListItem(
+                            headlineContent = { Text("Developer mode") },
+                            supportingContent = {
+                                Text(
+                                    "Debug builds only. Treats this device as always Premium and auto-approves " +
+                                        "AI photo checks locally, so you can test without a purchase or a running backend.",
+                                )
+                            },
+                            trailingContent = {
+                                Switch(checked = state.developerModeEnabled, onCheckedChange = viewModel::onDeveloperModeToggled)
+                            },
+                        )
+                    }
                 }
             }
 
