@@ -17,4 +17,6 @@ data class Todo(
     val createdAtEpochMillis: Long = System.currentTimeMillis(),
     /** When [isDone] was last set true -- null while pending, cleared back to null if un-done. Powers the time-to-complete stat. */
     val completedAtEpochMillis: Long? = null,
+    /** Which [TodoList] this todo is partitioned into -- null means unpartitioned ("Inbox"). */
+    val listId: Long? = null,
 )

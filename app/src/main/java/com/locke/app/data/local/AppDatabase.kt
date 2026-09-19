@@ -14,6 +14,7 @@ import com.locke.app.data.local.dao.HabitDao
 import com.locke.app.data.local.dao.PendingStatsSyncDao
 import com.locke.app.data.local.dao.StreakScarDao
 import com.locke.app.data.local.dao.TodoDao
+import com.locke.app.data.local.dao.TodoListDao
 import com.locke.app.data.local.entity.AccountabilityBuddyEntity
 import com.locke.app.data.local.entity.AnalyticsEventEntity
 import com.locke.app.data.local.entity.BlockAttemptEntity
@@ -25,6 +26,7 @@ import com.locke.app.data.local.entity.HabitEntity
 import com.locke.app.data.local.entity.PendingStatsSyncEntity
 import com.locke.app.data.local.entity.StreakScarEntity
 import com.locke.app.data.local.entity.TodoEntity
+import com.locke.app.data.local.entity.TodoListEntity
 
 @Database(
     entities = [
@@ -39,6 +41,7 @@ import com.locke.app.data.local.entity.TodoEntity
         AccountabilityBuddyEntity::class,
         PendingStatsSyncEntity::class,
         AnalyticsEventEntity::class,
+        TodoListEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
