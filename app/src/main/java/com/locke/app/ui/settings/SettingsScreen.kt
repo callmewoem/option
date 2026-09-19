@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.LabelOff
 import androidx.compose.material.icons.filled.Link
@@ -397,7 +395,6 @@ fun SettingsScreen(
                         }
                         habitsInSection.forEach { habit ->
                             key(habit.id) {
-                                val index = state.habits.indexOfFirst { it.id == habit.id }
                                 var showListMenu by remember { mutableStateOf(false) }
                                 ListItem(
                                     headlineContent = { Text(habit.name) },
@@ -425,18 +422,6 @@ fun SettingsScreen(
                                                         )
                                                     }
                                                 }
-                                            }
-                                            IconButton(
-                                                onClick = { viewModel.onMoveHabit(habit.id, up = true) },
-                                                enabled = index > 0,
-                                            ) {
-                                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
-                                            }
-                                            IconButton(
-                                                onClick = { viewModel.onMoveHabit(habit.id, up = false) },
-                                                enabled = index < state.habits.lastIndex,
-                                            ) {
-                                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
                                             }
                                             Icon(Icons.Filled.ChevronRight, contentDescription = null)
                                         }

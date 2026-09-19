@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -20,11 +23,18 @@ import java.time.temporal.ChronoUnit
 private val CellSize = 12.dp
 private val CellGap = 3.dp
 
+/** Which primitive [Heatmap] draws per cell -- dots for the Stats screen's contribution grid, squares for the Today hero's compact strip (design spec: "square, radius 3"). */
+enum class HeatmapCellShape { Circle, Square }
+
 /**
- * A dot-grid contribution grid: one column per week, one row per day-of-week (Sunday
- * at top), colored by [colorForDate]. Purely a renderer -- callers decide what a date's
- * color means (continuous completion-fraction shading for the aggregate heatmap, or a
- * flat done/slipped/empty color for a single habit's strip).
+ * A contribution grid, colored by [colorForDate] -- purely a renderer, callers decide
+ * what a date's color means (continuous completion-fraction shading for the aggregate
+ * heatmap, or a flat done/slipped/empty color for a single habit's strip).
+ *
+ * By default one column per week and one row per day-of-week (Sunday at top), matching
+ * the Stats screen's contribution grid. [weeksAsRows] transposes that -- one row per
+ * week, one column per day-of-week -- for the Today hero's compact 7-wide grid (design
+ * spec: "7 columns (days) x 3 rows (weeks)").
  */
 @Composable
 fun Heatmap(
@@ -32,34 +42,69 @@ fun Heatmap(
     endDate: LocalDate,
     colorForDate: (LocalDate) -> Color,
     modifier: Modifier = Modifier,
+    cellSize: Dp = CellSize,
+    cellGap: Dp = CellGap,
+    cellShape: HeatmapCellShape = HeatmapCellShape.Circle,
+    cellCornerRadius: Dp = 3.dp,
+    weeksAsRows: Boolean = false,
+    /** Square cells only -- an outline drawn regardless of fill, e.g. the design spec's empty-cell border. Null draws no outline. */
+    borderColorForDate: ((LocalDate) -> Color)? = null,
+    scrollable: Boolean = true,
 ) {
     val gridStart = startDate.minusDays(((startDate.dayOfWeek.value % 7).toLong())) // back up to Sunday
     val totalDays = ChronoUnit.DAYS.between(gridStart, endDate).toInt() + 1
     val weekCount = (totalDays + 6) / 7
 
     val density = LocalDensity.current
-    val cellPx = with(density) { CellSize.toPx() }
-    val gapPx = with(density) { CellGap.toPx() }
-    val width: Dp = (CellSize + CellGap) * weekCount
-    val height: Dp = (CellSize + CellGap) * 7
+    val cellPx = with(density) { cellSize.toPx() }
+    val gapPx = with(density) { cellGap.toPx() }
+    val cornerPx = with(density) { cellCornerRadius.toPx() }
+    val width: Dp = (cellSize + cellGap) * (if (weeksAsRows) 7 else weekCount)
+    val height: Dp = (cellSize + cellGap) * (if (weeksAsRows) weekCount else 7)
 
-    Box(modifier = modifier.horizontalScroll(rememberScrollState())) {
+    val canvas = @Composable {
         Canvas(modifier = Modifier.width(width).height(height)) {
             for (week in 0 until weekCount) {
                 for (dow in 0 until 7) {
                     val date = gridStart.plusDays((week * 7 + dow).toLong())
-                    val color = if (date in startDate..endDate) colorForDate(date) else Color.Transparent
-                    drawCircle(
-                        color = color,
-                        radius = cellPx / 2f,
-                        center = Offset(
-                            week * (cellPx + gapPx) + cellPx / 2f,
-                            dow * (cellPx + gapPx) + cellPx / 2f,
-                        ),
-                    )
+                    val inRange = date in startDate..endDate
+                    val color = if (inRange) colorForDate(date) else Color.Transparent
+                    val x = if (weeksAsRows) dow * (cellPx + gapPx) else week * (cellPx + gapPx)
+                    val y = if (weeksAsRows) week * (cellPx + gapPx) else dow * (cellPx + gapPx)
+                    when (cellShape) {
+                        HeatmapCellShape.Circle -> drawCircle(
+                            color = color,
+                            radius = cellPx / 2f,
+                            center = Offset(x + cellPx / 2f, y + cellPx / 2f),
+                        )
+                        HeatmapCellShape.Square -> {
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(x, y),
+                                size = Size(cellPx, cellPx),
+                                cornerRadius = CornerRadius(cornerPx, cornerPx),
+                            )
+                            val borderColor = borderColorForDate?.invoke(date)
+                            if (inRange && borderColor != null) {
+                                drawRoundRect(
+                                    color = borderColor,
+                                    topLeft = Offset(x, y),
+                                    size = Size(cellPx, cellPx),
+                                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                                    style = Stroke(width = with(density) { 1.5.dp.toPx() }),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    if (scrollable) {
+        Box(modifier = modifier.horizontalScroll(rememberScrollState())) { canvas() }
+    } else {
+        Box(modifier = modifier) { canvas() }
     }
 }
 

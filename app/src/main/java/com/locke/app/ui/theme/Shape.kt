@@ -21,3 +21,6 @@ val LockeShapes = Shapes(
 
 /** A bottom sheet's top-only curve -- used explicitly where Material3 doesn't already default to it. */
 val LockeSheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+
+/** Full rounding -- round buttons, the habit pill's outer radius (its own height / 2, so this reads identically to a hardcoded corner radius). Design spec: "pill = full rounding". */
+val LockePillShape = RoundedCornerShape(50)

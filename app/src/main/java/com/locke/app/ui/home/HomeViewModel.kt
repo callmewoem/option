@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
@@ -58,6 +59,8 @@ data class HomeUiState(
     val proofOfLifeWindowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     /** True until the first-run spotlight tour has been stepped through or dismissed. */
     val showTour: Boolean = false,
+    /** Completion fraction per date, the last 3 weeks -- Today's compact heatmap (design spec §2). Today's own cell is superseded by the live completion fraction at render time, not this snapshot. */
+    val dayScores: Map<LocalDate, Float> = emptyMap(),
     /** True only on the same calendar day onboarding finished, until dismissed or a photo-verification habit exists. */
     val showPhotoVerificationPrompt: Boolean = false,
     /** True while the app-usage/Health-Connect one-off refresh kicked off on app open/resume (or the manual refresh button) is still running. */
@@ -171,12 +174,17 @@ class HomeViewModel @Inject constructor(
     ) { (gating, tracked, antihabits), blockedApps, _, misc, lockoutUntil ->
         val hasImageVerificationHabit =
             (gating + tracked + antihabits).any { it.habit.type == HabitType.PHOTO }
+        val today = DateProvider.fromDateString(DateProvider.todayString())
+        val heatmapStart = DateProvider.toDateString(today.minusWeeks(2))
+        val dayScores = habitRepository.getDayScoresInRange(heatmapStart, DateProvider.todayString())
+            .mapKeys { DateProvider.fromDateString(it.key) }
         HomeUiState(
             isLoading = false,
             gating = gating,
             tracked = tracked,
             antihabits = antihabits,
             blockedApps = blockedApps,
+            dayScores = dayScores,
             streakDays = habitRepository.computeCurrentStreak(),
             easeInStatus = habitRepository.getEaseInStatus(misc.easeInStreakLength),
             proofOfLifeDue = misc.proofOfLife.due,
@@ -216,6 +224,16 @@ class HomeViewModel @Inject constructor(
                 WorkScheduler.requestHealthConnectRefreshNow(appContext)
             }
         }
+    }
+
+    /** Persists a Today drag-reorder -- see [HabitRepository.reorderHabits]. Today owns habit reordering now; Settings' old up/down buttons were removed in favor of this. */
+    fun onReorderHabits(orderedIds: List<Long>) {
+        viewModelScope.launch { habitRepository.reorderHabits(orderedIds) }
+    }
+
+    /** Archives a habit from Today's swipe-to-delete action -- see [HabitRepository.deleteHabit]. */
+    fun onDeleteHabit(habitId: Long) {
+        viewModelScope.launch { habitRepository.deleteHabit(habitId) }
     }
 
     fun onTallyHabitToggled(habitId: Long, done: Boolean) {
