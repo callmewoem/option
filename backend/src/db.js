@@ -51,10 +51,10 @@ db.exec(`
 
   -- One row per device: its current entitlement, last set either by a client-
   -- reported purchase verified against the Play Developer API, or by an RTDN
-  -- webhook call keyed by purchase_token. free_verification_month/_count track the
-  -- free tier's monthly photo-verification quota (config.freeTier.verificationsPerMonth,
-  -- see routes/verify.js) -- folded into this table rather than a separate one since
-  -- it's the same "one row per device" shape and always read/written alongside tier.
+  -- webhook call keyed by purchase_token. free_verification_month/_count are legacy,
+  -- unused columns left over from a since-removed monthly free-verification quota --
+  -- kept only so an existing database file doesn't need a destructive migration;
+  -- nothing reads or writes them anymore (see services/entitlement.js).
   CREATE TABLE IF NOT EXISTS entitlements (
     device_id TEXT PRIMARY KEY REFERENCES devices(id),
     tier TEXT NOT NULL DEFAULT 'NONE',
@@ -103,10 +103,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_analytics_events_device_id ON analytics_events(device_id);
 `);
 
-// Additive migration for a database file created before the free_verification_*
-// columns existed above -- CREATE TABLE IF NOT EXISTS doesn't retrofit columns onto
-// an already-existing table. Safe to run every boot: each ALTER is skipped once its
-// column is already present.
+// Additive migration for a database file created before the (now-unused, see the
+// entitlements table's own comment above) free_verification_* columns existed --
+// CREATE TABLE IF NOT EXISTS doesn't retrofit columns onto an already-existing table.
+// Safe to run every boot: each ALTER is skipped once its column is already present.
 const entitlementColumns = new Set(db.prepare('PRAGMA table_info(entitlements)').all().map((row) => row.name));
 if (!entitlementColumns.has('free_verification_month')) {
   db.exec('ALTER TABLE entitlements ADD COLUMN free_verification_month TEXT');

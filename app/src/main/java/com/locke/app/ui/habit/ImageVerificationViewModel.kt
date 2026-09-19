@@ -7,14 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.locke.app.data.billing.EntitlementRepository
 import com.locke.app.data.repository.HabitRepository
-import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.data.verification.ImageVerificationClient
 import com.locke.app.data.verification.ImageVerificationException
 import com.locke.app.data.verification.VerificationRequest
 import com.locke.app.data.verification.VerificationResult
 import com.locke.app.domain.model.Habit
 import com.locke.app.ui.navigation.Screen
-import com.locke.app.util.DateProvider
 import com.locke.app.util.ImageStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,7 +20,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -37,12 +34,8 @@ data class ImageVerificationUiState(
     val isDone: Boolean = false,
     /** True once [ImageVerificationViewModel.onOverride] has been used -- see [ImageVerificationViewModel.onCleared]. */
     val overridden: Boolean = false,
-    /**
-     * Null once premium (unlimited checks, nothing to count down). Otherwise how many
-     * of this calendar month's free checks are left, refreshed after every submit --
-     * see [PreferencesRepository.freeVerificationsRemaining].
-     */
-    val freeChecksRemaining: Int? = null,
+    /** AI photo checks require an active (trial or paid) subscription -- drives the upfront upgrade prompt before a photo is even captured. */
+    val isPremium: Boolean = false,
 )
 
 /** Drives the "submit today's proof photo" flow for one [com.locke.app.domain.model.HabitType.PHOTO] habit. */
@@ -51,7 +44,6 @@ class ImageVerificationViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val verificationClient: ImageVerificationClient,
     private val entitlementRepository: EntitlementRepository,
-    private val preferencesRepository: PreferencesRepository,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -65,18 +57,13 @@ class ImageVerificationViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(habit = habitRepository.getHabit(habitId))
         }
-        refreshFreeChecksRemaining()
+        refreshIsPremium()
     }
 
-    /** Re-reads how many free checks are left this month -- called on init and again after every submit, since a completed check spends one. Left null (hidden) once premium. */
-    private fun refreshFreeChecksRemaining() {
+    /** Re-reads entitlement -- called on init and again after every submit, in case a purchase completed elsewhere in the meantime. */
+    private fun refreshIsPremium() {
         viewModelScope.launch {
-            val remaining = if (entitlementRepository.isPremium()) {
-                null
-            } else {
-                preferencesRepository.freeVerificationsRemaining(DateProvider.currentMonthString()).first()
-            }
-            _uiState.value = _uiState.value.copy(freeChecksRemaining = remaining)
+            _uiState.value = _uiState.value.copy(isPremium = entitlementRepository.isPremium())
         }
     }
 
@@ -136,7 +123,7 @@ class ImageVerificationViewModel @Inject constructor(
                 } else {
                     _uiState.value = _uiState.value.copy(isVerifying = false, result = result)
                 }
-                refreshFreeChecksRemaining()
+                refreshIsPremium()
             } catch (e: ImageVerificationException.RequiresPremium) {
                 _uiState.value = _uiState.value.copy(isVerifying = false, requiresPremium = true, errorMessage = e.message)
             } catch (e: ImageVerificationException) {

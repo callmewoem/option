@@ -62,8 +62,8 @@ fun PhotoVerificationCapture(
     onUpgrade: () -> Unit,
     onOverride: (() -> Unit)? = null,
     promptText: String = "Take a photo that proves you did this today.",
-    /** Null once premium (nothing shown -- unlimited). Otherwise this month's free-check count, shown as a quiet reminder before capture, not a nag. */
-    freeChecksRemaining: Int? = null,
+    /** AI photo checks require an active (trial or paid) subscription -- false shows an upfront upgrade prompt instead of the capture button. */
+    isPremium: Boolean = true,
 ) {
     val context = LocalContext.current
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
@@ -96,26 +96,26 @@ fun PhotoVerificationCapture(
 
     if (capturedImagePath == null) {
         Text(text = promptText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (freeChecksRemaining != null) {
+        if (!isPremium) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = if (freeChecksRemaining > 0) {
-                    "$freeChecksRemaining free AI ${if (freeChecksRemaining == 1) "check" else "checks"} left this month"
-                } else {
-                    "Out of free checks this month -- upgrade for unlimited"
-                },
+                text = "AI photo checks are a Premium feature -- start your free trial to use this.",
                 style = MaterialTheme.typography.labelMedium,
-                color = if (freeChecksRemaining > 0) com.locke.app.ui.theme.LockeColor.Brass else MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.error,
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
-        // Camera-only, deliberately: a gallery picker would let an old or unrelated photo
-        // stand in for today's proof, defeating the point of verification.
-        LockePrimaryButton(
-            text = "Take photo",
-            onClick = { launchCamera() },
-            leadingIcon = { Icon(Icons.Filled.CameraAlt, contentDescription = null) },
-        )
+        if (isPremium) {
+            // Camera-only, deliberately: a gallery picker would let an old or unrelated
+            // photo stand in for today's proof, defeating the point of verification.
+            LockePrimaryButton(
+                text = "Take photo",
+                onClick = { launchCamera() },
+                leadingIcon = { Icon(Icons.Filled.CameraAlt, contentDescription = null) },
+            )
+        } else {
+            LockePrimaryButton(text = "Start free trial", onClick = onUpgrade)
+        }
     } else {
         AsyncImage(
             model = capturedImagePath,

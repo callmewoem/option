@@ -24,8 +24,7 @@ import javax.inject.Singleton
  * call [AccountabilityApiClient] directly. Buddies and their last-synced summaries are
  * cached in Room (see `data/local/entity/AccountabilityBuddyEntity.kt`), so the buddy
  * list still renders -- and a stats share still queues instead of getting lost -- with
- * no connectivity. Free tier gets one real buddy connection
- * ([PreferencesRepository.MAX_FREE_BUDDIES]) before Premium is required for more --
+ * no connectivity. Adding a buddy requires an active (trial or paid) subscription --
  * see [canAddBuddy], which callers should check before calling
  * [regeneratePairingCode]/[addBuddy] and route to the paywall instead when it's false,
  * rather than let the backend's 402 be the primary UX. Sharing itself
@@ -46,15 +45,13 @@ class AccountabilityRepository @Inject constructor(
     val buddies: Flow<List<AccountabilityBuddy>> = buddyDao.observeAll().map { list -> list.map { it.toDomain() } }
 
     /**
-     * Whether this device has room for another buddy right now -- true once premium
-     * (no cap), or below [PreferencesRepository.MAX_FREE_BUDDIES] on the free tier.
-     * Checked against the local cache, not the backend, so it's instant and works
-     * offline; the backend re-checks server-side regardless (both sides of a pairing,
-     * see `backend/src/routes/buddies.js`) since this device's cache could be stale
-     * (e.g. a buddy was removed from another device).
+     * Whether this device can add another buddy right now -- true once premium
+     * (trial or paid subscription; no cap). Checked against the local entitlement
+     * cache, not the backend, so it's instant and works offline; the backend
+     * re-checks server-side regardless (both sides of a pairing, see
+     * `backend/src/routes/buddies.js`) since this device's cache could be stale.
      */
-    suspend fun canAddBuddy(): Boolean =
-        entitlementRepository.isPremium() || buddies.first().size < PreferencesRepository.MAX_FREE_BUDDIES
+    suspend fun canAddBuddy(): Boolean = entitlementRepository.isPremium()
 
     /** Sharing itself is never gated on premium or the buddy cap -- once a buddy connection exists (free or paid), showing them your own progress is the entire point of having one and costs nothing extra. */
     val shareStatsEnabled: Flow<Boolean> = preferencesRepository.shareDailyStatsEnabled

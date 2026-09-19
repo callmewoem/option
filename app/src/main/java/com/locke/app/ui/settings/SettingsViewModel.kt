@@ -46,8 +46,6 @@ data class SettingsUiState(
     val notificationsEnabled: Boolean = true,
     val isPremium: Boolean = false,
     val subscriptionTier: SubscriptionTier = SubscriptionTier.NONE,
-    /** Null once premium (unlimited). Otherwise how many of this month's free AI photo checks are left. */
-    val freeVerificationsRemaining: Int? = null,
     val themeMode: ThemeMode = ThemeMode.DEFAULT,
     val selectedThemeVariant: ThemeVariant = ThemeVariant.DEFAULT,
     val unlockedThemeVariants: Set<ThemeVariant> = setOf(ThemeVariant.DEFAULT),
@@ -80,7 +78,7 @@ data class SettingsUiState(
     val myPairingCode: String? = null,
     val shareDailyStatsEnabled: Boolean = false,
     val buddies: List<AccountabilityBuddy> = emptyList(),
-    /** Whether this device has room for another buddy -- premium (unlimited), or still below the free-tier cap. See [AccountabilityRepository.canAddBuddy]. */
+    /** Whether this device can add another buddy -- true once premium (trial or paid). See [AccountabilityRepository.canAddBuddy]. */
     val canAddBuddy: Boolean = true,
     val exportRange: StatsRange = StatsRange.TWELVE_WEEKS,
     val isExporting: Boolean = false,
@@ -130,14 +128,12 @@ private data class BlockingSettings(
     val limitedUnblockWindow: PreferencesRepository.LimitedUnblockWindowSettings,
 )
 
-/** Hard mode/limited unblocking, the ease-in ramp's streak length, Health Connect sync, and this month's raw free-verification count -- grouped only to fit combine()'s 5-flow cap. */
+/** Hard mode/limited unblocking, the ease-in ramp's streak length, and Health Connect sync -- grouped only to fit combine()'s 5-flow cap. */
 private data class ExtraSettings(
     val blocking: BlockingSettings,
     val easeInStreakLength: Int,
     val healthConnectSyncEnabled: Boolean,
     val healthConnectPermissionsGranted: Boolean,
-    /** Not yet nulled out for premium -- the outer `uiState` combine() does that once entitlement is available. */
-    val freeVerificationsRemainingRaw: Int,
 )
 
 /** The data-export section's selected range and in-flight state. */
@@ -227,7 +223,6 @@ class SettingsViewModel @Inject constructor(
         preferencesRepository.easeInStreakLength,
         preferencesRepository.isHealthConnectSyncEnabled,
         _healthConnectPermissionsGranted,
-        preferencesRepository.freeVerificationsRemaining(DateProvider.currentMonthString()),
         ::ExtraSettings,
     )
 
@@ -287,9 +282,6 @@ class SettingsViewModel @Inject constructor(
             healthConnectAvailable = healthConnectManager.isAvailable,
             healthConnectPermissionsGranted = extra.healthConnectPermissionsGranted,
             healthConnectSyncEnabled = extra.healthConnectSyncEnabled,
-            // Not yet nulled out for premium -- the outer uiState combine() below does
-            // that once entitlement is available (not in scope up here).
-            freeVerificationsRemaining = extra.freeVerificationsRemainingRaw,
             exportRange = extraExport.export.range,
             isExporting = extraExport.export.isExporting,
         )
@@ -308,10 +300,9 @@ class SettingsViewModel @Inject constructor(
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
             buddies = accountability.buddies,
-            canAddBuddy = entitlement.isPremium || accountability.buddies.size < PreferencesRepository.MAX_FREE_BUDDIES,
+            canAddBuddy = entitlement.isPremium,
             isPremium = entitlement.isPremium,
             subscriptionTier = entitlement.tier,
-            freeVerificationsRemaining = if (entitlement.isPremium) null else base.freeVerificationsRemaining,
             analyticsEnabled = analyticsAndTheme.first,
             wakaTimeApiKey = connections.wakaTimeApiKey,
             githubToken = connections.githubToken,
@@ -482,11 +473,11 @@ class SettingsViewModel @Inject constructor(
 
     // -- Accountability buddies -----------------------------------------------------
 
-    /** Mints a new pairing code from the backend; feedback surfaces via [accountabilityMessage]. Free tier gets [PreferencesRepository.MAX_FREE_BUDDIES] buddy(s) -- [SettingsScreen] shows an upgrade CTA instead of the buddy controls once that's reached, this guard is the defense-in-depth backstop. */
+    /** Mints a new pairing code from the backend; feedback surfaces via [accountabilityMessage]. Requires an active subscription -- [SettingsScreen] shows an upgrade CTA instead of the buddy controls otherwise, this guard is the defense-in-depth backstop. */
     fun onRegeneratePairingCode() {
         viewModelScope.launch {
             if (!accountabilityRepository.canAddBuddy()) {
-                _accountabilityMessage.value = freeBuddyLimitMessage()
+                _accountabilityMessage.value = requiresSubscriptionMessage()
                 return@launch
             }
             val code = accountabilityRepository.regeneratePairingCode()
@@ -498,8 +489,8 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun freeBuddyLimitMessage() =
-        "You've reached the free plan's ${PreferencesRepository.MAX_FREE_BUDDIES}-buddy limit. Upgrade to add more."
+    private fun requiresSubscriptionMessage() =
+        "Adding a buddy requires a Locke Premium subscription -- start your free trial."
 
     // -- Data export ----------------------------------------------------------------
 
@@ -536,12 +527,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Redeems a buddy's pairing code with the backend; feedback surfaces via [accountabilityMessage]. Free tier gets [PreferencesRepository.MAX_FREE_BUDDIES] buddy(s), see [onRegeneratePairingCode]. */
+    /** Redeems a buddy's pairing code with the backend; feedback surfaces via [accountabilityMessage]. Requires an active subscription, see [onRegeneratePairingCode]. */
     fun onAddBuddy(code: String) {
         if (code.isBlank()) return
         viewModelScope.launch {
             if (!accountabilityRepository.canAddBuddy()) {
-                _accountabilityMessage.value = freeBuddyLimitMessage()
+                _accountabilityMessage.value = requiresSubscriptionMessage()
                 return@launch
             }
             val added = accountabilityRepository.addBuddy(code)

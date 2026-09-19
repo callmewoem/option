@@ -526,21 +526,20 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        when (val remaining = state.freeVerificationsRemaining) {
-                            null -> Text(
+                        if (state.isPremium) {
+                            Text(
                                 "Premium: unlimited checks.",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = LockeColor.Brass,
                             )
-                            else -> Text(
-                                "Free plan: $remaining of ${PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH} checks left this month.",
+                        } else {
+                            Text(
+                                "Requires a Locke Premium subscription.",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (remaining > 0) LockeColor.Brass else MaterialTheme.colorScheme.error,
+                                color = MaterialTheme.colorScheme.error,
                             )
-                        }
-                        if (state.freeVerificationsRemaining == 0) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            LockeGhostButton(text = "Upgrade to Premium", onClick = { onOpenPaywall(PremiumFeature.PHOTO_VERIFICATION) })
+                            LockeGhostButton(text = "Start free trial", onClick = { onOpenPaywall(PremiumFeature.PHOTO_VERIFICATION) })
                         }
                     }
                 }
@@ -813,10 +812,8 @@ private fun healthConnectSummary(state: SettingsUiState): String = when {
     else -> "Not connected"
 }
 
-private fun photoCheckingSummary(state: SettingsUiState): String = when (val remaining = state.freeVerificationsRemaining) {
-    null -> "Premium -- unlimited"
-    else -> "$remaining left this month"
-}
+private fun photoCheckingSummary(state: SettingsUiState): String =
+    if (state.isPremium) "Premium -- unlimited" else "Requires Premium"
 
 private fun connectionsSummary(state: SettingsUiState): String {
     val connected = buildList {
@@ -1045,18 +1042,18 @@ private fun SubHeader(text: String) {
 @Composable
 private fun PremiumSection(isPremium: Boolean, tier: SubscriptionTier, onUpgrade: () -> Unit) {
     ListItem(
-        headlineContent = { Text(if (isPremium) "Locke Premium" else "Free plan") },
+        headlineContent = { Text(if (isPremium) "Locke Premium" else "Not subscribed") },
         supportingContent = {
             Text(
                 if (isPremium) {
                     "You're on the ${tier.displayName} plan -- unlimited habits, AI photo checks, and buddies."
                 } else {
-                    "5 gating habits, 3 AI photo checks a month, 1 buddy -- Premium removes all three limits."
+                    "Unlimited gating habits, AI photo checks, and accountability buddies -- start your free trial."
                 },
             )
         },
         leadingContent = { Icon(Icons.Filled.WorkspacePremium, contentDescription = null, tint = LockeColor.Brass) },
-        trailingContent = { if (!isPremium) LockeGhostButton(text = "Upgrade", onClick = onUpgrade) },
+        trailingContent = { if (!isPremium) LockeGhostButton(text = "Start free trial", onClick = onUpgrade) },
     )
     HorizontalDivider()
 }
@@ -1105,11 +1102,11 @@ private fun ConnectionKeyField(
 
 /**
  * Accountability buddies, backed by Locke's own backend (`backend/`) -- see
- * `data/repository/AccountabilityRepository.kt`. Free tier gets one real buddy
- * connection -- your pairing code, any buddy you've already added, and sharing your
- * own stats with them all keep working regardless; only the "add another" control is
- * swapped for an upgrade CTA once [canAddBuddy] is false, so a free user who's used
- * their one connection still sees it working, not a wall.
+ * `data/repository/AccountabilityRepository.kt`. Adding a buddy requires an active
+ * subscription -- your pairing code, any buddy you've already added, and sharing your
+ * own stats with them all keep working regardless of entitlement; only the "add
+ * another" control is swapped for an upgrade CTA once [canAddBuddy] is false, so a
+ * lapsed subscriber still sees their existing connection working, not a wall.
  */
 @Composable
 private fun AccountabilitySection(
@@ -1127,7 +1124,7 @@ private fun AccountabilitySection(
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             text = "Pair with a friend to share your daily progress and see theirs, synced through Locke's " +
-                "own backend. Free plan: ${PreferencesRepository.MAX_FREE_BUDDIES} buddy. Offline-first -- " +
+                "own backend. Requires a Locke Premium subscription. Offline-first -- " +
                 "what's shown below is whatever was last synced, labeled as such.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1162,9 +1159,9 @@ private fun AccountabilitySection(
         }
     } else {
         ListItem(
-            headlineContent = { Text("Free plan buddy limit reached") },
-            supportingContent = { Text("Upgrade to Premium to add more buddies.") },
-            trailingContent = { LockeGhostButton(text = "Upgrade", onClick = onUpgrade) },
+            headlineContent = { Text("Premium required") },
+            supportingContent = { Text("Adding a buddy requires a Locke Premium subscription.") },
+            trailingContent = { LockeGhostButton(text = "Start free trial", onClick = onUpgrade) },
         )
     }
 

@@ -48,8 +48,8 @@ import com.locke.app.ui.theme.LockeColor
 
 /**
  * The CTA every premium gate routes to (design spec §5: be specific about what's being
- * asked for and why) -- a photo-verification habit past the free check, the buddy
- * section in Settings, the free-tier habit cap, and onboarding's own pitch
+ * asked for and why) -- AI photo checks, the buddy section in Settings, adding a
+ * gating habit beyond onboarding's initial set, and onboarding's own pitch
  * (`ui/onboarding/OnboardingPaywallScreen.kt`, which reuses [PaywallContent] below with
  * its own skippable bottom bar instead of this screen's back arrow).
  */
@@ -120,9 +120,9 @@ fun PaywallContent(state: PaywallUiState, onPurchase: (productId: String) -> Uni
     Spacer(modifier = Modifier.height(20.dp))
 
     listOf(
-        "Unlimited gating habits -- free plan covers ${state.gatingHabitCap}.",
-        "Unlimited AI photo checks -- free plan covers 3 a month.",
-        "Unlimited accountability buddies -- free plan covers 1.",
+        "Unlimited gating habits",
+        "Unlimited AI photo checks",
+        "Unlimited accountability buddies",
     ).forEach { line ->
         Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
             Icon(
@@ -179,8 +179,12 @@ private fun ProductCard(product: PremiumProduct, isEmphasized: Boolean, enabled:
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(product.tier.displayName, style = MaterialTheme.typography.titleMedium)
+                product.trialLabel?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = LockeColor.Brass)
+                }
                 Text(
-                    product.formattedPrice + (product.billingPeriodLabel?.let { " $it" } ?: ""),
+                    (if (product.trialLabel != null) "then " else "") +
+                        product.formattedPrice + (product.billingPeriodLabel?.let { " $it" } ?: ""),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -188,7 +192,15 @@ private fun ProductCard(product: PremiumProduct, isEmphasized: Boolean, enabled:
                     Text("Best value", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
             }
-            LockePrimaryButton(text = if (product.tier == SubscriptionTier.LIFETIME) "Buy" else "Subscribe", onClick = onPurchase, enabled = enabled)
+            LockePrimaryButton(
+                text = when {
+                    product.tier == SubscriptionTier.LIFETIME -> "Buy"
+                    product.trialLabel != null -> "Start free trial"
+                    else -> "Subscribe"
+                },
+                onClick = onPurchase,
+                enabled = enabled,
+            )
         }
     }
 }

@@ -377,17 +377,14 @@ fun AddEditHabitScreen(
         )
     }
 
-    // Free tier caps new gates at ExperimentRepository.gatingHabitCap (defaults to
-    // PreferencesRepository.MAX_FREE_GATING_HABITS) -- see AddEditHabitViewModel.onSave.
+    // Adding a new gating habit beyond onboarding's initial set requires an active
+    // subscription -- see AddEditHabitViewModel.onSave.
     if (state.requiresPremium) {
         AlertDialog(
             onDismissRequest = viewModel::onRequiresPremiumShown,
-            title = { Text("Free plan limit reached") },
+            title = { Text("Premium required") },
             text = {
-                Text(
-                    "You've reached the free plan's ${state.gatingHabitCapAtLimit}-habit " +
-                        "limit on gating habits. Upgrade to Premium for unlimited habits.",
-                )
+                Text("Adding another gating habit requires a Locke Premium subscription -- start your free trial.")
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.onRequiresPremiumShown(); onUpgrade() }) { Text("Upgrade") }

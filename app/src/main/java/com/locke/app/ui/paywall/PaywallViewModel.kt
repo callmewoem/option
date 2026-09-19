@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.locke.app.data.billing.EntitlementRepository
 import com.locke.app.data.repository.AnalyticsRepository
 import com.locke.app.data.repository.ExperimentRepository
-import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.domain.model.PaywallPlanEmphasis
 import com.locke.app.domain.model.PremiumFeature
 import com.locke.app.domain.model.PremiumProduct
@@ -29,8 +28,6 @@ data class PaywallUiState(
     val products: List<PremiumProduct> = emptyList(),
     val purchaseInFlight: Boolean = false,
     val errorMessage: String? = null,
-    /** [com.locke.app.domain.model.ExperimentKeys.GATING_HABIT_CAP]'s current value -- see "Unlimited gating habits" bullet in [PaywallContent]. */
-    val gatingHabitCap: Int = PreferencesRepository.MAX_FREE_GATING_HABITS,
     /** [com.locke.app.domain.model.ExperimentKeys.PAYWALL_PLAN_EMPHASIS] -- which plan [PaywallContent] sorts first and highlights as "Best value". */
     val planEmphasis: PaywallPlanEmphasis = PaywallPlanEmphasis.ANNUAL,
 )
@@ -61,16 +58,15 @@ class PaywallViewModel @Inject constructor(
         entitlementRepository.products,
         _purchaseInFlight,
         _errorMessage,
-        combine(experimentRepository.gatingHabitCap, experimentRepository.paywallPlanEmphasis, ::Pair),
-    ) { entitlement, products, purchaseInFlight, errorMessage, experiments ->
+        experimentRepository.paywallPlanEmphasis,
+    ) { entitlement, products, purchaseInFlight, errorMessage, planEmphasis ->
         PaywallUiState(
             feature = feature,
             isPremium = entitlement.isPremium,
             products = products,
             purchaseInFlight = purchaseInFlight,
             errorMessage = errorMessage,
-            gatingHabitCap = experiments.first,
-            planEmphasis = experiments.second,
+            planEmphasis = planEmphasis,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PaywallUiState(feature = feature))
 
@@ -86,7 +82,6 @@ class PaywallViewModel @Inject constructor(
                 mapOf(
                     "feature" to feature.name,
                     "planEmphasis" to experimentRepository.paywallPlanEmphasis.first().name,
-                    "gatingHabitCap" to experimentRepository.gatingHabitCap.first(),
                 ),
             )
         }

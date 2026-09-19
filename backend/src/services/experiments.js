@@ -12,20 +12,12 @@ const db = require('../db');
  * everyone fresh. `variants[].value` is the actual config payload the client acts on
  * (a number, a string, whatever) -- keeping it here instead of hardcoding a
  * key->behavior mapping on the client means changing what a variant *does* (e.g.
- * tweaking the "tighter" gating cap from 3 to 4) never needs an app release.
+ * swapping which paywall plan gets top billing) never needs an app release.
  *
  * Weights don't need to sum to 100 -- [assignVariant] normalizes against whatever they
  * add up to.
  */
 const EXPERIMENTS = [
-  {
-    key: 'gating_habit_cap',
-    description: 'Free-tier cap on new GATING habits before Premium is required.',
-    variants: [
-      { id: 'control', weight: 70, value: '5' },
-      { id: 'tighter', weight: 30, value: '3' },
-    ],
-  },
   {
     key: 'paywall_plan_emphasis',
     description: 'Which subscription plan the paywall sorts first and visually highlights as "Best value".',

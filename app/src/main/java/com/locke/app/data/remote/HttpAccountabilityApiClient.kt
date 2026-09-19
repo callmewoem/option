@@ -105,10 +105,10 @@ class HttpAccountabilityApiClient @Inject constructor(
                 if (!response.isSuccessful) {
                     if (response.code == 402) {
                         // The backend's own error body (see routes/buddies.js) already
-                        // names whose free-tier buddy limit was hit -- this generic
-                        // fallback is only for the rare case that body didn't parse.
+                        // says whose subscription is missing -- this generic fallback
+                        // is only for the rare case that body didn't parse.
                         throw AccountabilityApiException.Api(
-                            extractErrorMessage(text) ?: "Reached the free plan's buddy limit. Upgrade to add more.",
+                            extractErrorMessage(text) ?: "Adding a buddy requires a Locke Premium subscription.",
                         )
                     }
                     throw AccountabilityApiException.Api(extractErrorMessage(text) ?: "Request failed (HTTP ${response.code}).")

@@ -17,9 +17,9 @@ can't live on-device:
    anything that costs money (verification) or is a paid feature (buddies).
 4. **A/B experiment assignment** (`GET /v1/experiments`) -- deterministically
    buckets a device into a variant of each experiment defined in
-   `src/services/experiments.js` (pricing presentation, free-tier gating cap,
-   whether a given onboarding step is shown at all) and persists the
-   assignment so it stays stable even if an experiment's weights change later.
+   `src/services/experiments.js` (pricing presentation, whether a given
+   onboarding step is shown at all) and persists the assignment so it stays
+   stable even if an experiment's weights change later.
 5. **Analytics ingestion** (`POST /v1/analytics/events`) -- accepts batched,
    non-identifying product-analytics events queued by the Android client
    (`data/repository/AnalyticsRepository.kt`) and stores them in
@@ -32,14 +32,15 @@ that one device id (`data/remote/DeviceIdentityRepository.kt` on the Android
 side calls this lazily and caches the token). Every other endpoint requires
 `Authorization: Bearer <token>`.
 
-The free tier isn't a trial -- `config.freeTier` (`src/config.js`) sizes it to
-be generously usable on its own: `verificationsPerMonth` (3, resets every
-calendar month) gates `/v1/verify-photo`, `maxBuddies` (1) gates `/v1/buddies`
-(checked on *both* sides of a pairing, since a new connection could push
-either device over its own cap). These numbers must match the Android app's
-own copies (`PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH` /
-`MAX_FREE_BUDDIES`) -- the client checks them too, for instant feedback with
-no round trip, but this server-side check is the actual enforcement.
+There's no permanent free tier: `/v1/verify-photo` and `/v1/buddies` (the
+latter checked on *both* sides of a pairing) both require an active (trial or
+paid) subscription, gated on `getEntitlement(deviceId).isPremium` (see
+`services/entitlement.js`). A free trial is Play Billing's own introductory
+offer, configured per-subscription in Play Console -- a device in its trial
+period is simply an active subscription as far as this server (and
+`isPremium`) is concerned, nothing trial-specific to enforce here. The
+Android app checks entitlement too, for instant feedback with no round trip,
+but this server-side check is the actual enforcement.
 
 ## Running locally
 

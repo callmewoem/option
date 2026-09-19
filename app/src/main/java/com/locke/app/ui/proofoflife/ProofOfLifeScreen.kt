@@ -93,7 +93,7 @@ fun ProofOfLifeScreen(
                     onUpgrade = onUpgrade,
                     onOverride = viewModel::onOverride,
                     promptText = "Take a photo that proves you're up right now.",
-                    freeChecksRemaining = state.freeChecksRemaining,
+                    isPremium = state.isPremium,
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))

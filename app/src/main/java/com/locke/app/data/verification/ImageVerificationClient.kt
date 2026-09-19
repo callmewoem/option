@@ -19,8 +19,8 @@ interface ImageVerificationClient {
 }
 
 sealed class ImageVerificationException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    /** This month's free checks are used up and the caller isn't premium -- point the user at the paywall, not Settings. See [com.locke.app.data.repository.PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH]. */
-    object RequiresPremium : ImageVerificationException("You've used this month's free AI photo checks. Upgrade for unlimited.")
+    /** The caller has no active subscription -- point the user at the paywall, not Settings. */
+    object RequiresPremium : ImageVerificationException("AI photo checks require a Locke Premium subscription -- start your free trial.")
     class Network(message: String, cause: Throwable? = null) : ImageVerificationException(message, cause)
     class Api(message: String) : ImageVerificationException(message)
 }

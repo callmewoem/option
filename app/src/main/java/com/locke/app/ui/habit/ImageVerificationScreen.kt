@@ -100,7 +100,7 @@ fun ImageVerificationScreen(
                 onSubmit = viewModel::onSubmit,
                 onUpgrade = onUpgrade,
                 onOverride = viewModel::onOverride,
-                freeChecksRemaining = state.freeChecksRemaining,
+                isPremium = state.isPremium,
             )
         }
     }

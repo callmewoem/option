@@ -11,7 +11,6 @@ import com.locke.app.data.verification.ImageVerificationClient
 import com.locke.app.data.verification.ImageVerificationException
 import com.locke.app.data.verification.VerificationRequest
 import com.locke.app.data.verification.VerificationResult
-import com.locke.app.util.DateProvider
 import com.locke.app.util.ImageStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -37,8 +36,8 @@ data class ProofOfLifeUiState(
     val windowMinutes: Int = PreferencesRepository.DEFAULT_PROOF_OF_LIFE_WINDOW_MINUTES,
     /** Priced exactly, per design spec §6.3 -- shown on the "take the penalty now" control. */
     val penaltyMinutes: Int = ProofOfLifeRepository.PENALTY_MINUTES,
-    /** Null once premium (unlimited checks). Otherwise how many of this month's free AI photo checks are left -- see [com.locke.app.ui.habit.ImageVerificationUiState.freeChecksRemaining]'s twin on the habit-verification side. */
-    val freeChecksRemaining: Int? = null,
+    /** AI photo checks require an active (trial or paid) subscription -- see [com.locke.app.ui.habit.ImageVerificationUiState.isPremium]'s twin on the habit-verification side. */
+    val isPremium: Boolean = false,
 )
 
 /**
@@ -53,7 +52,6 @@ class ProofOfLifeViewModel @Inject constructor(
     private val proofOfLifeRepository: ProofOfLifeRepository,
     private val verificationClient: ImageVerificationClient,
     private val entitlementRepository: EntitlementRepository,
-    private val preferencesRepository: PreferencesRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -65,18 +63,13 @@ class ProofOfLifeViewModel @Inject constructor(
             val settings = proofOfLifeRepository.settings.first()
             _uiState.value = _uiState.value.copy(deadlineTime = settings.time, windowMinutes = settings.windowMinutes)
         }
-        refreshFreeChecksRemaining()
+        refreshIsPremium()
     }
 
-    /** Re-reads how many free checks are left this month -- called on init and again after every submit. Left null (hidden) once premium. */
-    private fun refreshFreeChecksRemaining() {
+    /** Re-reads entitlement -- called on init and again after every submit, in case a purchase completed elsewhere in the meantime. */
+    private fun refreshIsPremium() {
         viewModelScope.launch {
-            val remaining = if (entitlementRepository.isPremium()) {
-                null
-            } else {
-                preferencesRepository.freeVerificationsRemaining(DateProvider.currentMonthString()).first()
-            }
-            _uiState.value = _uiState.value.copy(freeChecksRemaining = remaining)
+            _uiState.value = _uiState.value.copy(isPremium = entitlementRepository.isPremium())
         }
     }
 
@@ -127,7 +120,7 @@ class ProofOfLifeViewModel @Inject constructor(
                 } else {
                     _uiState.value = _uiState.value.copy(isVerifying = false, result = result)
                 }
-                refreshFreeChecksRemaining()
+                refreshIsPremium()
             } catch (e: ImageVerificationException.RequiresPremium) {
                 _uiState.value = _uiState.value.copy(isVerifying = false, requiresPremium = true, errorMessage = e.message)
             } catch (e: ImageVerificationException) {

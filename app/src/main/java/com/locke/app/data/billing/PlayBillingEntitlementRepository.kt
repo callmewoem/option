@@ -216,15 +216,42 @@ class PlayBillingEntitlementRepository @Inject constructor(
             else -> return null
         }
         return if (productType == BillingClient.ProductType.SUBS) {
-            val phase = subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull() ?: return null
+            // An offer eligible for a free trial has the trial as an earlier,
+            // zero-priced phase followed by the actual recurring price -- e.g.
+            // [free 7 days, $4.99/month]. A device that's already used its trial (or an
+            // offer with none configured) gets just the one recurring phase. Either
+            // way, the *last* phase is always the price that actually recurs.
+            val phases = subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList ?: return null
+            val recurringPhase = phases.lastOrNull() ?: return null
+            val trialPhase = phases.dropLast(1).lastOrNull { it.priceAmountMicros == 0L }
             val periodLabel = when (tier) {
                 SubscriptionTier.ANNUAL -> "per year"
                 else -> "per month"
             }
-            PremiumProduct(productId, tier, phase.formattedPrice, periodLabel)
+            PremiumProduct(
+                productId = productId,
+                tier = tier,
+                formattedPrice = recurringPhase.formattedPrice,
+                billingPeriodLabel = periodLabel,
+                trialLabel = trialPhase?.let { billingPeriodToTrialLabel(it.billingPeriod) },
+            )
         } else {
             val price = oneTimePurchaseOfferDetails?.formattedPrice ?: return null
             PremiumProduct(productId, tier, price, billingPeriodLabel = null)
         }
+    }
+
+    /** Turns an ISO-8601 duration like Play Billing's `billingPeriod` ("P7D", "P1W", "P1M") into e.g. "7 days free". */
+    private fun billingPeriodToTrialLabel(isoPeriod: String): String {
+        val match = Regex("""P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?""").matchEntire(isoPeriod)
+        val (years, months, weeks, days) = match?.destructured ?: return "Free trial"
+        val (count, unit) = when {
+            years.toIntOrNull()?.let { it > 0 } == true -> years.toInt() to "year"
+            months.toIntOrNull()?.let { it > 0 } == true -> months.toInt() to "month"
+            weeks.toIntOrNull()?.let { it > 0 } == true -> weeks.toInt() to "week"
+            days.toIntOrNull()?.let { it > 0 } == true -> days.toInt() to "day"
+            else -> return "Free trial"
+        }
+        return "$count $unit${if (count == 1) "" else "s"} free"
     }
 }
