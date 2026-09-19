@@ -1,7 +1,6 @@
 package com.locke.app.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -182,18 +181,17 @@ private fun enforcementColorScheme() = darkColorScheme(
  * something (the block cover, curfew, the morning lock, the penalty sheet, the
  * lootbox reveal) and leave it at the [LockeMode.App] default everywhere else. Which
  * *mode* a screen is in is a design decision about what that screen *does*, not a user
- * preference, and [themeMode] can't change that -- but within [LockeMode.App] it picks
- * between [appColorScheme] and its dark counterpart, [appDarkColorScheme]. Enforcement
- * screens ignore [themeMode] entirely and always render dark.
+ * preference. Enforcement screens always render dark.
+ *
+ * [LockeMode.App] is forced light -- the Today-screen design spec defines only a light
+ * "ecobrutalist" palette, no dark counterpart, so [themeMode] is currently accepted but
+ * ignored for app-mode screens rather than resolving to [appDarkColorScheme]. Material
+ * You dynamic color is never used here (every color comes from [LockeColor]), so there's
+ * nothing additional to disable.
  */
 @Composable
 fun LockeTheme(mode: LockeMode = LockeMode.App, themeMode: ThemeMode = ThemeMode.DEFAULT, content: @Composable () -> Unit) {
-    val systemInDarkTheme = isSystemInDarkTheme()
-    val appModeIsDark = when (themeMode) {
-        ThemeMode.Light -> false
-        ThemeMode.Dark -> true
-        ThemeMode.System -> systemInDarkTheme
-    }
+    val appModeIsDark = false
     val surfaceIsDark = mode == LockeMode.Enforcement || appModeIsDark
     val colorScheme = when {
         mode == LockeMode.Enforcement -> enforcementColorScheme()

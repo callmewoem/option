@@ -474,18 +474,6 @@ class SettingsViewModel @Inject constructor(
      * Moves [habitId] one spot earlier ([up] true) or later (false) in the habit list --
      * the reorder arrows next to each row in Settings. A no-op at either end of the list.
      */
-    fun onMoveHabit(habitId: Long, up: Boolean) {
-        viewModelScope.launch {
-            val ids = uiState.value.habits.map { it.id }.toMutableList()
-            val fromIndex = ids.indexOf(habitId)
-            if (fromIndex < 0) return@launch
-            val toIndex = if (up) fromIndex - 1 else fromIndex + 1
-            if (toIndex < 0 || toIndex >= ids.size) return@launch
-            ids[fromIndex] = ids[toIndex].also { ids[toIndex] = ids[fromIndex] }
-            habitRepository.reorderHabits(ids)
-        }
-    }
-
     /** Which list's chip is selected to filter/section the Habits list by -- tapping the already-selected one deselects back to "All". */
     fun onSelectHabitListFilter(listId: Long?) {
         _selectedHabitListFilter.value = if (_selectedHabitListFilter.value == listId) null else listId

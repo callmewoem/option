@@ -56,7 +56,7 @@ interface HabitDao {
     @Query("SELECT MAX(sortOrder) FROM habits")
     suspend fun getMaxSortOrder(): Int?
 
-    /** Re-ranks one habit -- see [com.locke.app.data.repository.HabitRepository.reorderHabits], the Settings habit list's up/down reorder buttons. */
+    /** Re-ranks one habit -- see [com.locke.app.data.repository.HabitRepository.reorderHabits], Today's drag-to-reorder. */
     @Query("UPDATE habits SET sortOrder = :sortOrder WHERE id = :habitId")
     suspend fun updateSortOrder(habitId: Long, sortOrder: Int)
 

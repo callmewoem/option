@@ -151,6 +151,7 @@ fun LockeNavHost() {
                 onSetUpPhotoVerification = {
                     navController.navigate(Screen.AddHabit.createRoute(HabitKind.GATING, HabitType.PHOTO))
                 },
+                onEditHabit = { habitId -> navController.navigate(Screen.EditHabit.createRoute(habitId)) },
             )
         }
 

@@ -157,8 +157,8 @@ class HabitRepository @Inject constructor(
     }
 
     /**
-     * Re-ranks every habit in [orderedIds] to match its position in the list -- the
-     * Settings habit list's up/down reorder buttons. Renumbers from scratch rather than
+     * Re-ranks every habit in [orderedIds] to match its position in the list -- Today's
+     * drag-to-reorder. Renumbers from scratch rather than
      * swapping the two moved rows' existing [com.locke.app.data.local.entity.HabitEntity.sortOrder]
      * values, so it also self-heals any old rows still sharing the default
      * (pre-reorder-feature) value of 0.
