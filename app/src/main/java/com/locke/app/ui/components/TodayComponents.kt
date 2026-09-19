@@ -114,6 +114,7 @@ fun StatTile(
             .clip(RoundedCornerShape(4.dp))
             .then(if (filled) Modifier.background(LockeColor.Moss) else Modifier)
             .border(1.5.dp, if (filled) LockeColor.Moss else LockeColor.MossMid, RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 7.dp)
             .semantics { contentDescription = contentDescriptionText },
         horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -133,11 +134,13 @@ fun StatTile(
 }
 
 /**
- * Today's hero: the big habits-left numeral, the 7x3 today heatmap, and the
- * streak/streak-freeze tiles above the "HABITS LEFT" label (design spec §2, "Today
- * screen anatomy"). [dayScores] is the same 0f..1f-per-date map [Heatmap] uses
- * elsewhere; [todayFraction] overrides today's own cell so it fills live as habits are
- * completed rather than waiting for a saved day score.
+ * Today's hero: the big habits-left numeral on the left, and on the right a 2x2 grid --
+ * the 7x3 today heatmap over the "HABITS LEFT" label, with the streak-freeze tile beside
+ * the heatmap and the streak tile beside the label (design spec §2, "Today screen
+ * anatomy": `habitsLeft | heatmap heatmap freeze` / `habitsLeft | habits left streak`).
+ * [dayScores] is the same 0f..1f-per-date map [Heatmap] uses elsewhere; [todayFraction]
+ * overrides today's own cell so it fills live as habits are completed rather than
+ * waiting for a saved day score.
  *
  * Streak freezes have no data source yet anywhere in the app (no such concept exists in
  * the domain model or repository) -- [freezeCount] is a stub, always 0, until that
@@ -154,6 +157,8 @@ fun TodayHero(
 ) {
     val today = remember { java.time.LocalDate.now() }
     val rangeStart = remember(today) { today.minusWeeks(2) }
+    val statTileColumnWidth = 50.dp
+    val statTileGap = 10.dp
 
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Text(
@@ -165,49 +170,39 @@ fun TodayHero(
         )
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "HABITS LEFT",
-                style = spaceMono(11.sp, letterSpacing = 2.6.sp),
-                color = LockeColor.LabelOlive,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.Top) {
-                BoxWithConstraints(modifier = Modifier.weight(1f)) {
-                    val gap = 4.dp
-                    val cellSize = ((maxWidth - gap * 6) / 7).coerceAtLeast(8.dp)
-                    Heatmap(
-                        startDate = rangeStart,
-                        endDate = today,
-                        cellSize = cellSize,
-                        cellGap = gap,
-                        cellShape = HeatmapCellShape.Square,
-                        cellCornerRadius = 3.dp,
-                        weeksAsRows = true,
-                        scrollable = false,
-                        colorForDate = { date ->
-                            val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
-                            todayHeatmapLevelColor(fraction)
-                        },
-                        borderColorForDate = { date ->
-                            val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
-                            if (fraction <= 0f) LockeColor.HeatmapEmptyOutline else todayHeatmapLevelColor(fraction)
-                        },
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(
-                    modifier = Modifier.width(50.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    StatTile(
-                        value = "$streakDays",
-                        iconRes = R.drawable.ic_flame,
-                        iconWidth = 12.dp,
-                        iconHeight = 14.dp,
-                        filled = true,
-                        contentDescriptionText = "$streakDays day streak",
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
+            val rows = 3
+            // BoxWithConstraints up front to resolve the heatmap's cell size (and from
+            // it, the grid's exact pixel height) before laying out the freeze tile --
+            // BoxWithConstraints is built on SubcomposeLayout, which can't itself be
+            // intrinsically measured, so an IntrinsicSize.Min row (the more obvious
+            // "stretch to the tallest sibling" approach) isn't an option here.
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val gap = 4.dp
+                val cellSize = ((maxWidth - statTileGap - statTileColumnWidth - gap * 6) / 7).coerceAtLeast(8.dp)
+                val heatmapHeight = cellSize * rows + gap * (rows - 1)
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(modifier = Modifier.weight(1f).height(heatmapHeight)) {
+                        Heatmap(
+                            startDate = rangeStart,
+                            endDate = today,
+                            cellSize = cellSize,
+                            cellGap = gap,
+                            cellShape = HeatmapCellShape.Square,
+                            cellCornerRadius = 3.dp,
+                            weeksAsRows = true,
+                            scrollable = false,
+                            fixedRowCount = rows,
+                            colorForDate = { date ->
+                                val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
+                                todayHeatmapLevelColor(fraction)
+                            },
+                            borderColorForDate = { date ->
+                                val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
+                                if (fraction <= 0f) LockeColor.HeatmapEmptyOutline else todayHeatmapLevelColor(fraction)
+                            },
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(statTileGap))
                     StatTile(
                         value = "$freezeCount",
                         iconRes = R.drawable.ic_shield,
@@ -215,9 +210,28 @@ fun TodayHero(
                         iconHeight = 13.dp,
                         filled = false,
                         contentDescriptionText = "$freezeCount streak freezes left",
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier.width(statTileColumnWidth),
                     )
                 }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "HABITS LEFT",
+                    style = spaceMono(11.sp, letterSpacing = 2.6.sp),
+                    color = LockeColor.LabelOlive,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(statTileGap))
+                StatTile(
+                    value = "$streakDays",
+                    iconRes = R.drawable.ic_flame,
+                    iconWidth = 12.dp,
+                    iconHeight = 14.dp,
+                    filled = true,
+                    contentDescriptionText = "$streakDays day streak",
+                    modifier = Modifier.width(statTileColumnWidth),
+                )
             }
         }
     }
