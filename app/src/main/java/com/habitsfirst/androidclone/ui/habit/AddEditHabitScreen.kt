@@ -159,11 +159,12 @@ fun AddEditHabitScreen(
             Text(text = stringResource(R.string.add_habit_choose_type), style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
 
+            val pickerTypes = remember { HabitType.entries.filter { it.isVisibleInPicker } }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                HabitType.entries.take(4).forEach { type ->
+                pickerTypes.take(4).forEach { type ->
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },
@@ -180,7 +181,7 @@ fun AddEditHabitScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                HabitType.entries.drop(4).forEach { type ->
+                pickerTypes.drop(4).forEach { type ->
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },

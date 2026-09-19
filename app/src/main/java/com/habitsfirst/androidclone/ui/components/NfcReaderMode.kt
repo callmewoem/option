@@ -8,12 +8,18 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
+import com.habitsfirst.androidclone.util.FeatureFlags
 
-/** Whether this device has NFC hardware at all -- [com.habitsfirst.androidclone.domain.model.HabitType.TAG_SCAN]'s NFC path hides itself when false (QR still works everywhere). */
+/**
+ * Whether NFC should be offered right now -- device hardware present AND
+ * [FeatureFlags.NFC_ENABLED] --
+ * [com.habitsfirst.androidclone.domain.model.HabitType.TAG_SCAN]'s NFC path hides itself
+ * otherwise (QR still works everywhere).
+ */
 @Composable
 fun rememberNfcAvailable(): Boolean {
     val context = LocalContext.current
-    return NfcAdapter.getDefaultAdapter(context) != null
+    return FeatureFlags.NFC_ENABLED && NfcAdapter.getDefaultAdapter(context) != null
 }
 
 /**

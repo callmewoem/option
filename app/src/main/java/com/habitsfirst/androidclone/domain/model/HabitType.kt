@@ -71,6 +71,19 @@ enum class HabitType {
     val requiresTagSetup: Boolean
         get() = this == TAG_SCAN
 
+    /**
+     * Whether this type is offered in the add/edit habit type picker (see
+     * `AddEditHabitScreen`). Everything else about a gated type -- sync workers, DB
+     * columns, Settings fields -- stays wired up regardless; see
+     * [com.habitsfirst.androidclone.util.FeatureFlags].
+     */
+    val isVisibleInPicker: Boolean
+        get() = when (this) {
+            GITHUB_CONTRIBUTION, WAKATIME_CODING_MINUTES ->
+                com.habitsfirst.androidclone.util.FeatureFlags.GITHUB_WAKATIME_HABITS_ENABLED
+            else -> true
+        }
+
     val unit: String
         get() = when (this) {
             STEPS -> "steps"

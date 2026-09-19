@@ -74,7 +74,7 @@ fun ScanTagScreen(
         }
     }
 
-    NfcReaderModeEffect(enabled = !state.isDone, onTagDiscovered = viewModel::onNfcTagDiscovered)
+    NfcReaderModeEffect(enabled = rememberNfcAvailable() && !state.isDone, onTagDiscovered = viewModel::onNfcTagDiscovered)
 
     Scaffold(
         topBar = {

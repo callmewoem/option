@@ -93,6 +93,7 @@ import com.habitsfirst.androidclone.ui.components.LockePrimaryButton
 import com.habitsfirst.androidclone.ui.components.icon
 import com.habitsfirst.androidclone.ui.habits.StatsRange
 import com.habitsfirst.androidclone.ui.theme.LockeColor
+import com.habitsfirst.androidclone.util.FeatureFlags
 import com.habitsfirst.androidclone.util.PermissionUtils
 import com.habitsfirst.androidclone.util.exportShareIntent
 import java.time.DayOfWeek
@@ -525,32 +526,34 @@ fun SettingsScreen(
                 }
             }
 
-            item {
-                ExpandableSection(
-                    title = "Connections",
-                    icon = Icons.Filled.Link,
-                    summary = connectionsSummary(state),
-                ) {
-                    ConnectionKeyField(
-                        title = "WakaTime",
-                        description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
-                            "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
-                        label = "WakaTime API key",
-                        placeholder = "waka_...",
-                        value = state.wakaTimeApiKey,
-                        onValueChanged = viewModel::onWakaTimeApiKeyChanged,
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    ConnectionKeyField(
-                        title = "GitHub",
-                        description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
-                            "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
-                            "needed for public activity) to raise that limit and count private contributions too.",
-                        label = "GitHub personal access token",
-                        placeholder = "ghp_...",
-                        value = state.githubToken,
-                        onValueChanged = viewModel::onGithubTokenChanged,
-                    )
+            if (FeatureFlags.GITHUB_WAKATIME_HABITS_ENABLED) {
+                item {
+                    ExpandableSection(
+                        title = "Connections",
+                        icon = Icons.Filled.Link,
+                        summary = connectionsSummary(state),
+                    ) {
+                        ConnectionKeyField(
+                            title = "WakaTime",
+                            description = "Powers \"Code (WakaTime)\" habits -- reads today's total coding time from " +
+                                "your WakaTime account. Get a key at wakatime.com/settings/api-key.",
+                            label = "WakaTime API key",
+                            placeholder = "waka_...",
+                            value = state.wakaTimeApiKey,
+                            onValueChanged = viewModel::onWakaTimeApiKeyChanged,
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        ConnectionKeyField(
+                            title = "GitHub",
+                            description = "Optional for \"GitHub\" habits -- without a token, only public activity is " +
+                                "checked at GitHub's standard rate limit. Add a personal access token (no scopes " +
+                                "needed for public activity) to raise that limit and count private contributions too.",
+                            label = "GitHub personal access token",
+                            placeholder = "ghp_...",
+                            value = state.githubToken,
+                            onValueChanged = viewModel::onGithubTokenChanged,
+                        )
+                    }
                 }
             }
 
