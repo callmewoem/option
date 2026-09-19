@@ -11,9 +11,11 @@ import com.locke.app.data.local.dao.BlockedDomainDao
 import com.locke.app.data.local.dao.BlockListDao
 import com.locke.app.data.local.dao.HabitCompletionDao
 import com.locke.app.data.local.dao.HabitDao
+import com.locke.app.data.local.dao.HabitListDao
 import com.locke.app.data.local.dao.PendingStatsSyncDao
 import com.locke.app.data.local.dao.StreakScarDao
 import com.locke.app.data.local.dao.TodoDao
+import com.locke.app.data.local.dao.TodoListDao
 import com.locke.app.data.local.entity.AccountabilityBuddyEntity
 import com.locke.app.data.local.entity.AnalyticsEventEntity
 import com.locke.app.data.local.entity.BlockAttemptEntity
@@ -22,9 +24,11 @@ import com.locke.app.data.local.entity.BlockedDomainEntity
 import com.locke.app.data.local.entity.BlockListEntity
 import com.locke.app.data.local.entity.HabitCompletionEntity
 import com.locke.app.data.local.entity.HabitEntity
+import com.locke.app.data.local.entity.HabitListEntity
 import com.locke.app.data.local.entity.PendingStatsSyncEntity
 import com.locke.app.data.local.entity.StreakScarEntity
 import com.locke.app.data.local.entity.TodoEntity
+import com.locke.app.data.local.entity.TodoListEntity
 
 @Database(
     entities = [
@@ -39,6 +43,8 @@ import com.locke.app.data.local.entity.TodoEntity
         AccountabilityBuddyEntity::class,
         PendingStatsSyncEntity::class,
         AnalyticsEventEntity::class,
+        TodoListEntity::class,
+        HabitListEntity::class,
     ],
     // v2 (two independent branches merged into this one): added HabitEntity.kind/
     // expiresAfterDate, streak_scars, todos, and separately HabitCompletionEntity's
@@ -81,21 +87,32 @@ import com.locke.app.data.local.entity.TodoEntity
     // (HabitType.TAG_SCAN's NFC/QR payload) -- four new habit "connections". See
     // MIGRATION_12_13 in data/local/migrations/Migrations.kt.
     //
-    // Every step through 12->13 now has a real Migration in
+    // v14: added todo_lists (a user-defined "which bucket is this todo in" partition --
+    // see domain/model/TodoList.kt) and TodoEntity.listId (nullable FK, ON DELETE SET
+    // NULL -- deleting a list un-assigns its todos rather than deleting them). See
+    // MIGRATION_13_14 in data/local/migrations/Migrations.kt.
+    // v15: same idea for habits -- added habit_lists and HabitEntity.listId (see
+    // domain/model/HabitList.kt), so a habit can be partitioned into a user-defined
+    // sublist too (e.g. "Morning routine"). See MIGRATION_14_15 in
+    // data/local/migrations/Migrations.kt.
+    //
+    // Every step through 14->15 now has a real Migration in
     // data/local/migrations/Migrations.kt, wired in by di/AppModule.kt's
     // provideDatabase(). exportSchema is on and app/schemas/ is checked in as the
     // ground truth those migrations are written and tested against -- see
     // Migrations.kt's file-level KDoc and MigrationsSqlTest before touching either.
-    version = 13,
+    version = 15,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
+    abstract fun habitListDao(): HabitListDao
     abstract fun habitCompletionDao(): HabitCompletionDao
     abstract fun blockedAppDao(): BlockedAppDao
     abstract fun streakScarDao(): StreakScarDao
     abstract fun todoDao(): TodoDao
+    abstract fun todoListDao(): TodoListDao
     abstract fun blockListDao(): BlockListDao
     abstract fun blockedDomainDao(): BlockedDomainDao
     abstract fun blockAttemptDao(): BlockAttemptDao

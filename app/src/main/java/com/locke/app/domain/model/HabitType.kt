@@ -78,4 +78,27 @@ enum class HabitType {
             SLEEP_HOURS -> "hr"
             PHOTO, TALLY, VISIT_LOCATION, GITHUB_CONTRIBUTION, TAG_SCAN -> ""
         }
+
+    /** Which [HabitTypeCategory] this type sorts into in the add-habit picker -- see that enum's KDoc. */
+    val category: HabitTypeCategory
+        get() = when (this) {
+            TIMED_MINUTES, APP_USAGE_MINUTES, WORKOUT_MINUTES, SLEEP_HOURS, WAKATIME_CODING_MINUTES -> HabitTypeCategory.TIME
+            TALLY, STEPS -> HabitTypeCategory.COUNT
+            PHOTO, VISIT_LOCATION, GITHUB_CONTRIBUTION, TAG_SCAN -> HabitTypeCategory.PROOF
+        }
+}
+
+/**
+ * A higher-level grouping over [HabitType]'s eleven concrete types, so the add-habit flow
+ * asks "what kind of goal is this?" first (three choices) rather than presenting all
+ * eleven [HabitType]s flat -- see `AddEditHabitScreen`'s type picker.
+ */
+enum class HabitTypeCategory(val label: String, val hint: String) {
+    TIME("Time", "Spend a target amount of time on it"),
+    COUNT("Count", "A plain check-in or a number to hit, no timer"),
+    PROOF("Proof", "Verified by a photo, a place, a tag, or a connected account"),
+    ;
+
+    /** Every [HabitType] in this category, in [HabitType]'s own declared order. */
+    val types: List<HabitType> get() = HabitType.entries.filter { it.category == this }
 }

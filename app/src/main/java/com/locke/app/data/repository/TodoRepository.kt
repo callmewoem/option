@@ -2,10 +2,13 @@ package com.locke.app.data.repository
 
 import com.locke.app.data.local.dao.TodoCompletionTiming
 import com.locke.app.data.local.dao.TodoDao
+import com.locke.app.data.local.dao.TodoListDao
 import com.locke.app.data.local.entity.TodoEntity
+import com.locke.app.data.local.entity.TodoListEntity
 import com.locke.app.data.local.entity.toDomain
 import com.locke.app.data.local.entity.toEntity
 import com.locke.app.domain.model.Todo
+import com.locke.app.domain.model.TodoList
 import com.locke.app.util.DateProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class TodoRepository @Inject constructor(
     private val todoDao: TodoDao,
+    private val todoListDao: TodoListDao,
 ) {
     /**
      * Todos due today or tomorrow -- the only two due dates a todo can have (see
@@ -48,11 +52,11 @@ class TodoRepository @Inject constructor(
         todoDao.setDates(todoIds, today)
     }
 
-    /** Adds a task due today, or tomorrow if [dueTomorrow] is set. */
-    suspend fun addTodo(title: String, dueTomorrow: Boolean = false) {
+    /** Adds a task due today, or tomorrow if [dueTomorrow] is set, optionally partitioned into [listId] -- see [TodoList]. */
+    suspend fun addTodo(title: String, dueTomorrow: Boolean = false, listId: Long? = null) {
         if (title.isBlank()) return
         val date = if (dueTomorrow) DateProvider.tomorrowString() else DateProvider.todayString()
-        todoDao.upsert(TodoEntity(title = title.trim(), date = date))
+        todoDao.upsert(TodoEntity(title = title.trim(), date = date, listId = listId))
     }
 
     suspend fun setDone(todo: Todo, done: Boolean) {
@@ -61,6 +65,26 @@ class TodoRepository @Inject constructor(
 
     suspend fun delete(todo: Todo) {
         todoDao.delete(todo.toEntity())
+    }
+
+    /** Every [TodoList] the user has defined, in manual order -- the filter/section chips on [com.locke.app.ui.todo.TodoScreen]. */
+    fun observeLists(): Flow<List<TodoList>> = todoListDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
+    /** Creates a new list and returns its id, ready to assign a todo to immediately. */
+    suspend fun createList(name: String): Long? {
+        if (name.isBlank()) return null
+        val sortOrder = todoListDao.getMaxSortOrder() + 1
+        return todoListDao.insert(TodoListEntity(name = name.trim(), sortOrder = sortOrder))
+    }
+
+    /** Deletes [list] -- its todos fall back to unpartitioned rather than being deleted (`ON DELETE SET NULL`, see [TodoEntity.listId]). */
+    suspend fun deleteList(list: TodoList) {
+        todoListDao.delete(TodoListEntity(id = list.id, name = list.name, sortOrder = list.sortOrder, createdAtEpochMillis = list.createdAtEpochMillis))
+    }
+
+    /** Reassigns [todo] to [listId] (null un-partitions it). */
+    suspend fun setList(todo: Todo, listId: Long?) {
+        todoDao.setListId(todo.id, listId)
     }
 
     suspend fun hasTodosForDate(date: String = DateProvider.todayString()): Boolean =

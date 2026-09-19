@@ -2,6 +2,7 @@ package com.locke.app.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -27,6 +30,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.LabelOff
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MonitorHeart
@@ -44,6 +49,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,7 +93,9 @@ import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.data.repository.ProofOfLifeRepository
 import com.locke.app.domain.model.AccountabilityBuddy
 import com.locke.app.domain.model.BuddyConnectionStatus
+import com.locke.app.domain.model.Habit
 import com.locke.app.domain.model.HabitKind
+import com.locke.app.domain.model.HabitList
 import com.locke.app.domain.model.PremiumFeature
 import com.locke.app.domain.model.SubscriptionTier
 import com.locke.app.domain.model.ThemeMode
@@ -127,6 +135,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showSkipHabitDialog by remember { mutableStateOf(false) }
+    var showNewHabitListDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val accountabilityMessage by viewModel.accountabilityMessage.collectAsStateWithLifecycle()
@@ -361,37 +370,81 @@ fun SettingsScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    state.habits.forEachIndexed { index, habit ->
-                        key(habit.id) {
-                            ListItem(
-                                headlineContent = { Text(habit.name) },
-                                supportingContent = {
-                                    val target = habit.displayTarget.ifBlank { "Custom check-in" }
-                                    val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
-                                    Text("${habit.kind.label} · $target${schedule.orEmpty()}")
-                                },
-                                leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
-                                trailingContent = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(
-                                            onClick = { viewModel.onMoveHabit(habit.id, up = true) },
-                                            enabled = index > 0,
-                                        ) {
-                                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
-                                        }
-                                        IconButton(
-                                            onClick = { viewModel.onMoveHabit(habit.id, up = false) },
-                                            enabled = index < state.habits.lastIndex,
-                                        ) {
-                                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
-                                        }
-                                        Icon(Icons.Filled.ChevronRight, contentDescription = null)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onEditHabit(habit.id) },
+                    HabitListFilterRow(
+                        lists = state.habitLists,
+                        selectedListId = state.selectedHabitListFilter,
+                        onSelect = viewModel::onSelectHabitListFilter,
+                        onDeleteSelected = viewModel::onDeleteHabitList,
+                        onAddList = { showNewHabitListDialog = true },
+                    )
+                    val sections = habitSections(state.habits, state.habitLists, state.selectedHabitListFilter)
+                    sections.forEach { (list, habitsInSection) ->
+                        if (list != null && sections.size > 1) {
+                            Text(
+                                text = list.name,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
                             )
+                        } else if (list == null && sections.size > 1) {
+                            Text(
+                                text = "Unsorted",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                            )
+                        }
+                        habitsInSection.forEach { habit ->
+                            key(habit.id) {
+                                val index = state.habits.indexOfFirst { it.id == habit.id }
+                                var showListMenu by remember { mutableStateOf(false) }
+                                ListItem(
+                                    headlineContent = { Text(habit.name) },
+                                    supportingContent = {
+                                        val target = habit.displayTarget.ifBlank { "Custom check-in" }
+                                        val schedule = if (habit.isDaily) null else " · ${habit.scheduleLabel}"
+                                        Text("${habit.kind.label} · $target${schedule.orEmpty()}")
+                                    },
+                                    leadingContent = { Icon(habit.type.icon(), contentDescription = null) },
+                                    trailingContent = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box {
+                                                IconButton(onClick = { showListMenu = true }) {
+                                                    Icon(Icons.Filled.Label, contentDescription = "Add to another list")
+                                                }
+                                                DropdownMenu(expanded = showListMenu, onDismissRequest = { showListMenu = false }) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("No list") },
+                                                        onClick = { viewModel.onMoveHabitToList(habit.id, null); showListMenu = false },
+                                                    )
+                                                    state.habitLists.forEach { habitList ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(habitList.name) },
+                                                            onClick = { viewModel.onMoveHabitToList(habit.id, habitList.id); showListMenu = false },
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            IconButton(
+                                                onClick = { viewModel.onMoveHabit(habit.id, up = true) },
+                                                enabled = index > 0,
+                                            ) {
+                                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")
+                                            }
+                                            IconButton(
+                                                onClick = { viewModel.onMoveHabit(habit.id, up = false) },
+                                                enabled = index < state.habits.lastIndex,
+                                            ) {
+                                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down")
+                                            }
+                                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onEditHabit(habit.id) },
+                                )
+                            }
                         }
                     }
                     ListItem(
@@ -680,6 +733,33 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (showNewHabitListDialog) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNewHabitListDialog = false },
+            title = { Text("New list") },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    placeholder = { Text("e.g. \"Morning routine\"") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.onCreateHabitList(name); showNewHabitListDialog = false },
+                    enabled = name.isNotBlank(),
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewHabitListDialog = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 /**
@@ -801,6 +881,79 @@ private fun reminderSummary(state: SettingsUiState): String {
 private fun habitsSummary(state: SettingsUiState): String {
     val count = state.habits.size
     return "$count ${if (count == 1) "habit" else "habits"} · eases in over ${state.easeInStreakLength} days"
+}
+
+/**
+ * "All" plus every user-defined [HabitList], Habitica tag-filter style -- tapping one
+ * narrows the Habits list below (and becomes the default list a new habit's own "+ List"
+ * button pre-selects, see [com.locke.app.ui.habit.AddEditHabitScreen]); tapping the
+ * already-selected one deselects back to "All". The selected list's own chip carries a
+ * small delete affordance, since there's no other list-management screen -- deleting
+ * only un-assigns its habits (see [com.locke.app.data.repository.HabitRepository.deleteList]).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HabitListFilterRow(
+    lists: List<HabitList>,
+    selectedListId: Long?,
+    onSelect: (Long?) -> Unit,
+    onDeleteSelected: (HabitList) -> Unit,
+    onAddList: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterChip(selected = selectedListId == null, onClick = { onSelect(null) }, label = { Text("All") })
+        lists.forEach { list ->
+            val selected = selectedListId == list.id
+            FilterChip(
+                selected = selected,
+                onClick = { onSelect(if (selected) null else list.id) },
+                label = { Text(list.name) },
+            )
+            if (selected) {
+                IconButton(
+                    onClick = { onDeleteSelected(list) },
+                    modifier = Modifier.height(32.dp).width(32.dp),
+                ) {
+                    Icon(Icons.Filled.LabelOff, contentDescription = "Delete \"${list.name}\"", modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+        FilterChip(selected = false, onClick = onAddList, label = { Text("+ List") })
+    }
+}
+
+/**
+ * Groups [habits] by [HabitList] for display, in [lists]' own manual order, with any
+ * unassigned habits (or ones whose list was just deleted) trailing in an "Unsorted"
+ * bucket -- a single unheaded section (see the [selectedListId] and empty-[lists] cases
+ * below) renders exactly like the old flat list did, so this is a no-op visually until
+ * there's more than one list. Filtering to one selected list collapses to that one
+ * section, unheaded, since the chip row above already says which list is showing.
+ */
+private fun habitSections(
+    habits: List<Habit>,
+    lists: List<HabitList>,
+    selectedListId: Long?,
+): List<Pair<HabitList?, List<Habit>>> {
+    val filtered = if (selectedListId == null) habits else habits.filter { it.listId == selectedListId }
+    if (selectedListId != null || lists.isEmpty()) {
+        val noHeader: HabitList? = null
+        return listOf(noHeader to filtered)
+    }
+
+    val byId = lists.associateBy { it.id }
+    val grouped = filtered.groupBy { byId[it.listId] }
+    val ordered = mutableListOf<Pair<HabitList?, List<Habit>>>()
+    lists.forEach { list -> grouped[list]?.let { ordered += list to it } }
+    grouped[null]?.let { ordered += null to it }
+    return ordered
 }
 
 private fun rewardsSummary(state: SettingsUiState): String =

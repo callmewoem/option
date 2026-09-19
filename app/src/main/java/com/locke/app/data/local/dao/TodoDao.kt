@@ -42,6 +42,10 @@ interface TodoDao {
     @Delete
     suspend fun delete(todo: TodoEntity)
 
+    /** Reassigns [id] to [listId] (null moves it back to unpartitioned/"Inbox") -- see [com.locke.app.data.repository.TodoRepository.setList]. */
+    @Query("UPDATE todos SET listId = :listId WHERE id = :id")
+    suspend fun setListId(id: Long, listId: Long?)
+
     @Query("SELECT COUNT(*) FROM todos WHERE date = :date")
     suspend fun getCountForDate(date: String): Int
 

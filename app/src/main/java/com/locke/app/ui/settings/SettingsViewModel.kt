@@ -15,6 +15,7 @@ import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.data.repository.ProofOfLifeRepository
 import com.locke.app.domain.model.AccountabilityBuddy
 import com.locke.app.domain.model.Habit
+import com.locke.app.domain.model.HabitList
 import com.locke.app.domain.model.SubscriptionTier
 import com.locke.app.domain.model.ThemeCodeResult
 import com.locke.app.domain.model.ThemeMode
@@ -43,6 +44,9 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val habits: List<Habit> = emptyList(),
+    val habitLists: List<HabitList> = emptyList(),
+    /** Which list's chip is selected to filter/section the Habits list by -- null means "All" (sectioned by list). */
+    val selectedHabitListFilter: Long? = null,
     val notificationsEnabled: Boolean = true,
     val isPremium: Boolean = false,
     val subscriptionTier: SubscriptionTier = SubscriptionTier.NONE,
@@ -172,6 +176,9 @@ class SettingsViewModel @Inject constructor(
     private val _exportRange = MutableStateFlow(StatsRange.TWELVE_WEEKS)
     private val _isExporting = MutableStateFlow(false)
 
+    /** Which habit-list chip is selected to filter/section the Habits list by -- see [onSelectHabitListFilter]. */
+    private val _selectedHabitListFilter = MutableStateFlow<Long?>(null)
+
     /** One-shot: a just-written export ready to share; cleared by [onExportRequestHandled] once the share sheet's been launched. */
     private val _exportRequest = MutableStateFlow<ExportedFile?>(null)
     val exportRequest: StateFlow<ExportedFile?> = _exportRequest.asStateFlow()
@@ -243,6 +250,9 @@ class SettingsViewModel @Inject constructor(
 
     private val extraAndExport = combine(extraSettings, exportSettings, ::ExtraAndExport)
 
+    /** Paired only to fit the top-level `uiState` combine()'s 5-flow cap -- see its own note. */
+    private val habitListsAndFilter = combine(habitRepository.observeLists(), _selectedHabitListFilter, ::Pair)
+
     // combine()'s typed overloads top out at 5 flows (see the note above), so the
     // accountability group is folded in with a second combine() rather than growing
     // this one past its cap.
@@ -292,10 +302,12 @@ class SettingsViewModel @Inject constructor(
         accountabilitySettings,
         entitlementRepository.entitlement,
         connectionKeys,
-        // combine()'s typed overloads top out at 5 flows -- analyticsEnabled/themeMode
-        // are paired up in a nested combine() rather than growing this one past its cap.
-        combine(preferencesRepository.isAnalyticsEnabled, preferencesRepository.themeMode, ::Pair),
-    ) { base, accountability, entitlement, connections, analyticsAndTheme ->
+        // combine()'s typed overloads top out at 5 flows -- analyticsEnabled/themeMode/
+        // habitListsAndFilter are grouped in a nested combine() rather than growing this
+        // one past its cap.
+        combine(preferencesRepository.isAnalyticsEnabled, preferencesRepository.themeMode, habitListsAndFilter, ::Triple),
+    ) { base, accountability, entitlement, connections, misc ->
+        val (analyticsEnabled, themeMode, listsAndFilter) = misc
         base.copy(
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
@@ -303,10 +315,12 @@ class SettingsViewModel @Inject constructor(
             canAddBuddy = entitlement.isPremium,
             isPremium = entitlement.isPremium,
             subscriptionTier = entitlement.tier,
-            analyticsEnabled = analyticsAndTheme.first,
+            analyticsEnabled = analyticsEnabled,
             wakaTimeApiKey = connections.wakaTimeApiKey,
             githubToken = connections.githubToken,
-            themeMode = analyticsAndTheme.second,
+            themeMode = themeMode,
+            habitLists = listsAndFilter.first,
+            selectedHabitListFilter = listsAndFilter.second,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -447,6 +461,25 @@ class SettingsViewModel @Inject constructor(
             ids[fromIndex] = ids[toIndex].also { ids[toIndex] = ids[fromIndex] }
             habitRepository.reorderHabits(ids)
         }
+    }
+
+    /** Which list's chip is selected to filter/section the Habits list by -- tapping the already-selected one deselects back to "All". */
+    fun onSelectHabitListFilter(listId: Long?) {
+        _selectedHabitListFilter.value = if (_selectedHabitListFilter.value == listId) null else listId
+    }
+
+    fun onCreateHabitList(name: String) {
+        viewModelScope.launch { habitRepository.createList(name) }
+    }
+
+    fun onDeleteHabitList(list: HabitList) {
+        if (_selectedHabitListFilter.value == list.id) _selectedHabitListFilter.value = null
+        viewModelScope.launch { habitRepository.deleteList(list) }
+    }
+
+    /** Quick reassignment from the Habits row's own list icon -- an alternative to opening the full edit screen just to change this. */
+    fun onMoveHabitToList(habitId: Long, listId: Long?) {
+        viewModelScope.launch { habitRepository.setList(habitId, listId) }
     }
 
     /** Re-checks whether the Health Connect read permissions are actually granted -- call on screen resume, since a grant/revoke happens outside the app. */
