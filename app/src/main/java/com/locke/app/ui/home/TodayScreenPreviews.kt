@@ -35,7 +35,7 @@ import com.locke.app.ui.theme.spaceMono
  * unrelated to this redesign, so previews focus on header/hero/progress/list/footer/nav.
  */
 @Composable
-private fun TodayScreenPreviewScaffold(rows: List<Pair<HabitProgress, HabitKind>>) {
+internal fun TodayScreenPreviewScaffold(rows: List<Pair<HabitProgress, HabitKind>>) {
     val positive = rows.filter { it.second != HabitKind.ANTIHABIT }
     val avoid = rows.filter { it.second == HabitKind.ANTIHABIT }
     val completed = positive.count { it.first.isCompleted }
@@ -127,7 +127,7 @@ private fun previewHabit(id: Long, name: String, type: HabitType, target: Int = 
 private fun previewProgress(habit: Habit, current: Int = 0, done: Boolean = false) =
     HabitProgress(habit = habit, currentValue = current, isCompleted = done)
 
-private val TWELVE_HABIT_ROWS: List<Pair<HabitProgress, HabitKind>> = listOf(
+internal val TWELVE_HABIT_ROWS: List<Pair<HabitProgress, HabitKind>> = listOf(
     previewProgress(previewHabit(1, "make bed", HabitType.PHOTO), done = true) to HabitKind.GATING,
     previewProgress(previewHabit(2, "walk pt 1", HabitType.STEPS, target = 1000)) to HabitKind.GATING,
     previewProgress(previewHabit(3, "meditate", HabitType.TIMED_MINUTES, target = 20), current = 3, done = true) to HabitKind.GATING,
@@ -142,7 +142,7 @@ private val TWELVE_HABIT_ROWS: List<Pair<HabitProgress, HabitKind>> = listOf(
     previewProgress(previewHabit(12, "no snoozing", HabitType.TALLY, kind = HabitKind.ANTIHABIT)) to HabitKind.ANTIHABIT,
 )
 
-private val FEW_HABIT_ROWS: List<Pair<HabitProgress, HabitKind>> = listOf(
+internal val FEW_HABIT_ROWS: List<Pair<HabitProgress, HabitKind>> = listOf(
     previewProgress(previewHabit(1, "make bed", HabitType.PHOTO), done = true) to HabitKind.GATING,
     previewProgress(previewHabit(2, "drink water", HabitType.TALLY)) to HabitKind.TRACKED,
     previewProgress(previewHabit(3, "no phone in bed", HabitType.TALLY, kind = HabitKind.ANTIHABIT)) to HabitKind.ANTIHABIT,

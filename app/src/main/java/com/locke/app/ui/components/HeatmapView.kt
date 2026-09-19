@@ -50,10 +50,28 @@ fun Heatmap(
     /** Square cells only -- an outline drawn regardless of fill, e.g. the design spec's empty-cell border. Null draws no outline. */
     borderColorForDate: ((LocalDate) -> Color)? = null,
     scrollable: Boolean = true,
+    /**
+     * Forces exactly this many rows (only meaningful with [weeksAsRows]), ending on
+     * [endDate] as the grid's last cell, and treats every cell in that fixed block as
+     * "in range" -- unlike the default mode below, which only colors dates inside
+     * [startDate]..[endDate] and leaves the days added to align the grid to Sunday
+     * blank. Today's hero needs a fully-colored fixed 7-wide grid (design spec:
+     * "7 columns (days) x 3 rows (weeks)"), not a Sunday-aligned window with blank
+     * padding at the edges -- the Stats screen's grid (null here) still wants that
+     * alignment, since it's an arbitrarily long, actually-scrollable history.
+     */
+    fixedRowCount: Int? = null,
 ) {
-    val gridStart = startDate.minusDays(((startDate.dayOfWeek.value % 7).toLong())) // back up to Sunday
-    val totalDays = ChronoUnit.DAYS.between(gridStart, endDate).toInt() + 1
-    val weekCount = (totalDays + 6) / 7
+    val gridStart: LocalDate
+    val weekCount: Int
+    if (fixedRowCount != null) {
+        weekCount = fixedRowCount
+        gridStart = endDate.minusDays(fixedRowCount * 7L - 1)
+    } else {
+        gridStart = startDate.minusDays(((startDate.dayOfWeek.value % 7).toLong())) // back up to Sunday
+        val totalDays = ChronoUnit.DAYS.between(gridStart, endDate).toInt() + 1
+        weekCount = (totalDays + 6) / 7
+    }
 
     val density = LocalDensity.current
     val cellPx = with(density) { cellSize.toPx() }
@@ -67,7 +85,7 @@ fun Heatmap(
             for (week in 0 until weekCount) {
                 for (dow in 0 until 7) {
                     val date = gridStart.plusDays((week * 7 + dow).toLong())
-                    val inRange = date in startDate..endDate
+                    val inRange = fixedRowCount != null || date in startDate..endDate
                     val color = if (inRange) colorForDate(date) else Color.Transparent
                     val x = if (weeksAsRows) dow * (cellPx + gapPx) else week * (cellPx + gapPx)
                     val y = if (weeksAsRows) week * (cellPx + gapPx) else dow * (cellPx + gapPx)

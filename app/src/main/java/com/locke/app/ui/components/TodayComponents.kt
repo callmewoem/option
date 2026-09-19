@@ -171,52 +171,67 @@ fun TodayHero(
                 color = LockeColor.LabelOlive,
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.Top) {
-                BoxWithConstraints(modifier = Modifier.weight(1f)) {
-                    val gap = 4.dp
-                    val cellSize = ((maxWidth - gap * 6) / 7).coerceAtLeast(8.dp)
-                    Heatmap(
-                        startDate = rangeStart,
-                        endDate = today,
-                        cellSize = cellSize,
-                        cellGap = gap,
-                        cellShape = HeatmapCellShape.Square,
-                        cellCornerRadius = 3.dp,
-                        weeksAsRows = true,
-                        scrollable = false,
-                        colorForDate = { date ->
-                            val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
-                            todayHeatmapLevelColor(fraction)
-                        },
-                        borderColorForDate = { date ->
-                            val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
-                            if (fraction <= 0f) LockeColor.HeatmapEmptyOutline else todayHeatmapLevelColor(fraction)
-                        },
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(
-                    modifier = Modifier.width(50.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    StatTile(
-                        value = "$streakDays",
-                        iconRes = R.drawable.ic_flame,
-                        iconWidth = 12.dp,
-                        iconHeight = 14.dp,
-                        filled = true,
-                        contentDescriptionText = "$streakDays day streak",
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
-                    StatTile(
-                        value = "$freezeCount",
-                        iconRes = R.drawable.ic_shield,
-                        iconWidth = 12.dp,
-                        iconHeight = 13.dp,
-                        filled = false,
-                        contentDescriptionText = "$freezeCount streak freezes left",
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    )
+            val rows = 3
+            val statTileColumnWidth = 50.dp
+            val statTileGap = 10.dp
+            // BoxWithConstraints up front to resolve the heatmap's cell size (and from
+            // it, the grid's exact pixel height) before laying out either sibling --
+            // BoxWithConstraints is built on SubcomposeLayout, which can't itself be
+            // intrinsically measured, so an IntrinsicSize.Min row (the more obvious
+            // "stretch to the tallest sibling" approach) isn't an option here. Handing
+            // both children the same already-known height directly is the same result
+            // CSS flexbox's default align-items: stretch gets for free in the HTML
+            // reference, without needing intrinsics at all.
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val gap = 4.dp
+                val cellSize = ((maxWidth - statTileGap - statTileColumnWidth - gap * 6) / 7).coerceAtLeast(8.dp)
+                val heatmapHeight = cellSize * rows + gap * (rows - 1)
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(modifier = Modifier.weight(1f).height(heatmapHeight)) {
+                        Heatmap(
+                            startDate = rangeStart,
+                            endDate = today,
+                            cellSize = cellSize,
+                            cellGap = gap,
+                            cellShape = HeatmapCellShape.Square,
+                            cellCornerRadius = 3.dp,
+                            weeksAsRows = true,
+                            scrollable = false,
+                            fixedRowCount = rows,
+                            colorForDate = { date ->
+                                val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
+                                todayHeatmapLevelColor(fraction)
+                            },
+                            borderColorForDate = { date ->
+                                val fraction = if (date == today) todayFraction else (dayScores[date] ?: 0f)
+                                if (fraction <= 0f) LockeColor.HeatmapEmptyOutline else todayHeatmapLevelColor(fraction)
+                            },
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(statTileGap))
+                    Column(
+                        modifier = Modifier.width(statTileColumnWidth).height(heatmapHeight),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        StatTile(
+                            value = "$streakDays",
+                            iconRes = R.drawable.ic_flame,
+                            iconWidth = 12.dp,
+                            iconHeight = 14.dp,
+                            filled = true,
+                            contentDescriptionText = "$streakDays day streak",
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                        StatTile(
+                            value = "$freezeCount",
+                            iconRes = R.drawable.ic_shield,
+                            iconWidth = 12.dp,
+                            iconHeight = 13.dp,
+                            filled = false,
+                            contentDescriptionText = "$freezeCount streak freezes left",
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }
