@@ -262,6 +262,19 @@ points at a deliberately unresolvable placeholder host
 (`app/build.gradle.kts`'s `backendBaseUrl`) -- every backend call fails cleanly with
 "can't reach the backend" rather than silently hitting a hardcoded host nobody owns.
 
+**Developer mode:** a debug-build-only toggle at Settings -> Developer (hidden entirely
+from release builds, gated on `BuildConfig.DEBUG`) skips the backend altogether instead
+of pointing at a local instance of it: `DevModeEntitlementRepository`
+(`data/billing/`, bound in `di/BillingModule.kt` in place of
+`PlayBillingEntitlementRepository`) treats the device as always Premium with no Play
+Billing purchase, and `DevModeImageVerificationClient` (`data/verification/`, bound in
+`di/VerificationModule.kt`) routes AI photo checks to `MockImageVerificationClient`,
+which auto-approves locally instead of calling Locke's backend (and therefore Claude).
+Useful for exercising Premium-gated screens and photo-verification habits with neither
+a running `backend/` nor a Play Billing purchase; both wrappers re-check
+`BuildConfig.DEBUG` themselves, so the stored preference can never do anything in a
+release build.
+
 **Google Play Billing:** `data/billing/SubscriptionProducts.kt`'s three IDs
 (`locke_premium_monthly`, `locke_premium_annual`, `locke_premium_lifetime`) must be
 created in Play Console -> Monetize -> Products (two subscriptions, one in-app

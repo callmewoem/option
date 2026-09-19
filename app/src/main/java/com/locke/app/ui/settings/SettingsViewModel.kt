@@ -3,6 +3,7 @@ package com.locke.app.ui.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.locke.app.BuildConfig
 import com.locke.app.data.billing.EntitlementRepository
 import com.locke.app.data.healthconnect.HealthConnectManager
 import com.locke.app.data.repository.AccountabilityRepository
@@ -87,6 +88,8 @@ data class SettingsUiState(
     val exportRange: StatsRange = StatsRange.TWELVE_WEEKS,
     val isExporting: Boolean = false,
     val analyticsEnabled: Boolean = true,
+    /** Debug builds only -- see `SettingsScreen.kt`'s Developer section, gated on `BuildConfig.DEBUG` alongside this. */
+    val developerModeEnabled: Boolean = false,
 )
 
 /**
@@ -96,6 +99,14 @@ data class SettingsUiState(
  * grouped only to keep the final combine() within its 5-flow cap.
  */
 private data class ConnectionKeys(val wakaTimeApiKey: String?, val githubToken: String?)
+
+/** Analytics/theme-mode/habit-list-filter plus the developer-mode flag -- grouped only to keep the top-level `uiState` combine() within its 5-flow cap. */
+private data class MiscSettings(
+    val analyticsEnabled: Boolean,
+    val themeMode: ThemeMode,
+    val listsAndFilter: Pair<List<HabitList>, Long?>,
+    val developerModeEnabled: Boolean,
+)
 
 /** The accountability-buddy fields folded into [SettingsUiState] -- grouped only to keep the final combine() within its 5-flow cap alongside the rest of the screen. */
 private data class AccountabilitySettings(
@@ -303,11 +314,16 @@ class SettingsViewModel @Inject constructor(
         entitlementRepository.entitlement,
         connectionKeys,
         // combine()'s typed overloads top out at 5 flows -- analyticsEnabled/themeMode/
-        // habitListsAndFilter are grouped in a nested combine() rather than growing this
-        // one past its cap.
-        combine(preferencesRepository.isAnalyticsEnabled, preferencesRepository.themeMode, habitListsAndFilter, ::Triple),
+        // habitListsAndFilter/developerModeEnabled are grouped in a nested combine()
+        // rather than growing this one past its cap.
+        combine(
+            preferencesRepository.isAnalyticsEnabled,
+            preferencesRepository.themeMode,
+            habitListsAndFilter,
+            preferencesRepository.isDeveloperModeEnabled,
+            ::MiscSettings,
+        ),
     ) { base, accountability, entitlement, connections, misc ->
-        val (analyticsEnabled, themeMode, listsAndFilter) = misc
         base.copy(
             myPairingCode = accountability.pairingCode,
             shareDailyStatsEnabled = accountability.shareEnabled,
@@ -315,12 +331,13 @@ class SettingsViewModel @Inject constructor(
             canAddBuddy = entitlement.isPremium,
             isPremium = entitlement.isPremium,
             subscriptionTier = entitlement.tier,
-            analyticsEnabled = analyticsEnabled,
+            analyticsEnabled = misc.analyticsEnabled,
             wakaTimeApiKey = connections.wakaTimeApiKey,
             githubToken = connections.githubToken,
-            themeMode = themeMode,
-            habitLists = listsAndFilter.first,
-            selectedHabitListFilter = listsAndFilter.second,
+            themeMode = misc.themeMode,
+            habitLists = misc.listsAndFilter.first,
+            selectedHabitListFilter = misc.listsAndFilter.second,
+            developerModeEnabled = misc.developerModeEnabled,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -339,6 +356,12 @@ class SettingsViewModel @Inject constructor(
                 analyticsRepository.setEnabled(false)
             }
         }
+    }
+
+    /** Debug builds only -- see [PreferencesRepository.isDeveloperModeEnabled]'s doc. A no-op in a release build even if this were somehow reachable, since the stored preference is only ever acted on behind its own `BuildConfig.DEBUG` check. */
+    fun onDeveloperModeToggled(enabled: Boolean) {
+        if (!BuildConfig.DEBUG) return
+        viewModelScope.launch { preferencesRepository.setDeveloperModeEnabled(enabled) }
     }
 
     fun onWakaTimeApiKeyChanged(key: String) {

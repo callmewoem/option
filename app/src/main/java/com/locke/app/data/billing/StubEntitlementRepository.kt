@@ -15,8 +15,9 @@ import javax.inject.Singleton
  * The simplest correct [EntitlementRepository]: derives `isPremium` purely from whatever
  * tier/expiry is locally stored, with no purchase flow and no server verification of its
  * own. Not bound anywhere in the app (see `di/BillingModule.kt`, which binds
- * [PlayBillingEntitlementRepository] instead) -- kept as a reference implementation and
- * for tests that need an [EntitlementRepository] without a real Play Billing connection.
+ * [DevModeEntitlementRepository] -- itself wrapping [PlayBillingEntitlementRepository] --
+ * instead) -- kept as a reference implementation and for tests that need an
+ * [EntitlementRepository] without a real Play Billing connection.
  */
 @Singleton
 class StubEntitlementRepository @Inject constructor(
