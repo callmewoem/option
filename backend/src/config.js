@@ -21,15 +21,6 @@ const config = {
     serviceAccountJsonPath: process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH || null,
   },
 
-  // What the free tier gets before Premium is required -- must match the Android app's
-  // own copies of these numbers (PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH /
-  // MAX_FREE_BUDDIES). The client checks these too (for instant, no-network feedback),
-  // but this is the actual enforcement -- see routes/verify.js and routes/buddies.js.
-  freeTier: {
-    verificationsPerMonth: 3,
-    maxBuddies: 1,
-  },
-
   // Devices register once (POST /v1/devices) and get back an opaque bearer token
   // that's just an HMAC of their device id under this secret -- cheap to verify
   // (recompute and compare) without a session table, and rotating this secret

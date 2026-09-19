@@ -54,15 +54,6 @@ class ExperimentRepository @Inject constructor(
     /** Raw cached value for [key], or null if it's never been assigned (offline since install, or an unrecognized key). */
     fun rawValue(key: String): Flow<String?> = preferencesRepository.cachedExperimentAssignments.map { it[key] }
 
-    /**
-     * [ExperimentKeys.GATING_HABIT_CAP] -- free-tier cap on new GATING habits,
-     * overriding [PreferencesRepository.MAX_FREE_GATING_HABITS] once assigned. See
-     * `ui/habit/AddEditHabitViewModel.kt`'s free-tier check.
-     */
-    val gatingHabitCap: Flow<Int> = rawValue(ExperimentKeys.GATING_HABIT_CAP).map { raw ->
-        raw?.toIntOrNull()?.takeIf { it > 0 } ?: PreferencesRepository.MAX_FREE_GATING_HABITS
-    }
-
     /** [ExperimentKeys.PAYWALL_PLAN_EMPHASIS] -- which plan the paywall sorts first and visually highlights. */
     val paywallPlanEmphasis: Flow<PaywallPlanEmphasis> = rawValue(ExperimentKeys.PAYWALL_PLAN_EMPHASIS).map { raw ->
         PaywallPlanEmphasis.fromValue(raw)

@@ -25,11 +25,14 @@ import com.locke.app.ui.paywall.PaywallContent
 import com.locke.app.ui.paywall.PaywallViewModel
 
 /**
- * Onboarding's final step: the Premium pitch, right after every free feature is already
- * set up -- the CTA lands once the person has seen what the free app does, not before.
- * Always skippable ("Maybe later"): the free tier is a complete, usable app on its own
- * (design spec §5 -- never a dead end), this is upsell, not a gate. Either path (skip,
- * or a purchase completing) finishes onboarding the same way, via [onboardingViewModel].
+ * Onboarding's final step: the trial/subscribe pitch, right after the habits/apps set
+ * up during onboarding are already in place -- the CTA lands once the person has seen
+ * what the app does, not before. Always skippable ("Maybe later"): onboarding itself
+ * never forces a subscription (design spec §5 -- never a dead end), even though
+ * Premium features (more gating habits, buddies, AI photo checks) require one --
+ * skipping just means hitting that same pitch later, from whichever premium feature
+ * the person tries first. Either path (skip, or a purchase completing) finishes
+ * onboarding the same way, via [onboardingViewModel].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

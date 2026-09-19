@@ -102,8 +102,9 @@ already sent is retroactively deleted by this toggle.
 ## A/B testing
 
 Locke occasionally runs small experiments -- e.g. testing two ways of
-presenting subscription pricing, or two different free-tier habit limits --
-to learn what actually works, the same way most software does. Your device is
+presenting subscription pricing, or whether onboarding's own Premium pitch
+step is shown at all -- to learn what actually works, the same way most
+software does. Your device is
 bucketed into one variant of each active experiment, deterministically and
 anonymously, keyed by your device ID; which variant you're in may itself be
 included as a property on the analytics events above, so results can be

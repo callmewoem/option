@@ -5,7 +5,6 @@ const crypto = require('crypto');
 const db = require('../db');
 const { requireDevice } = require('../auth');
 const { getEntitlement } = require('../services/entitlement');
-const config = require('../config');
 
 const router = express.Router();
 
@@ -19,13 +18,9 @@ function generateCode() {
   return code;
 }
 
-function countBuddies(deviceId) {
-  return db.prepare('SELECT COUNT(*) AS count FROM buddy_links WHERE device_id = ?').get(deviceId).count;
-}
-
-/** Free tier gets config.freeTier.maxBuddies (1) real buddy connections -- enough to try the whole feature -- before Premium is required for more. */
+/** Adding a buddy requires an active (trial or paid) subscription -- no free tier. */
 function hasRoomForAnotherBuddy(deviceId) {
-  return getEntitlement(deviceId).isPremium || countBuddies(deviceId) < config.freeTier.maxBuddies;
+  return getEntitlement(deviceId).isPremium;
 }
 
 function loadSummary(deviceId) {
@@ -78,10 +73,9 @@ router.post('/pairing-codes', requireDevice, (req, res) => {
 
 /**
  * Redeems a buddy's pairing code -- pairing is mutual, both directions are linked in
- * one transaction. Free tier: checked on *both* sides, since the new connection would
- * push either one over their own cap -- whichever is unpaid and already at the limit
- * is the one named in the error, so the redeemer knows whether it's their own limit
- * or the other person's.
+ * one transaction. Checked on *both* sides, since the new connection needs each side
+ * to have an active subscription -- whichever one doesn't is named in the error, so
+ * the redeemer knows whether it's their own subscription or the other person's.
  */
 router.post('/buddies', requireDevice, (req, res) => {
   const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
@@ -94,11 +88,11 @@ router.post('/buddies', requireDevice, (req, res) => {
 
   if (!hasRoomForAnotherBuddy(req.deviceId)) {
     return res.status(402).json({
-      error: `You've reached the free plan's ${config.freeTier.maxBuddies}-buddy limit. Upgrade to add more.`,
+      error: 'Adding a buddy requires a Locke Premium subscription -- start your free trial.',
     });
   }
   if (!hasRoomForAnotherBuddy(pairing.device_id)) {
-    return res.status(402).json({ error: 'That person has already reached their free plan buddy limit.' });
+    return res.status(402).json({ error: "That person doesn't have an active Locke Premium subscription." });
   }
 
   const link = db.transaction(() => {
@@ -115,7 +109,7 @@ router.post('/buddies', requireDevice, (req, res) => {
   res.status(201).json(toBuddyJson(pairing.device_id, code));
 });
 
-/** Every paired buddy's latest known summary. Not gated at all (read-only) -- a lapsed subscriber, or someone below the free cap, still sees who they'd paired with. */
+/** Every paired buddy's latest known summary. Not gated at all (read-only) -- a lapsed subscriber still sees who they'd paired with. */
 router.get('/buddies', requireDevice, (req, res) => {
   const rows = db.prepare('SELECT buddy_device_id, pairing_code FROM buddy_links WHERE device_id = ?').all(req.deviceId);
   res.json(rows.map((row) => toBuddyJson(row.buddy_device_id, row.pairing_code)));

@@ -22,7 +22,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.locke.app.R
-import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.data.repository.ProofOfLifeRepository
 import com.locke.app.ui.components.LockeCard
 import com.locke.app.ui.components.LockePrimaryButton
@@ -127,8 +126,8 @@ fun OnboardingCurfewCheckInScreen(
                             Text("Morning check-in", style = MaterialTheme.typography.titleMedium)
                             Text(
                                 "A photo proving you're up, checked by the same AI as photo-verification " +
-                                    "habits (${PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH} free checks a month -- " +
-                                    "see the next step). Miss the window and the block extends " +
+                                    "habits (requires a Locke Premium subscription -- see the next step). " +
+                                    "Miss the window and the block extends " +
                                     "${ProofOfLifeRepository.PENALTY_MINUTES} minutes -- priced exactly, every time.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

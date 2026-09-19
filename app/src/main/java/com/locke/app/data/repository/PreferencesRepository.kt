@@ -87,8 +87,6 @@ class PreferencesRepository @Inject constructor(
         val LIMITED_UNBLOCK_WINDOW_MINUTES = intPreferencesKey("limited_unblock_window_minutes")
         val LIMITED_UNBLOCK_STREAK_BONUS_ENABLED = booleanPreferencesKey("limited_unblock_streak_bonus_enabled")
         val LIMITED_UNBLOCK_STREAK_BONUS_MINUTES_PER_DAY = intPreferencesKey("limited_unblock_streak_bonus_minutes_per_day")
-        val FREE_VERIFICATION_MONTH = stringPreferencesKey("free_verification_month") // "yyyy-MM"
-        val FREE_VERIFICATION_COUNT = intPreferencesKey("free_verification_count")
         val ANALYTICS_ENABLED = booleanPreferencesKey("analytics_enabled")
         val CACHED_EXPERIMENT_ASSIGNMENTS = stringPreferencesKey("cached_experiment_assignments") // JSON: {key: value}
         val EXPERIMENT_ASSIGNMENTS_FETCHED_AT_EPOCH_MILLIS = longPreferencesKey("experiment_assignments_fetched_at_epoch_millis")
@@ -482,46 +480,6 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
-    // -- Free-tier monthly photo-verification quota ------------------------------------
-
-    /**
-     * How many of this calendar month's [FREE_VERIFICATIONS_PER_MONTH] free AI photo
-     * checks are left, for a non-premium user -- 0 once they're used up (checked, not
-     * negative). A stored count from an earlier month doesn't carry over or need
-     * clearing: it's simply ignored once [DateProvider.currentMonthString] has moved on,
-     * and the next [consumeFreeVerificationIfAvailable] call naturally starts a fresh
-     * month's count. Meaningless (and not read) once premium -- see
-     * [com.locke.app.data.billing.EntitlementRepository.isPremium].
-     */
-    fun freeVerificationsRemaining(nowMonth: String): Flow<Int> = dataStore.data.map { prefs ->
-        val usedThisMonth = if (prefs[Keys.FREE_VERIFICATION_MONTH] == nowMonth) prefs[Keys.FREE_VERIFICATION_COUNT] ?: 0 else 0
-        (FREE_VERIFICATIONS_PER_MONTH - usedThisMonth).coerceIn(0, FREE_VERIFICATIONS_PER_MONTH)
-    }
-
-    /**
-     * Spends one of this month's free checks if any are left, atomically (so two
-     * concurrent calls can't both succeed past the cap). Call this once a check has
-     * actually gotten a verdict back -- approved or rejected, both cost the backend a
-     * real Anthropic call, so both count -- but not after a network/API failure that
-     * never reached a verdict; see
-     * [com.locke.app.data.verification.BackendImageVerificationClient]. Returns whether
-     * it was spent; false means the month's quota was already gone before this call
-     * (the caller should already have checked [freeVerificationsRemaining] first and
-     * not be calling this in that case, but this is still safe to call blind).
-     */
-    suspend fun consumeFreeVerificationIfAvailable(nowMonth: String): Boolean {
-        var consumed = false
-        dataStore.edit { prefs ->
-            val usedThisMonth = if (prefs[Keys.FREE_VERIFICATION_MONTH] == nowMonth) prefs[Keys.FREE_VERIFICATION_COUNT] ?: 0 else 0
-            if (usedThisMonth < FREE_VERIFICATIONS_PER_MONTH) {
-                prefs[Keys.FREE_VERIFICATION_MONTH] = nowMonth
-                prefs[Keys.FREE_VERIFICATION_COUNT] = usedThisMonth + 1
-                consumed = true
-            }
-        }
-        return consumed
-    }
-
     // -- App-usage tracking diagnostics -------------------------------------------------
 
     /**
@@ -714,38 +672,6 @@ class PreferencesRepository @Inject constructor(
         dataStore.data.map { it[Keys.EXPERIMENT_ASSIGNMENTS_FETCHED_AT_EPOCH_MILLIS] ?: 0L }
 
     companion object {
-        /**
-         * Free-tier cap on new GATING habits -- see
-         * [com.locke.app.ui.habit.AddEditHabitViewModel.onSave]. Only
-         * gates *creating* a new gate past the cap; existing gates (including ones
-         * the onboarding "ease into it" ramp promotes from TRACKED later) are never
-         * un-gated or blocked from being edited by this. Deliberately generous --
-         * most people run 2-4 gating habits at a time (onboarding itself only ever
-         * starts one to three), so this should cover normal use of the app on the
-         * free tier and only actually bite someone stacking on a lot of gates.
-         */
-        const val MAX_FREE_GATING_HABITS = 5
-
-        /**
-         * Free-tier cap on paired accountability buddies -- see
-         * [com.locke.app.data.repository.AccountabilityRepository.canAddBuddy]. One
-         * real buddy is enough to try the whole feature (pairing, sharing, seeing
-         * their progress) for free; Premium removes the cap for a bigger group.
-         */
-        const val MAX_FREE_BUDDIES = 1
-
-        /**
-         * Free AI photo checks per calendar month -- see
-         * [freeVerificationsRemaining]/[consumeFreeVerificationIfAvailable] below and
-         * `backend/src/routes/verify.js`'s matching server-side quota (the actual
-         * enforcement; this and the client-side check are both about giving fast,
-         * honest feedback before spending a network round trip, not the ground truth).
-         * Resets every month rather than being a one-time trial, so photo verification
-         * stays usable on the free tier indefinitely, just capped -- not a
-         * disappearing "try it once" gimmick.
-         */
-        const val FREE_VERIFICATIONS_PER_MONTH = 3
-
         const val HARD_MODE_ENTRY_GRACE_TOKENS = 5
         const val HARD_MODE_TOGGLE_COOLDOWN_DAYS = 7
         const val DEFAULT_EASE_IN_STREAK_LENGTH = 5

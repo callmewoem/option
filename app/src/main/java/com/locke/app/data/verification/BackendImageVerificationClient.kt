@@ -5,10 +5,7 @@ import com.locke.app.data.billing.EntitlementRepository
 import com.locke.app.data.remote.BackendApiException
 import com.locke.app.data.remote.BackendConfig
 import com.locke.app.data.remote.DeviceIdentityRepository
-import com.locke.app.data.repository.PreferencesRepository
-import com.locke.app.util.DateProvider
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -26,30 +23,21 @@ import javax.inject.Singleton
  * an API key the user had to paste into Settings -- that key now lives only in the
  * backend process's environment (`ANTHROPIC_API_KEY`), never inside the app.
  *
- * Free tier gets [PreferencesRepository.FREE_VERIFICATIONS_PER_MONTH] checks a month
- * before Premium is required -- checked here before the request is even sent (cheaper
- * than a round trip, and gives an instant, no-network answer), and the backend enforces
- * the same quota server-side for defense in depth against a modified client. The local
- * count is only spent once a check actually gets a verdict back, approved or rejected
- * (both cost the backend a real Anthropic call) -- not on a network/API failure that
- * never reached one; see [PreferencesRepository.consumeFreeVerificationIfAvailable]'s doc.
+ * Requires an active (trial or paid) subscription -- checked here before the request
+ * is even sent (cheaper than a round trip, and gives an instant, no-network answer),
+ * and the backend enforces the same requirement server-side for defense in depth
+ * against a modified client.
  */
 @Singleton
 class BackendImageVerificationClient @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val deviceIdentity: DeviceIdentityRepository,
     private val entitlementRepository: EntitlementRepository,
-    private val preferencesRepository: PreferencesRepository,
 ) : ImageVerificationClient {
 
     override suspend fun verify(request: VerificationRequest): VerificationResult =
         withContext(Dispatchers.IO) {
-            val isPremium = entitlementRepository.isPremium()
-            val nowMonth = DateProvider.currentMonthString()
-            if (!isPremium) {
-                val remaining = preferencesRepository.freeVerificationsRemaining(nowMonth).first()
-                if (remaining <= 0) throw ImageVerificationException.RequiresPremium
-            }
+            if (!entitlementRepository.isPremium()) throw ImageVerificationException.RequiresPremium
 
             val authHeader = try {
                 deviceIdentity.authHeader()
@@ -77,12 +65,6 @@ class BackendImageVerificationClient @Inject constructor(
             } catch (e: IOException) {
                 throw ImageVerificationException.Network("Couldn't reach the verification service.", e)
             }
-
-            // A round trip that actually got a verdict back -- whether the photo was
-            // approved or rejected, it cost the backend an Anthropic call, so it
-            // counts against the free monthly allowance either way. Mirrors what the
-            // backend itself just counted server-side (see routes/verify.js).
-            if (!isPremium) preferencesRepository.consumeFreeVerificationIfAvailable(nowMonth)
 
             parseVerdict(responseBody)
         }

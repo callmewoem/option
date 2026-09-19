@@ -22,9 +22,6 @@ data class ExperimentAssignment(
  * file's own doc for adding a new one.
  */
 object ExperimentKeys {
-    /** [value] is the free-tier cap on new GATING habits, overriding [com.locke.app.data.repository.PreferencesRepository.MAX_FREE_GATING_HABITS]. */
-    const val GATING_HABIT_CAP = "gating_habit_cap"
-
     /** [value] is a [PaywallPlanEmphasis] name -- which plan the paywall sorts first and highlights. */
     const val PAYWALL_PLAN_EMPHASIS = "paywall_plan_emphasis"
 
