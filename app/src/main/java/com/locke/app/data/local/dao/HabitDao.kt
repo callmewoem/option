@@ -60,6 +60,10 @@ interface HabitDao {
     @Query("UPDATE habits SET sortOrder = :sortOrder WHERE id = :habitId")
     suspend fun updateSortOrder(habitId: Long, sortOrder: Int)
 
+    /** Reassigns [habitId] to [listId] (null moves it back to unpartitioned) -- see [com.locke.app.data.repository.HabitRepository.setList]. */
+    @Query("UPDATE habits SET listId = :listId WHERE id = :habitId")
+    suspend fun setListId(habitId: Long, listId: Long?)
+
     /** Whether the user has any active GATING habit at all, regardless of which days it's due -- see [com.locke.app.data.repository.HabitRepository.isDateFullyComplete]. */
     @Query("SELECT COUNT(*) FROM habits WHERE isArchived = 0 AND kind = 'GATING'")
     suspend fun getActiveGatingHabitCount(): Int

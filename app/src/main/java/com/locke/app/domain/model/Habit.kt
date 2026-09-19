@@ -55,6 +55,8 @@ data class Habit(
      * `ui/habit/ScanTagScreen`.
      */
     val tagPayload: String? = null,
+    /** Which [com.locke.app.data.local.entity.HabitListEntity] this habit is partitioned into -- null means unpartitioned. */
+    val listId: Long? = null,
 ) {
     val displayTarget: String
         get() = if (!type.isMeasurable) "" else "$targetValue ${type.unit}"

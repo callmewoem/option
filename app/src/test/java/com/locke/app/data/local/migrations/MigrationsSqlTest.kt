@@ -55,7 +55,7 @@ class MigrationsSqlTest {
         "CREATE TABLE `blocked_apps` (`packageName` TEXT NOT NULL, `appLabel` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`packageName`))",
     )
 
-    /** Every migration's SQL, 1->2 through 12->13, in order. */
+    /** Every migration's SQL, 1->2 through 14->15, in order. */
     private val allMigrationSql = listOf(
         MIGRATION_1_2_SQL,
         MIGRATION_2_3_SQL,
@@ -69,6 +69,8 @@ class MigrationsSqlTest {
         MIGRATION_10_11_SQL,
         MIGRATION_11_12_SQL,
         MIGRATION_12_13_SQL,
+        MIGRATION_13_14_SQL,
+        MIGRATION_14_15_SQL,
     )
 
     private fun newV1Database(): Connection {
@@ -124,7 +126,7 @@ class MigrationsSqlTest {
     }
 
     @Test
-    fun `every migration's SQL is valid and the full chain 1 to 13 lands on the current table set`() {
+    fun `every migration's SQL is valid and the full chain 1 to 15 lands on the current table set`() {
         newV1Database().use { db ->
             allMigrationSql.forEach { db.runSql(it) }
 
@@ -133,10 +135,12 @@ class MigrationsSqlTest {
                     "habits", "habit_completions", "blocked_apps", "streak_scars", "todos",
                     "block_lists", "blocked_domains", "block_attempts",
                     "accountability_buddies", "pending_stats_sync", "analytics_events",
+                    "todo_lists", "habit_lists",
                 ),
                 db.tableNames(),
             )
-            // No leftover recreation-scratch tables from MIGRATION_5_6/MIGRATION_8_9.
+            // No leftover recreation-scratch tables from MIGRATION_5_6/MIGRATION_8_9/
+            // MIGRATION_13_14/MIGRATION_14_15.
             assertFalse(db.tableNames().contains("todos_new"))
             assertFalse(db.tableNames().contains("habits_new"))
             assertFalse(db.tableNames().contains("todo_completions"))
@@ -147,7 +151,7 @@ class MigrationsSqlTest {
                     "sortOrder", "createdAtEpochMillis", "isArchived", "verificationPrompt",
                     "verificationExampleImagePath", "kind", "expiresAfterDate", "easeInOrder",
                     "scheduledDaysMask", "targetLatitude", "targetLongitude", "targetRadiusMeters",
-                    "targetLocationLabel", "targetGithubUsername", "tagPayload",
+                    "targetLocationLabel", "targetGithubUsername", "tagPayload", "listId",
                 ),
                 db.columnNames("habits"),
             )
@@ -160,10 +164,12 @@ class MigrationsSqlTest {
                 db.columnNames("habit_completions"),
             )
             assertEquals(
-                listOf("id", "title", "date", "isDone", "createdAtEpochMillis", "completedAtEpochMillis"),
+                listOf("id", "title", "date", "isDone", "createdAtEpochMillis", "completedAtEpochMillis", "listId"),
                 db.columnNames("todos"),
             )
             assertFalse("repeatDaysMask must not survive past v6", db.columnNames("todos").contains("repeatDaysMask"))
+            assertEquals(listOf("id", "name", "sortOrder", "createdAtEpochMillis"), db.columnNames("todo_lists"))
+            assertEquals(listOf("id", "name", "sortOrder", "createdAtEpochMillis"), db.columnNames("habit_lists"))
             assertEquals(listOf("date", "reason", "createdAtEpochMillis"), db.columnNames("streak_scars"))
             assertEquals(
                 listOf("id", "name", "source", "blockMode", "isEnabled", "createdAtEpochMillis"),
@@ -425,6 +431,85 @@ class MigrationsSqlTest {
                 assertEquals(0, rs.getInt("isDone"))
                 assertEquals(1000, rs.getLong("createdAtEpochMillis"))
                 assertFalse(rs.next())
+            }
+        }
+    }
+
+    @Test
+    fun `migration 13 to 14 adds todo_lists and un-assigns rather than deletes a todo when its list is deleted`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(12).forEach { db.runSql(it) } // 1->2 .. 12->13, i.e. up to v13
+            db.createStatement().use { it.execute("PRAGMA foreign_keys = ON") }
+
+            db.runSql(
+                listOf(
+                    "INSERT INTO `todos` (`title`, `date`, `isDone`, `createdAtEpochMillis`) VALUES ('Hoover', '2026-09-06', 0, 1000)",
+                ),
+            )
+
+            db.runSql(MIGRATION_13_14_SQL)
+
+            assertEquals(
+                listOf("id", "title", "date", "isDone", "createdAtEpochMillis", "completedAtEpochMillis", "listId"),
+                db.columnNames("todos"),
+            )
+            db.runSql(
+                listOf(
+                    "INSERT INTO `todo_lists` (`name`, `sortOrder`, `createdAtEpochMillis`) VALUES ('Chores', 0, 0)",
+                    "UPDATE `todos` SET `listId` = 1 WHERE `title` = 'Hoover'",
+                    "DELETE FROM `todo_lists` WHERE `id` = 1",
+                ),
+            )
+            db.createStatement().use { statement ->
+                statement.executeQuery("SELECT `title`, `listId` FROM `todos`").use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals("Hoover", rs.getString("title"))
+                    assertEquals(null, rs.getObject("listId"))
+                    assertFalse(rs.next())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `migration 14 to 15 adds habit_lists and un-assigns rather than deletes a habit when its list is deleted`() {
+        newV1Database().use { db ->
+            allMigrationSql.take(13).forEach { db.runSql(it) } // 1->2 .. 13->14, i.e. up to v14
+            db.createStatement().use { it.execute("PRAGMA foreign_keys = ON") }
+
+            db.runSql(
+                listOf(
+                    "INSERT INTO `habits` (`name`, `type`, `targetValue`, `targetPackageName`, `targetAppLabel`, `sortOrder`, `createdAtEpochMillis`, `isArchived`) " +
+                        "VALUES ('Read', 'TALLY', 0, NULL, NULL, 0, 0, 0)",
+                ),
+            )
+
+            db.runSql(MIGRATION_14_15_SQL)
+
+            assertEquals(
+                listOf(
+                    "id", "name", "type", "targetValue", "targetPackageName", "targetAppLabel",
+                    "sortOrder", "createdAtEpochMillis", "isArchived", "verificationPrompt",
+                    "verificationExampleImagePath", "kind", "expiresAfterDate", "easeInOrder",
+                    "scheduledDaysMask", "targetLatitude", "targetLongitude", "targetRadiusMeters",
+                    "targetLocationLabel", "targetGithubUsername", "tagPayload", "listId",
+                ),
+                db.columnNames("habits"),
+            )
+            db.runSql(
+                listOf(
+                    "INSERT INTO `habit_lists` (`name`, `sortOrder`, `createdAtEpochMillis`) VALUES ('Morning routine', 0, 0)",
+                    "UPDATE `habits` SET `listId` = 1 WHERE `name` = 'Read'",
+                    "DELETE FROM `habit_lists` WHERE `id` = 1",
+                ),
+            )
+            db.createStatement().use { statement ->
+                statement.executeQuery("SELECT `name`, `listId` FROM `habits`").use { rs ->
+                    assertTrue(rs.next())
+                    assertEquals("Read", rs.getString("name"))
+                    assertEquals(null, rs.getObject("listId"))
+                    assertFalse(rs.next())
+                }
             }
         }
     }

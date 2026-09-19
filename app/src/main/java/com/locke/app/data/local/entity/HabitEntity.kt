@@ -2,13 +2,26 @@ package com.locke.app.data.local.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.locke.app.domain.model.Habit
 import com.locke.app.domain.model.HabitKind
 import com.locke.app.domain.model.HabitType
 import java.time.DayOfWeek
 
-@Entity(tableName = "habits")
+@Entity(
+    tableName = "habits",
+    foreignKeys = [
+        ForeignKey(
+            entity = HabitListEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["listId"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index("listId")],
+)
 data class HabitEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val name: String,
@@ -54,6 +67,8 @@ data class HabitEntity(
     val targetGithubUsername: String? = null,
     /** [HabitType.TAG_SCAN] only. */
     val tagPayload: String? = null,
+    /** Which [HabitListEntity] this habit is partitioned into -- null means unpartitioned. */
+    val listId: Long? = null,
 )
 
 /** Shared by [HabitEntity.scheduledDaysMask] -- kept here since it's the only entity that still needs it. */
@@ -83,6 +98,7 @@ fun HabitEntity.toDomain(): Habit = Habit(
     targetLocationLabel = targetLocationLabel,
     targetGithubUsername = targetGithubUsername,
     tagPayload = tagPayload,
+    listId = listId,
 )
 
 fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
@@ -107,4 +123,5 @@ fun Habit.toEntity(isArchived: Boolean = false): HabitEntity = HabitEntity(
     targetLocationLabel = targetLocationLabel,
     targetGithubUsername = targetGithubUsername,
     tagPayload = tagPayload,
+    listId = listId,
 )

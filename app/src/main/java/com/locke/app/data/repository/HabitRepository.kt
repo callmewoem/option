@@ -2,13 +2,16 @@ package com.locke.app.data.repository
 
 import com.locke.app.data.local.dao.HabitCompletionDao
 import com.locke.app.data.local.dao.HabitDao
+import com.locke.app.data.local.dao.HabitListDao
 import com.locke.app.data.local.dao.ScarReasonCount
 import com.locke.app.data.local.dao.StreakScarDao
 import com.locke.app.data.local.entity.HabitCompletionEntity
+import com.locke.app.data.local.entity.HabitListEntity
 import com.locke.app.data.local.entity.toDomain
 import com.locke.app.data.local.entity.toEntity
 import com.locke.app.domain.model.Habit
 import com.locke.app.domain.model.HabitKind
+import com.locke.app.domain.model.HabitList
 import com.locke.app.domain.model.HabitProgress
 import com.locke.app.domain.model.HabitType
 import com.locke.app.util.DateProvider
@@ -84,6 +87,7 @@ data class ConsistencyStats(
 @Singleton
 class HabitRepository @Inject constructor(
     private val habitDao: HabitDao,
+    private val habitListDao: HabitListDao,
     private val completionDao: HabitCompletionDao,
     private val streakScarDao: StreakScarDao,
 ) {
@@ -161,6 +165,26 @@ class HabitRepository @Inject constructor(
      */
     suspend fun reorderHabits(orderedIds: List<Long>) {
         orderedIds.forEachIndexed { index, habitId -> habitDao.updateSortOrder(habitId, index) }
+    }
+
+    /** Every [HabitList] the user has defined, in manual order -- the filter chips on Settings' habit list. */
+    fun observeLists(): Flow<List<HabitList>> = habitListDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
+    /** Creates a new list and returns its id, ready to assign a habit to immediately. */
+    suspend fun createList(name: String): Long? {
+        if (name.isBlank()) return null
+        val sortOrder = habitListDao.getMaxSortOrder() + 1
+        return habitListDao.insert(HabitListEntity(name = name.trim(), sortOrder = sortOrder))
+    }
+
+    /** Deletes [list] -- its habits fall back to unpartitioned rather than being deleted (`ON DELETE SET NULL`, see [com.locke.app.data.local.entity.HabitEntity.listId]). */
+    suspend fun deleteList(list: HabitList) {
+        habitListDao.delete(HabitListEntity(id = list.id, name = list.name, sortOrder = list.sortOrder, createdAtEpochMillis = list.createdAtEpochMillis))
+    }
+
+    /** Reassigns [habitId] to [listId] (null un-partitions it). */
+    suspend fun setList(habitId: Long, listId: Long?) {
+        habitDao.setListId(habitId, listId)
     }
 
     /** Removes expired makeup habits (see [PenaltyRepository]). Safe to call often -- it's a no-op most days. */

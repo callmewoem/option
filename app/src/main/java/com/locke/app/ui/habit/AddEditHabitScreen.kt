@@ -63,6 +63,7 @@ import coil.compose.AsyncImage
 import com.locke.app.R
 import com.locke.app.domain.model.HabitKind
 import com.locke.app.domain.model.HabitType
+import com.locke.app.domain.model.HabitTypeCategory
 import com.locke.app.domain.model.toScheduleLabel
 import com.locke.app.ui.components.LockeGhostButton
 import com.locke.app.ui.components.LockePrimaryButton
@@ -83,6 +84,7 @@ fun AddEditHabitScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAppPicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showNewListDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.savedSuccessfully) {
         if (state.savedSuccessfully) onDone()
@@ -158,30 +160,46 @@ fun AddEditHabitScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
             Text(text = stringResource(R.string.add_habit_choose_type), style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "What kind of goal is this?",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Step 1: pick a category (3 choices, not all eleven types at once). Picking a
+            // new category jumps straight to its first type so the form is never left on
+            // an invalid/mismatched type -- see AddEditHabitViewModel.onTypeChanged.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                HabitType.entries.take(4).forEach { type ->
+                HabitTypeCategory.entries.forEach { category ->
                     FilterChip(
-                        selected = state.type == type,
-                        onClick = { viewModel.onTypeChanged(type) },
+                        selected = state.type.category == category,
+                        onClick = { viewModel.onTypeChanged(category.types.first()) },
                         enabled = !state.isKindLocked,
-                        label = { Text(type.label(), maxLines = 1) },
-                        leadingIcon = { Icon(type.icon(), contentDescription = null) },
+                        label = { Text(category.label) },
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = state.type.category.hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(modifier = Modifier.height(8.dp))
+
+            // Step 2: pick the specific type within that category (at most five choices).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                HabitType.entries.drop(4).forEach { type ->
+                state.type.category.types.forEach { type ->
                     FilterChip(
                         selected = state.type == type,
                         onClick = { viewModel.onTypeChanged(type) },
@@ -302,6 +320,35 @@ fun AddEditHabitScreen(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
+            Text(text = "List", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Optional -- purely organizational, groups habits in Settings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                state.lists.forEach { list ->
+                    FilterChip(
+                        selected = state.listId == list.id,
+                        onClick = { viewModel.onListSelected(list.id) },
+                        label = { Text(list.name) },
+                    )
+                }
+                FilterChip(
+                    selected = false,
+                    onClick = { showNewListDialog = true },
+                    label = { Text("+ List") },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
             Text(text = "Frequency", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -357,6 +404,33 @@ fun AddEditHabitScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showAppPicker = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+
+    if (showNewListDialog) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNewListDialog = false },
+            title = { Text("New list") },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    placeholder = { Text("e.g. \"Morning routine\"") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.onCreateList(name); showNewListDialog = false },
+                    enabled = name.isNotBlank(),
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewListDialog = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

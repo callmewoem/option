@@ -6,7 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Real, hand-written [Migration]s covering every version transition
  * [AppDatabase][com.locke.app.data.local.AppDatabase] has ever been through,
- * 1 through 13 -- see the version-history comment above `@Database` there for the
+ * 1 through 15 -- see the version-history comment above `@Database` there for the
  * user-facing story of each step; this file is the literal DDL/DML for it.
  *
  * Each `MIGRATION_x_y` is backed by a `MIGRATION_x_y_SQL` statement list so the exact same
@@ -261,6 +261,51 @@ internal val MIGRATION_12_13_SQL: List<String> = listOf(
 val MIGRATION_12_13: Migration = sqlMigration(12, 13, MIGRATION_12_13_SQL)
 
 /**
+ * SQL for [MIGRATION_13_14]: added `todo_lists` -- a user-defined "which bucket is this
+ * todo in" partition (see [com.locke.app.domain.model.TodoList]) -- and
+ * `TodoEntity.listId`, a nullable FK to it with `ON DELETE SET NULL`: deleting a list
+ * un-assigns its todos rather than deleting them. SQLite can't `ALTER TABLE ... ADD
+ * COLUMN` with a `FOREIGN KEY` clause, so `todos` is recreated with the new column and
+ * constraint, copying every existing row across -- same shape as [MIGRATION_8_9_SQL].
+ * `listId` is nullable with no backfill needed: every existing todo simply starts
+ * unpartitioned.
+ */
+internal val MIGRATION_13_14_SQL: List<String> = listOf(
+    "CREATE TABLE IF NOT EXISTS `todo_lists` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL)",
+    "CREATE TABLE `todos_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `date` TEXT NOT NULL, `isDone` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `completedAtEpochMillis` INTEGER, `listId` INTEGER, FOREIGN KEY(`listId`) REFERENCES `todo_lists`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+    "INSERT INTO `todos_new` (`id`, `title`, `date`, `isDone`, `createdAtEpochMillis`, `completedAtEpochMillis`) " +
+        "SELECT `id`, `title`, `date`, `isDone`, `createdAtEpochMillis`, `completedAtEpochMillis` FROM `todos`",
+    "DROP TABLE `todos`",
+    "ALTER TABLE `todos_new` RENAME TO `todos`",
+    "CREATE INDEX IF NOT EXISTS `index_todos_listId` ON `todos` (`listId`)",
+)
+
+/** v13 -> v14, see [MIGRATION_13_14_SQL]. */
+val MIGRATION_13_14: Migration = sqlMigration(13, 14, MIGRATION_13_14_SQL)
+
+/**
+ * SQL for [MIGRATION_14_15]: same idea as [MIGRATION_13_14_SQL], for habits -- added
+ * `habit_lists` and `HabitEntity.listId` (see
+ * [com.locke.app.domain.model.HabitList]), nullable FK, `ON DELETE SET NULL`. `habits`
+ * is recreated (same SQLite `ALTER TABLE` limitation as above) with every column it had
+ * at v13 plus the new `listId`/FK -- column list checked against
+ * [MIGRATION_8_9_SQL]'s own `habits_new` recreation plus [MIGRATION_12_13_SQL]'s six
+ * additions, in the same order `HabitEntity` declares them.
+ */
+internal val MIGRATION_14_15_SQL: List<String> = listOf(
+    "CREATE TABLE IF NOT EXISTS `habit_lists` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL)",
+    "CREATE TABLE `habits_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `targetValue` INTEGER NOT NULL, `targetPackageName` TEXT, `targetAppLabel` TEXT, `sortOrder` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `verificationPrompt` TEXT, `verificationExampleImagePath` TEXT, `kind` TEXT NOT NULL DEFAULT 'GATING', `expiresAfterDate` TEXT, `easeInOrder` INTEGER, `scheduledDaysMask` INTEGER NOT NULL DEFAULT 0, `targetLatitude` REAL, `targetLongitude` REAL, `targetRadiusMeters` INTEGER, `targetLocationLabel` TEXT, `targetGithubUsername` TEXT, `tagPayload` TEXT, `listId` INTEGER, FOREIGN KEY(`listId`) REFERENCES `habit_lists`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+    "INSERT INTO `habits_new` (`id`, `name`, `type`, `targetValue`, `targetPackageName`, `targetAppLabel`, `sortOrder`, `createdAtEpochMillis`, `isArchived`, `verificationPrompt`, `verificationExampleImagePath`, `kind`, `expiresAfterDate`, `easeInOrder`, `scheduledDaysMask`, `targetLatitude`, `targetLongitude`, `targetRadiusMeters`, `targetLocationLabel`, `targetGithubUsername`, `tagPayload`) " +
+        "SELECT `id`, `name`, `type`, `targetValue`, `targetPackageName`, `targetAppLabel`, `sortOrder`, `createdAtEpochMillis`, `isArchived`, `verificationPrompt`, `verificationExampleImagePath`, `kind`, `expiresAfterDate`, `easeInOrder`, `scheduledDaysMask`, `targetLatitude`, `targetLongitude`, `targetRadiusMeters`, `targetLocationLabel`, `targetGithubUsername`, `tagPayload` FROM `habits`",
+    "DROP TABLE `habits`",
+    "ALTER TABLE `habits_new` RENAME TO `habits`",
+    "CREATE INDEX IF NOT EXISTS `index_habits_listId` ON `habits` (`listId`)",
+)
+
+/** v14 -> v15, see [MIGRATION_14_15_SQL]. */
+val MIGRATION_14_15: Migration = sqlMigration(14, 15, MIGRATION_14_15_SQL)
+
+/**
  * Every real migration this database has, in order, for
  * [com.locke.app.di.AppModule.provideDatabase] to install via
  * `addMigrations(*ALL_MIGRATIONS)`.
@@ -278,6 +323,8 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_10_11,
     MIGRATION_11_12,
     MIGRATION_12_13,
+    MIGRATION_13_14,
+    MIGRATION_14_15,
 )
 
 /** Builds a [Migration] that just runs [statements] in order via [SupportSQLiteDatabase.execSQL]. */

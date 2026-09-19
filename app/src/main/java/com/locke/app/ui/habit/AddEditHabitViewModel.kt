@@ -12,6 +12,7 @@ import com.locke.app.data.repository.HabitRepository
 import com.locke.app.data.repository.PreferencesRepository
 import com.locke.app.domain.model.Habit
 import com.locke.app.domain.model.HabitKind
+import com.locke.app.domain.model.HabitList
 import com.locke.app.domain.model.HabitType
 import com.locke.app.domain.model.InstalledApp
 import com.locke.app.service.WorkScheduler
@@ -61,6 +62,10 @@ data class AddEditHabitUiState(
     val targetGithubUsername: String = "",
     /** [HabitType.TAG_SCAN] only: generated once, the first time this type is picked -- see [AddEditHabitViewModel.onTypeChanged]. */
     val tagPayload: String? = null,
+    /** Which [HabitList] this habit is partitioned into -- null means unpartitioned. */
+    val listId: Long? = null,
+    /** Every [HabitList] the user has defined, for the list picker. */
+    val lists: List<HabitList> = emptyList(),
     val isSaving: Boolean = false,
     val isNew: Boolean = true,
     val canDelete: Boolean = false,
@@ -155,6 +160,7 @@ class AddEditHabitViewModel @Inject constructor(
                         targetLocationLabel = habit.targetLocationLabel.orEmpty(),
                         targetGithubUsername = habit.targetGithubUsername.orEmpty(),
                         tagPayload = habit.tagPayload,
+                        listId = habit.listId,
                     )
                 }
                 // Hard mode only ever locks an *existing* gate -- a habit already
@@ -170,6 +176,11 @@ class AddEditHabitViewModel @Inject constructor(
         viewModelScope.launch {
             val apps = installedAppsProvider.getLaunchableApps()
             _uiState.value = _uiState.value.copy(installedApps = apps)
+        }
+        viewModelScope.launch {
+            habitRepository.observeLists().collect { lists ->
+                _uiState.value = _uiState.value.copy(lists = lists)
+            }
         }
     }
 
@@ -301,6 +312,19 @@ class AddEditHabitViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(targetGithubUsername = username)
     }
 
+    /** Tapping the already-selected list chip deselects back to unpartitioned -- see [AddEditHabitScreen]. */
+    fun onListSelected(listId: Long?) {
+        _uiState.value = _uiState.value.copy(listId = if (_uiState.value.listId == listId) null else listId)
+    }
+
+    /** Creates a new list and assigns this habit to it right away. */
+    fun onCreateList(name: String) {
+        viewModelScope.launch {
+            val id = habitRepository.createList(name)
+            if (id != null) _uiState.value = _uiState.value.copy(listId = id)
+        }
+    }
+
     fun onSave() {
         val state = _uiState.value
         if (!state.isValid || state.isSaving) return
@@ -341,6 +365,7 @@ class AddEditHabitViewModel @Inject constructor(
                         state.type == HabitType.GITHUB_CONTRIBUTION && it.isNotBlank()
                     },
                     tagPayload = state.tagPayload.takeIf { state.type == HabitType.TAG_SCAN },
+                    listId = state.listId,
                 ),
             )
             // The periodic worker behind each of these types is otherwise only ever
